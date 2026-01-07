@@ -1,0 +1,162 @@
+{
+  "forwards": {
+    "blocks": {
+      "shooting_scoring": [
+        "reg_shots_per60",
+        "reg_goals_per60",
+        "reg_assists_per60",
+        "reg_points_per60"
+      ],
+      "physical_disruption": [
+        "reg_hits_per60",
+        "reg_blocked_shots_per60",
+        "reg_takeaways_per60",
+        "reg_giveaways_per60"
+      ],
+      "discipline": [
+        "reg_pim_per60"
+      ],
+      "special_teams_usage": [
+        "reg_pp_share",
+        "reg_pk_share"
+      ],
+      "faceoffs": [
+        "reg_fo_pct",
+        "reg_fo_taken_per_game"
+      ]
+    },
+    "all_features": [
+      "reg_shots_per60",
+      "reg_goals_per60",
+      "reg_assists_per60",
+      "reg_points_per60",
+      "reg_hits_per60",
+      "reg_blocked_shots_per60",
+      "reg_takeaways_per60",
+      "reg_giveaways_per60",
+      "reg_pim_per60",
+      "reg_pp_share",
+      "reg_pk_share",
+      "reg_fo_pct",
+      "reg_fo_taken_per_game"
+    ],
+    "scaler": {
+      "median": {
+        "reg_shots_per60": 7.115970980969404,
+        "reg_goals_per60": 0.7783189836069744,
+        "reg_assists_per60": 1.0494366994186943,
+        "reg_points_per60": 1.8151537838622438,
+        "reg_hits_per60": 3.063457330415755,
+        "reg_blocked_shots_per60": 1.385414662305176,
+        "reg_takeaways_per60": 1.5517888677225133,
+        "reg_giveaways_per60": 1.6332752613240418,
+        "reg_pim_per60": 2.8223119438673514,
+        "reg_pp_share": 0.0,
+        "reg_pk_share": 0.0,
+        "reg_fo_pct": 0.0,
+        "reg_fo_taken_per_game": 0.0
+      },
+      "iqr": {
+        "reg_shots_per60": 2.9876631798562503,
+        "reg_goals_per60": 0.5841774288506824,
+        "reg_assists_per60": 0.7113067884478262,
+        "reg_points_per60": 1.239266492223627,
+        "reg_hits_per60": 4.170642908161355,
+        "reg_blocked_shots_per60": 1.120383938853792,
+        "reg_takeaways_per60": 0.81613204059546,
+        "reg_giveaways_per60": 1.1098172868793246,
+        "reg_pim_per60": 2.241720618841053,
+        "reg_pp_share": 1.0,
+        "reg_pk_share": 1.0,
+        "reg_fo_pct": 1.0,
+        "reg_fo_taken_per_game": 1.0
+      }
+    },
+    "filters": {
+      "min_reg_games": 5,
+      "min_reg_toi_s": 3600
+    },
+    "rows": 489,
+    "path": "data/features/X_forwards_20052006.parquet"
+  },
+  "defense": {
+    "blocks": {
+      "shooting_scoring": [
+        "reg_shots_per60",
+        "reg_goals_per60",
+        "reg_assists_per60",
+        "reg_points_per60"
+      ],
+      "physical_disruption": [
+        "reg_hits_per60",
+        "reg_blocked_shots_per60",
+        "reg_takeaways_per60",
+        "reg_giveaways_per60"
+      ],
+      "discipline": [
+        "reg_pim_per60"
+      ],
+      "special_teams_usage": [
+        "reg_pp_share",
+        "reg_pk_share"
+      ],
+      "faceoffs": [
+        "reg_fo_pct",
+        "reg_fo_taken_per_game"
+      ]
+    },
+    "all_features": [
+      "reg_shots_per60",
+      "reg_goals_per60",
+      "reg_assists_per60",
+      "reg_points_per60",
+      "reg_hits_per60",
+      "reg_blocked_shots_per60",
+      "reg_takeaways_per60",
+      "reg_giveaways_per60",
+      "reg_pim_per60",
+      "reg_pp_share",
+      "reg_pk_share",
+      "reg_fo_pct",
+      "reg_fo_taken_per_game"
+    ],
+    "scaler": {
+      "median": {
+        "reg_shots_per60": 3.5284876682883777,
+        "reg_goals_per60": 0.16055235585889688,
+        "reg_assists_per60": 0.6490709695999288,
+        "reg_points_per60": 0.7889404270030611,
+        "reg_hits_per60": 3.077131886004725,
+        "reg_blocked_shots_per60": 4.0620361698253475,
+        "reg_takeaways_per60": 0.9789965820203907,
+        "reg_giveaways_per60": 1.8213860357094527,
+        "reg_pim_per60": 2.9883740046203653,
+        "reg_pp_share": 0.0,
+        "reg_pk_share": 0.0,
+        "reg_fo_pct": 0.0,
+        "reg_fo_taken_per_game": 0.0
+      },
+      "iqr": {
+        "reg_shots_per60": 2.371639939694357,
+        "reg_goals_per60": 0.2839124821024355,
+        "reg_assists_per60": 0.5767974661078041,
+        "reg_points_per60": 0.7603354556099461,
+        "reg_hits_per60": 2.5391039079310196,
+        "reg_blocked_shots_per60": 1.91322294901609,
+        "reg_takeaways_per60": 0.6880422355432348,
+        "reg_giveaways_per60": 0.9406085289533701,
+        "reg_pim_per60": 1.8086641966193469,
+        "reg_pp_share": 1.0,
+        "reg_pk_share": 1.0,
+        "reg_fo_pct": 1.0,
+        "reg_fo_taken_per_game": 1.0
+      }
+    },
+    "filters": {
+      "min_reg_games": 5,
+      "min_reg_toi_s": 3600
+    },
+    "rows": 268,
+    "path": "data/features/X_defense_20052006.parquet"
+  }
+}
