@@ -428,11 +428,18 @@ def wrap_label(s: str, width: int = 16) -> str:
 # -------------------------
 # Data loading
 # -------------------------
-@st.cache_data
+@st.cache_data(ttl=3600)
+def load_parquet(path: str, mtime: float):
+    return pd.read_parquet(path)
+
+def read_parquet_fresh(path: str):
+    mtime = Path(path).stat().st_mtime
+    return load_parquet(path, mtime)
+    
 def load_group(group: str, season: str):
     return pd.read_parquet(DATA_DIR / f"players_{group}_{season}.parquet")
 
-@st.cache_data
+@st.cache_data(ttl=3600)
 def load_traits(group: str, season: str):
     p = REPORTS_DIR / f"archetype_traits_{group}_{season}.csv"
     if p.exists():
