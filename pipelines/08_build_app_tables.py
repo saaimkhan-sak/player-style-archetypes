@@ -4,7 +4,6 @@ import argparse
 from pathlib import Path
 from typing import Optional, Sequence
 
-import numpy as np
 import pandas as pd
 
 
@@ -15,12 +14,8 @@ def norm_pos(p: str) -> str:
     return p
 
 
-REQ_REG = [
-    "reg_games","reg_avg_toi_min","reg_goals","reg_assists","reg_points","reg_shots","reg_plus_minus","reg_pim"
-]
-REQ_PO = [
-    "po_games","po_avg_toi_min","po_goals","po_assists","po_points","po_shots","po_plus_minus","po_pim"
-]
+REQ_REG = ["reg_games","reg_avg_toi_min","reg_goals","reg_assists","reg_points","reg_shots","reg_plus_minus","reg_pim"]
+REQ_PO  = ["po_games","po_avg_toi_min","po_goals","po_assists","po_points","po_shots","po_plus_minus","po_pim"]
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -29,7 +24,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = ap.parse_args(argv)
     season = args.season_label
 
-    directory = pd.read_parquet("data/processed/player_directory.parquet")
+    # Use season-specific directory (full names) if available
+    dir_path = Path(f"data/processed/player_directory_{season}.parquet")
+    if not dir_path.exists():
+        raise FileNotFoundError(f"Missing {dir_path}. Run pipelines/06_build_player_directory.py --season_label {season} first.")
+    directory = pd.read_parquet(dir_path)
+
     teams = pd.read_parquet(f"data/processed/player_season_teams_{season}.parquet")
     stats = pd.read_parquet(f"data/features/player_season_boxscore_{season}.parquet")
 
@@ -49,13 +49,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         df["full_name"] = df["full_name"].fillna(df["player_id"].astype(str))
         df["teams_played"] = df["teams_played"].fillna(df.get("primary_team", "NA"))
 
-        # Ensure expected REG/PO columns exist even if season has no playoffs yet
+        # Ensure expected REG/PO columns exist even if no playoffs yet
         for c in REQ_REG + REQ_PO:
             if c not in df.columns:
                 df[c] = 0
-
-        # Ensure numeric types (prevents weird object columns)
-        for c in REQ_REG + REQ_PO:
             df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
         pcols = [c for c in df.columns if c.startswith("p") and c[1:].isdigit()]
@@ -65,14 +62,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
         keep = [
             "season","player_id","full_name","teams_played","position",
-            *REQ_REG,
-            *REQ_PO,
+            *REQ_REG, *REQ_PO,
             "top_cluster","confidence",
         ] + pcols
 
-        keep = [c for c in keep if c in df.columns]
         out = df[keep].copy()
-
         outpath = outdir / f"players_{group}_{season}.parquet"
         out.to_parquet(outpath, index=False)
         print(f"Saved {group}: {len(out):,} rows -> {outpath}")

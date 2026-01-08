@@ -1,0 +1,162 @@
+{
+  "forwards": {
+    "blocks": {
+      "shooting_scoring": [
+        "reg_shots_per60",
+        "reg_goals_per60",
+        "reg_assists_per60",
+        "reg_points_per60"
+      ],
+      "physical_disruption": [
+        "reg_hits_per60",
+        "reg_blocked_shots_per60",
+        "reg_takeaways_per60",
+        "reg_giveaways_per60"
+      ],
+      "discipline": [
+        "reg_pim_per60"
+      ],
+      "special_teams_usage": [
+        "reg_pp_share",
+        "reg_pk_share"
+      ],
+      "faceoffs": [
+        "reg_fo_pct",
+        "reg_fo_taken_per_game"
+      ]
+    },
+    "all_features": [
+      "reg_shots_per60",
+      "reg_goals_per60",
+      "reg_assists_per60",
+      "reg_points_per60",
+      "reg_hits_per60",
+      "reg_blocked_shots_per60",
+      "reg_takeaways_per60",
+      "reg_giveaways_per60",
+      "reg_pim_per60",
+      "reg_pp_share",
+      "reg_pk_share",
+      "reg_fo_pct",
+      "reg_fo_taken_per_game"
+    ],
+    "scaler": {
+      "median": {
+        "reg_shots_per60": NaN,
+        "reg_goals_per60": NaN,
+        "reg_assists_per60": NaN,
+        "reg_points_per60": NaN,
+        "reg_hits_per60": NaN,
+        "reg_blocked_shots_per60": NaN,
+        "reg_takeaways_per60": NaN,
+        "reg_giveaways_per60": NaN,
+        "reg_pim_per60": NaN,
+        "reg_pp_share": NaN,
+        "reg_pk_share": NaN,
+        "reg_fo_pct": NaN,
+        "reg_fo_taken_per_game": NaN
+      },
+      "iqr": {
+        "reg_shots_per60": NaN,
+        "reg_goals_per60": NaN,
+        "reg_assists_per60": NaN,
+        "reg_points_per60": NaN,
+        "reg_hits_per60": NaN,
+        "reg_blocked_shots_per60": NaN,
+        "reg_takeaways_per60": NaN,
+        "reg_giveaways_per60": NaN,
+        "reg_pim_per60": NaN,
+        "reg_pp_share": NaN,
+        "reg_pk_share": NaN,
+        "reg_fo_pct": NaN,
+        "reg_fo_taken_per_game": NaN
+      }
+    },
+    "filters": {
+      "min_reg_games": 5,
+      "min_reg_toi_s": 3600
+    },
+    "rows": 0,
+    "path": "data/features/X_forwards_19901991.parquet"
+  },
+  "defense": {
+    "blocks": {
+      "shooting_scoring": [
+        "reg_shots_per60",
+        "reg_goals_per60",
+        "reg_assists_per60",
+        "reg_points_per60"
+      ],
+      "physical_disruption": [
+        "reg_hits_per60",
+        "reg_blocked_shots_per60",
+        "reg_takeaways_per60",
+        "reg_giveaways_per60"
+      ],
+      "discipline": [
+        "reg_pim_per60"
+      ],
+      "special_teams_usage": [
+        "reg_pp_share",
+        "reg_pk_share"
+      ],
+      "faceoffs": [
+        "reg_fo_pct",
+        "reg_fo_taken_per_game"
+      ]
+    },
+    "all_features": [
+      "reg_shots_per60",
+      "reg_goals_per60",
+      "reg_assists_per60",
+      "reg_points_per60",
+      "reg_hits_per60",
+      "reg_blocked_shots_per60",
+      "reg_takeaways_per60",
+      "reg_giveaways_per60",
+      "reg_pim_per60",
+      "reg_pp_share",
+      "reg_pk_share",
+      "reg_fo_pct",
+      "reg_fo_taken_per_game"
+    ],
+    "scaler": {
+      "median": {
+        "reg_shots_per60": NaN,
+        "reg_goals_per60": NaN,
+        "reg_assists_per60": NaN,
+        "reg_points_per60": NaN,
+        "reg_hits_per60": NaN,
+        "reg_blocked_shots_per60": NaN,
+        "reg_takeaways_per60": NaN,
+        "reg_giveaways_per60": NaN,
+        "reg_pim_per60": NaN,
+        "reg_pp_share": NaN,
+        "reg_pk_share": NaN,
+        "reg_fo_pct": NaN,
+        "reg_fo_taken_per_game": NaN
+      },
+      "iqr": {
+        "reg_shots_per60": NaN,
+        "reg_goals_per60": NaN,
+        "reg_assists_per60": NaN,
+        "reg_points_per60": NaN,
+        "reg_hits_per60": NaN,
+        "reg_blocked_shots_per60": NaN,
+        "reg_takeaways_per60": NaN,
+        "reg_giveaways_per60": NaN,
+        "reg_pim_per60": NaN,
+        "reg_pp_share": NaN,
+        "reg_pk_share": NaN,
+        "reg_fo_pct": NaN,
+        "reg_fo_taken_per_game": NaN
+      }
+    },
+    "filters": {
+      "min_reg_games": 5,
+      "min_reg_toi_s": 3600
+    },
+    "rows": 0,
+    "path": "data/features/X_defense_19901991.parquet"
+  }
+}

@@ -46,7 +46,10 @@ def _name_piece(x: Any) -> str:
 
 def get_name(p: Dict[str, Any]) -> str:
     """
-    Prefer full first+last if available (avoids abbreviated 'A. Matthews' style strings).
+    Strong preference order:
+    1) firstName + lastName (dict or str)
+    2) fullName (if present)
+    3) name.default / name.en
     """
     first = _name_piece(p.get("firstName"))
     last = _name_piece(p.get("lastName"))
@@ -57,10 +60,11 @@ def get_name(p: Dict[str, Any]) -> str:
     if full:
         return full
 
+    nm = ""
     if isinstance(p.get("name"), dict):
-        nm = _name_piece(p["name"])
-        if nm:
-            return nm
+        nm = _name_piece(p.get("name"))
+    if nm:
+        return nm
 
     return ""
 
@@ -94,7 +98,6 @@ def extract_players_from_boxscore(box: Dict[str, Any], game_id: int, season: str
 
                 pos = norm_pos(p.get("position") or p.get("positionCode") or p.get("pos") or ("G" if group == "goalies" else "UNK"))
 
-                # Shots are typically SOG in this payload
                 sog = p.get("sog")
                 if sog is None:
                     sog = p.get("shotsOnGoal")
@@ -157,7 +160,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = ap.parse_args(argv)
 
     schedule = pd.read_parquet(args.schedule_parquet).sort_values(["game_date", "game_id"])
-    schedule = schedule[schedule["game_type"].isin([2, 3])].copy()  # ignore preseason
+    schedule = schedule[schedule["game_type"].isin([2, 3])].copy()
 
     game_type_map = dict(zip(schedule["game_id"].astype(int), schedule["game_type"].astype(int)))
 
