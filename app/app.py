@@ -432,10 +432,12 @@ def wrap_label(s: str, width: int = 16) -> str:
 def load_parquet(path: str, mtime: float):
     return pd.read_parquet(path)
 
+@st.cache_data(ttl=3600)
 def read_parquet_fresh(path: str):
     mtime = Path(path).stat().st_mtime
     return load_parquet(path, mtime)
-    
+
+@st.cache_data(ttl=3600)
 def load_group(group: str, season: str):
     return pd.read_parquet(DATA_DIR / f"players_{group}_{season}.parquet")
 
@@ -445,6 +447,40 @@ def load_traits(group: str, season: str):
     if p.exists():
         return pd.read_csv(p)
     return None
+
+@st.cache_data(ttl=3600)
+def load_all_seasons_group(group: str) -> pd.DataFrame:
+    """Load and concatenate app parquets for a group across all built seasons."""
+    frames = []
+    for sk in available_seasons():  # keys like "20242025"
+        path = DATA_DIR / f"players_{group}_{sk}.parquet"
+        if path.exists():
+            df = pd.read_parquet(path)
+            df["season"] = sk
+            frames.append(df)
+    if not frames:
+        return pd.DataFrame()
+    out = pd.concat(frames, ignore_index=True)
+    return out
+
+@st.cache_data(ttl=3600)
+def load_archetype_name_map_for_season(group: str, season_key: str) -> dict[int, str]:
+    """
+    Returns {cluster_id -> archetype_name} for a given season & group,
+    derived from that season's traits CSV (so names are season-specific).
+    """
+    p = REPORTS_DIR / f"archetype_traits_{group}_{season_key}.csv"
+    if not p.exists():
+        return {}
+    traits_df = pd.read_csv(p)
+    m = {}
+    for _, tr in traits_df.iterrows():
+        kk = int(tr["cluster"])
+        ht = parse_trait_string(tr.get("top_traits", ""))
+        lt = parse_trait_string(tr.get("low_traits", ""))
+        nm, _ = build_unique_name_summary(kk, ht, lt)
+        m[kk] = nm
+    return m
 
 # -------------------------
 # Page
@@ -465,6 +501,50 @@ else:
     season = st.sidebar.text_input("Season label", value="20242025", key="season_text")
 
 group = st.sidebar.selectbox("Group", ["forwards", "defense"], key="group_select")
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("Player evolution")
+
+player_query = st.sidebar.text_input(
+    "Search player (all seasons)",
+    value="",
+    key="player_search_all"
+)
+
+# Build player index from all seasons (group-specific)
+_all = load_all_seasons_group(group)
+
+player_id_selected = None
+player_label_selected = None
+
+if not _all.empty:
+    # Most recent row per player_id for nicer display
+    idx = (_all.sort_values("season")
+               .groupby("player_id", as_index=False)
+               .tail(1)
+               .copy())
+
+    idx["display"] = (idx["full_name"].astype(str) + " — " + idx["teams_played"] + " — " + idx["position"] + " — " + idx["season"].apply(season_key_to_label))
+
+    if player_query.strip():
+        matches = idx[idx["full_name"].str.contains(player_query, case=False, na=False)].copy()
+    else:
+        matches = idx.copy()
+
+    options = matches.sort_values(["full_name", "player_id"])["display"].tolist()
+
+    if options:
+        player_label_selected = st.sidebar.selectbox(
+            "Select player",
+            options,
+            index=0,
+            key="player_select_all"
+        )
+        # map label -> player_id
+        display_to_id = dict(zip(matches["display"], matches["player_id"].astype(int)))
+        player_id_selected = int(display_to_id[player_label_selected])
+else:
+    st.sidebar.caption("No multi-season data found yet in data/app/. Build more seasons first.")
 
 df = load_group(group, season)
 traits = load_traits(group, season)
@@ -576,7 +656,7 @@ if traits is not None:
         })
     make_legend_grid(pd.DataFrame(legend_rows).sort_values("Archetype"))
 
-tabs = st.tabs(["Player Explorer", "Team Roster Fit", "Need Finder"])
+tabs = st.tabs(["Player Explorer", "Team Roster Fit", "Need Finder", "Player Evolution"])
 
 # -------------------------
 # Player Explorer
@@ -953,3 +1033,83 @@ with tabs[2]:
         extra_styles={"Target similarity (%)": similarity_js_fixed_bins()},
         key_suffix=f"needfinder_target_{target}"
     )
+
+# -------------------------
+# Player Archetype Evolution
+# -------------------------
+
+with tabs[3]:
+    st.subheader("Player Evolution")
+
+    if player_id_selected is None:
+        st.info("Use the sidebar to search/select a player to view career archetype evolution.")
+    else:
+        st.write(f"Selected: **{player_label_selected}**")
+
+        hist = _all[_all["player_id"] == player_id_selected].copy()
+        if hist.empty:
+            st.warning("No rows found for this player in the selected group.")
+        else:
+            hist = hist.sort_values("season")
+            hist["Season"] = hist["season"].apply(season_key_to_label)
+
+            # Top archetype + season-specific name
+            def top_label(row):
+                k = int(row.get("top_cluster", 0))
+                names = load_archetype_name_map_for_season(group, row["season"])
+                nm = names.get(k, "Unknown archetype")
+                return f"A{k} — {nm}"
+
+            hist["Top archetype (season-specific)"] = hist.apply(top_label, axis=1)
+            hist["Confidence (%)"] = (hist["confidence"].astype(float) * 100).round(1)
+
+            # Mixedness: 1 - max probability (higher = more mixed)
+            hist["Mixedness"] = (1.0 - hist["confidence"].astype(float)).round(3)
+
+            st.markdown("""
+**How to read this**
+- **Top archetype (season-specific)** is the most likely archetype for that season’s model.
+- **Confidence (%)** is the probability assigned to the top archetype.
+- **Mixedness** increases when the player’s probability mass is spread across multiple archetypes.
+""")
+
+            # Chart: confidence over time
+            conf_chart = (
+                alt.Chart(hist)
+                .mark_line(point=True)
+                .encode(
+                    x=alt.X("Season:O", axis=alt.Axis(labelAngle=0), title="Season"),
+                    y=alt.Y("Confidence (%):Q", title="Top-archetype confidence (%)"),
+                    tooltip=["Season", "Top archetype (season-specific)", "Confidence (%)", "Mixedness"]
+                )
+                .properties(height=260)
+            )
+            st.altair_chart(conf_chart, use_container_width=True)
+
+            # Table: season-by-season summary
+            cols = ["Season", "teams_played", "reg_games", "reg_points", "Top archetype (season-specific)", "Confidence (%)", "Mixedness"]
+            cols = [c for c in cols if c in hist.columns]
+            show = hist[cols].rename(columns={"teams_played": "Teams", "reg_games": "REG GP", "reg_points": "REG P"})
+            st.dataframe(show, use_container_width=True, hide_index=True)
+
+            # Optional: show per-season probability distribution (top 3) in an expander
+            with st.expander("Show top-3 archetype probabilities by season", expanded=False):
+                rows = []
+                for _, r in hist.iterrows():
+                    names = load_archetype_name_map_for_season(group, r["season"])
+                    pcols = [c for c in r.index if isinstance(c, str) and c.startswith("p") and c[1:].isdigit()]
+                    probs = []
+                    for pc in pcols:
+                        k = int(pc[1:])
+                        probs.append((k, float(r[pc])))
+                    probs.sort(key=lambda x: x[1], reverse=True)
+                    top3 = probs[:3]
+                    for (k, pr) in top3:
+                        rows.append({
+                            "Season": season_key_to_label(r["season"]),
+                            "Archetype": f"A{k}",
+                            "Name": names.get(k, "Unknown"),
+                            "Prob (%)": round(pr * 100, 1),
+                        })
+                dist_df = pd.DataFrame(rows)
+                st.dataframe(dist_df, use_container_width=True, hide_index=True)
