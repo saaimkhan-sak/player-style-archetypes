@@ -1,6 +1,15 @@
-.DS_Store
+# environments
+.venv/
 __pycache__/
 *.pyc
-.venv/
-data/raw/
+
+# generated / large
+data/features/
+data/processed/
+models/
 logs/
+notebooks/
+
+# misc
+.DS_Store
+
