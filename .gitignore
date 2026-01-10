@@ -1,15 +1,13 @@
-# environments
-.venv/
+# generated / large (do not track)
+data/raw/
+data/features/
+data/processed/
+dir-structure.txt
+
+# python
 __pycache__/
 *.pyc
 
-# generated / large
-data/features/
-data/processed/
-models/
-logs/
-notebooks/
-
-# misc
-.DS_Store
+# venv
+.venv/
 
