@@ -506,6 +506,41 @@ else:
 
 group = st.sidebar.selectbox("Group", ["forwards", "defense"], key="group_select")
 
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+ET_TZ = ZoneInfo("America/New_York")
+
+def get_last_updated_ts(season_key: str) -> datetime | None:
+    """
+    Returns the most recent modification time (as UTC-aware datetime)
+    among the files the app serves for this season.
+    """
+    repo_root = Path(__file__).resolve().parents[2]  # app/pages -> app -> repo root
+
+    candidates = [
+        repo_root / f"data/app/players_forwards_{season_key}.parquet",
+        repo_root / f"data/app/players_defense_{season_key}.parquet",
+        repo_root / f"reports/archetype_traits_forwards_{season_key}.csv",
+        repo_root / f"reports/archetype_traits_defense_{season_key}.csv",
+        repo_root / f"data/processed/schedule_{season_key}.parquet",
+    ]
+
+    mtimes = [p.stat().st_mtime for p in candidates if p.exists()]
+    if not mtimes:
+        return None
+
+    return datetime.fromtimestamp(max(mtimes), tz=timezone.utc)
+
+def fmt_updated_et(ts: datetime | None) -> str:
+    if ts is None:
+        return "unknown"
+    return ts.astimezone(ET_TZ).strftime("%Y-%m-%d %H:%M %Z")
+
+season_key = str(season).replace("-", "")  # works for "20252026" and "2025-2026"
+last_updated_ts = get_last_updated_ts(season_key)
+st.sidebar.caption(f"Last updated: {fmt_updated_et(last_updated_ts)}")
+
 
 df = load_group(group, season)
 traits = load_traits(group, season)
@@ -987,9 +1022,3 @@ with tabs[2]:
         key_suffix=f"needfinder_target_{target}"
     )
 
-st.sidebar.caption(
-    "Data updated: " +
-    datetime.datetime.fromtimestamp(
-        Path(f"data/app/players_{group}_{season}.parquet").stat().st_mtime
-    ).strftime("%Y-%m-%d %H:%M:%S")
-)

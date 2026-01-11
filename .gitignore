@@ -4,9 +4,3 @@ __pycache__/
 .venv/
 data/raw/
 logs/
-
-# Ignore all processed outputs by default
-data/processed/*
-
-# ...but keep season schedules trackable (used by GH Actions update)
-!data/processed/schedule_*.parquet
