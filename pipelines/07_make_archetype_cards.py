@@ -1,122 +1,304 @@
+# pipelines/07_make_archetype_cards.py
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
 
 
-# Interpret archetypes using REGULAR SEASON features (more stable, higher sample size)
-FEATURES = [
-    "reg_shots_per60", "reg_goals_per60", "reg_assists_per60", "reg_points_per60",
-    "reg_hits_per60", "reg_blocked_shots_per60", "reg_takeaways_per60", "reg_giveaways_per60",
-    "reg_pim_per60",
-    "reg_pp_share", "reg_pk_share",
-    "reg_fo_pct", "reg_fo_taken_per_game",
-]
+REPORTS_DIR = Path("reports")
+PROCESSED_DIR = Path("data/processed")
+FEATURES_DIR = Path("data/features")
 
 
-def zscore_cols(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
-    out = df.copy()
-    for c in cols:
-        mu = out[c].mean()
-        sd = out[c].std(ddof=0)
-        if sd == 0 or np.isnan(sd):
-            out[c + "_z"] = 0.0
+def _find_player_id_col(df: pd.DataFrame) -> str:
+    for c in ["player_id", "playerId", "id"]:
+        if c in df.columns:
+            return c
+    raise KeyError("Could not find a player id column (expected one of: player_id, playerId, id).")
+
+
+def _prob_cols(df: pd.DataFrame) -> List[str]:
+    p = [c for c in df.columns if isinstance(c, str) and re.fullmatch(r"p\d+", c)]
+    p.sort(key=lambda x: int(x[1:]))
+    return p
+
+
+def _ensure_season(df: pd.DataFrame, season: str) -> pd.DataFrame:
+    if "season" not in df.columns:
+        df = df.copy()
+        df["season"] = season
+    return df
+
+
+def _read_first_existing(paths: List[Path]) -> Optional[pd.DataFrame]:
+    for p in paths:
+        if p.exists():
+            return pd.read_parquet(p)
+    return None
+
+
+def _load_directory(season: str) -> pd.DataFrame:
+    """
+    Returns a df with at least: player_id, full_name, position (if available).
+    """
+    df = _read_first_existing([
+        PROCESSED_DIR / f"player_directory_{season}.parquet",
+        PROCESSED_DIR / "player_directory.parquet",
+    ])
+    if df is None:
+        return pd.DataFrame(columns=["player_id", "full_name", "position"])
+
+    pid = _find_player_id_col(df)
+    out = df.rename(columns={pid: "player_id"}).copy()
+    if "full_name" not in out.columns:
+        out["full_name"] = ""
+    if "position" not in out.columns:
+        out["position"] = ""
+    return out[["player_id", "full_name", "position"]].drop_duplicates("player_id")
+
+
+def _load_player_season_teams(season: str) -> pd.DataFrame:
+    """
+    Returns df with: season, player_id, teams_played, primary_team (if available)
+    """
+    df = _read_first_existing([
+        PROCESSED_DIR / f"player_season_teams_{season}.parquet",
+        PROCESSED_DIR / "player_season_teams.parquet",
+    ])
+    if df is None:
+        return pd.DataFrame(columns=["season", "player_id", "teams_played", "primary_team"])
+
+    pid = _find_player_id_col(df)
+    out = df.rename(columns={pid: "player_id"}).copy()
+    out = _ensure_season(out, season)
+
+    # Some files might contain multiple seasons; filter if so
+    if "season" in out.columns:
+        out = out[out["season"].astype(str) == str(season)].copy()
+
+    if "teams_played" not in out.columns:
+        out["teams_played"] = ""
+    if "primary_team" not in out.columns:
+        out["primary_team"] = ""
+
+    return out[["season", "player_id", "teams_played", "primary_team"]].drop_duplicates(["season", "player_id"])
+
+
+def _load_archetypes(group: str, season: str) -> pd.DataFrame:
+    p = PROCESSED_DIR / f"archetypes_{group}_{season}.parquet"
+    if not p.exists():
+        raise FileNotFoundError(f"Missing archetypes file: {p}")
+    df = pd.read_parquet(p)
+    pid = _find_player_id_col(df)
+    df = df.rename(columns={pid: "player_id"})
+    df = _ensure_season(df, season)
+
+    pcols = _prob_cols(df)
+    if not pcols:
+        raise ValueError(f"No probability columns p0..pK found in {p}")
+
+    if "top_cluster" not in df.columns:
+        df = df.copy()
+        df["top_cluster"] = df[pcols].idxmax(axis=1).str[1:].astype(int)
+
+    if "confidence" not in df.columns:
+        df = df.copy()
+        df["confidence"] = df[pcols].max(axis=1).astype(float)
+
+    return df
+
+
+def _load_features(group: str, season: str) -> pd.DataFrame:
+    """
+    Loads the feature matrix produced by pipeline 04 (preferred),
+    otherwise tries to fall back to archetypes parquet if it already contains features.
+    """
+    p = FEATURES_DIR / f"X_{group}_{season}.parquet"
+    if p.exists():
+        df = pd.read_parquet(p)
+        pid = _find_player_id_col(df)
+        df = df.rename(columns={pid: "player_id"})
+        df = _ensure_season(df, season)
+        return df
+
+    # Fallback: if no X file, we still try to proceed with empty features
+    return pd.DataFrame(columns=["season", "player_id"])
+
+
+def _feature_cols(df: pd.DataFrame) -> List[str]:
+    """
+    Pick numeric feature columns, excluding obvious non-features.
+    """
+    exclude = {
+        "season", "player_id", "full_name", "position", "teams_played", "primary_team",
+        "top_cluster", "confidence",
+    }
+    # exclude pK columns
+    for c in df.columns:
+        if isinstance(c, str) and re.fullmatch(r"p\d+", c):
+            exclude.add(c)
+
+    cols = []
+    for c in df.columns:
+        if c in exclude:
+            continue
+        if pd.api.types.is_numeric_dtype(df[c]):
+            cols.append(c)
+    return cols
+
+
+def _weighted_trait_zscores(
+    merged: pd.DataFrame,
+    pcol: str,
+    feat_cols: List[str],
+    eps: float = 1e-9,
+) -> pd.Series:
+    """
+    Probability-weighted mean per feature for archetype k,
+    converted into z-score vs overall population.
+    """
+    X = merged[feat_cols].astype(float)
+
+    # overall mean/std
+    mu = X.mean(axis=0)
+    sd = X.std(axis=0, ddof=0).replace(0.0, np.nan)
+
+    w = merged[pcol].astype(float).to_numpy()
+    wsum = float(np.nansum(w))
+
+    if not np.isfinite(wsum) or wsum <= eps:
+        # fallback: unweighted
+        wm = X.mean(axis=0)
+    else:
+        wm = (X.mul(w, axis=0).sum(axis=0) / wsum)
+
+    z = (wm - mu) / (sd + eps)
+    z = z.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    return z
+
+
+def _fmt_traits(z: pd.Series, n: int, reverse: bool) -> str:
+    s = z.sort_values(ascending=not reverse).head(n)
+    parts = [f"{idx}({val:+.2f})" for idx, val in s.items()]
+    return ",".join(parts)
+
+
+def _format_prototypes(
+    merged_meta: pd.DataFrame,
+    pcol: str,
+    n: int = 8,
+) -> str:
+    """
+    merged_meta should already include: full_name, primary_team/teams_played
+    """
+    tmp = merged_meta.copy()
+    tmp[pcol] = tmp[pcol].astype(float)
+
+    tmp = tmp.sort_values(pcol, ascending=False).head(n)
+
+    out = []
+    for r in tmp.itertuples(index=False):
+        name = getattr(r, "full_name", "") or ""
+        pid = getattr(r, "player_id")
+        team = getattr(r, "primary_team", "") or getattr(r, "teams_played", "") or ""
+        prob = getattr(r, pcol)
+
+        label = name.strip() if str(name).strip() else str(pid)
+        if str(team).strip():
+            label = f"{label} ({team})"
+        out.append(f"{label} p={float(prob):.3f}")
+    return " | ".join(out)
+
+
+def build_cards_for_group(group: str, season: str, top_n_traits: int, low_n_traits: int, n_prototypes: int) -> pd.DataFrame:
+    arch = _load_archetypes(group, season)
+    feats = _load_features(group, season)
+
+    pcols = _prob_cols(arch)
+    K = len(pcols)
+
+    # Merge for traits computation
+    feat_cols = _feature_cols(feats)
+    merged = arch[["season", "player_id"] + pcols].merge(
+        feats[["season", "player_id"] + feat_cols],
+        on=["season", "player_id"],
+        how="inner",
+    )
+
+    # Merge for prototype display (names + teams)
+    directory = _load_directory(season)
+    teams = _load_player_season_teams(season)
+
+    merged_meta = arch[["season", "player_id"] + pcols].merge(directory, on="player_id", how="left")
+    merged_meta = merged_meta.merge(teams, on=["season", "player_id"], how="left")
+
+    # Fill safe defaults
+    for c in ["full_name", "position", "teams_played", "primary_team"]:
+        if c not in merged_meta.columns:
+            merged_meta[c] = ""
+        merged_meta[c] = merged_meta[c].fillna("")
+
+    rows = []
+    for k in range(K):
+        pcol = f"p{k}"
+        if pcol not in merged.columns:
+            continue
+
+        if feat_cols:
+            z = _weighted_trait_zscores(merged, pcol, feat_cols)
+            top_traits = _fmt_traits(z, top_n_traits, reverse=True)
+            low_traits = _fmt_traits(z, low_n_traits, reverse=False)
         else:
-            out[c + "_z"] = (out[c] - mu) / sd
+            top_traits = ""
+            low_traits = ""
+
+        prototypes = _format_prototypes(merged_meta, pcol, n=n_prototypes)
+
+        rows.append({
+            "cluster": k,
+            "top_traits": top_traits,
+            "low_traits": low_traits,
+            "prototype_players": prototypes,
+        })
+
+    out = pd.DataFrame(rows).sort_values("cluster").reset_index(drop=True)
     return out
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    ap = argparse.ArgumentParser(description="Make archetype cards/traits from GMM outputs + REG player-season features.")
-    ap.add_argument("--season_label", required=True)
+    ap = argparse.ArgumentParser(description="Create season-specific archetype trait cards for the Streamlit app.")
+    ap.add_argument("--season_label", required=True, help="Season key like 20252026")
+    ap.add_argument("--groups", nargs="*", default=["forwards", "defense"], choices=["forwards", "defense"])
+    ap.add_argument("--top_n_traits", type=int, default=6)
+    ap.add_argument("--low_n_traits", type=int, default=4)
+    ap.add_argument("--n_prototypes", type=int, default=8)
     args = ap.parse_args(argv)
-    season = args.season_label
 
-    directory = pd.read_parquet("data/processed/player_directory.parquet")
-    teams = pd.read_parquet(f"data/processed/player_season_teams_{season}.parquet")
-    base = pd.read_parquet(f"data/features/player_season_boxscore_{season}.parquet")
+    season = str(args.season_label)
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Ensure features exist
-    for c in FEATURES:
-        if c not in base.columns:
-            base[c] = 0.0
-        base[c] = pd.to_numeric(base[c], errors="coerce").fillna(0.0)
+    for group in args.groups:
+        print(f"\n[07_make_archetype_cards] Building traits for {group} {season}...")
+        try:
+            cards = build_cards_for_group(
+                group=group,
+                season=season,
+                top_n_traits=args.top_n_traits,
+                low_n_traits=args.low_n_traits,
+                n_prototypes=args.n_prototypes,
+            )
+        except Exception as e:
+            print(f"  ⚠️  Skipping {group} {season}: {e}")
+            continue
 
-    outdir = Path("reports")
-    outdir.mkdir(parents=True, exist_ok=True)
-
-    for group in ["forwards", "defense"]:
-        arch = pd.read_parquet(f"data/processed/archetypes_{group}_{season}.parquet")
-
-        # Merge by (season, player_id) to avoid position-code mismatch dropping rows
-        merged = (
-            arch.merge(directory, on="player_id", how="left")
-                .merge(teams, on=["season", "player_id"], how="left")
-                .merge(base[["season", "player_id"] + FEATURES], on=["season", "player_id"], how="left")
-        )
-
-        merged["full_name"] = merged["full_name"].fillna(merged["player_id"].astype(str))
-        merged["teams_played"] = merged["teams_played"].fillna(merged.get("primary_team", "NA"))
-
-        pcols = [c for c in merged.columns if c.startswith("p") and c[1:].isdigit()]
-        if not pcols:
-            raise RuntimeError("No probability columns p0..pK found in archetypes output.")
-
-        K = len(pcols)
-
-        cards = []
-        for k in range(K):
-            w = pd.to_numeric(merged[f"p{k}"], errors="coerce").fillna(0.0).to_numpy()
-            if w.sum() <= 0:
-                w = np.ones_like(w)
-
-            means = {feat: float(np.average(merged[feat].to_numpy(dtype=float), weights=w)) for feat in FEATURES}
-
-            prot = merged.sort_values(f"p{k}", ascending=False).head(12)
-            prot_list = []
-            for r in prot.itertuples(index=False):
-                name = getattr(r, "full_name", None) or str(getattr(r, "player_id"))
-                tp = getattr(r, "teams_played", None) or "NA"
-                pk = getattr(r, f"p{k}")
-                prot_list.append(f"{name} ({tp}) p={pk:.2f}")
-
-            cards.append({
-                "cluster": k,
-                "soft_size": float(pd.Series(w).sum()),
-                **means,
-                "prototype_players": " | ".join(prot_list),
-            })
-
-        cards_df = pd.DataFrame(cards)
-        zdf = zscore_cols(cards_df, FEATURES)
-
-        trait_rows = []
-        for r in zdf.itertuples(index=False):
-            zcols = [(c, getattr(r, c + "_z")) for c in FEATURES]
-            top = sorted(zcols, key=lambda x: x[1], reverse=True)[:4]
-            bot = sorted(zcols, key=lambda x: x[1])[:3]
-            trait_rows.append({
-                "cluster": int(r.cluster),
-                "soft_size": float(r.soft_size),
-                "top_traits": ", ".join([f"{c}({z:+.2f})" for c, z in top]),
-                "low_traits": ", ".join([f"{c}({z:+.2f})" for c, z in bot]),
-                "prototype_players": r.prototype_players,
-            })
-
-        traits = pd.DataFrame(trait_rows).sort_values("cluster")
-
-        cards_path = outdir / f"archetype_cards_{group}_{season}.csv"
-        traits_path = outdir / f"archetype_traits_{group}_{season}.csv"
-        cards_df.to_csv(cards_path, index=False)
-        traits.to_csv(traits_path, index=False)
-
-        print(f"\n[{group.upper()}] saved:")
-        print(f"- {cards_path}")
-        print(f"- {traits_path}")
+        out_path = REPORTS_DIR / f"archetype_traits_{group}_{season}.csv"
+        cards.to_csv(out_path, index=False)
+        print(f"  ✅ Wrote {out_path} ({len(cards)} archetypes)")
 
     return 0
 
