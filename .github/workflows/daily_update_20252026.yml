@@ -32,6 +32,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Restore raw game cache (20252026)
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/raw/season/20252026/games
+            data/raw/season_schedules/20252026
+            data/raw/player_landing/20252026
+          key: raw-20252026-${{ github.run_id }}
+          restore-keys: |
+            raw-20252026-
+
       - name: Update current season
         run: |
           bash scripts/update_20252026.sh
