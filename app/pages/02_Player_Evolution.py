@@ -261,23 +261,24 @@ def show_multiline_table(df: pd.DataFrame, height: int = 420):
 # ----------------------------
 with st.expander("Understanding the Evolution of a Player's Archetype", expanded=False):
     st.markdown("""
-### How to use this tool
-When you search and select a player, the dropdown shows their **name**, **position**, and the **most recent season in my dataset** for that player (e.g., 2024–2025).  
-That “most recent season played” helps you confirm you selected the current/latest version of the player.
+### How to Use This Tool
+When you search and select a player, the dropdown shows their **name**, **position**, and the **most recent season in the dataset** for that player (i.e. 2024–2025).  
 
-### What you can interpret from evolution
+### What Does the Evolution Really Mean?
 - **Stable top archetype + high confidence** → consistent role/style across years  
 - **Shifts in top archetype** → role changes, team/system changes, aging, or deployment changes  
 - **Lower confidence** → “mixed profile” seasons where the player blends multiple archetype patterns
 
-### Mixedness (definition)
+### What is Mixedness?
+In this table, you will see a value for each player called "mixedness". What is that? 
+
 I define **Mixedness** as:
 """)
     st.latex(r"\text{Mixedness} = 1 - \max_k(p_{ik})")
     st.markdown("where **maxₖ(pᵢₖ)** is the probability of the player’s **top archetype** that season.")
     st.markdown("""
 - Mixedness near **0.00** → the model is very confident the player fits a single archetype  
-- Mixedness near **0.40** (or higher) → the player blends multiple archetypes (probability mass is spread out)
+- Mixedness >= **0.40** → the player blends multiple archetypes (probability mass is spread out)
 """)
 
 # ----------------------------
@@ -512,7 +513,7 @@ with c1:
     st.metric("Seasons in dataset", len(hist))
 
 with c2:
-    st.metric("Avg top-confidence", f"{avg_conf:.1f}%")
+    st.metric("Avg confidence", f"{avg_conf:.1f}%")
 
 with c2chip:
     # vertical spacing so chip sits centered next to the big number

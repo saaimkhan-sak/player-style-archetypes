@@ -4,10 +4,12 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 from pathlib import Path
+import datetime
+
 
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
 
-st.set_page_config(page_title="Quantifying Player Style Archetypes", layout="wide")
+st.set_page_config(page_title="Season-Level Analysis", layout="wide")
 
 import datetime, hashlib
 try:
@@ -17,6 +19,8 @@ except Exception:
 
 DATA_DIR = Path("data/app")
 REPORTS_DIR = Path("reports")
+
+
 
 def available_seasons() -> list[str]:
     # seasons are inferred from built app parquet files
@@ -485,7 +489,7 @@ def load_archetype_name_map_for_season(group: str, season_key: str) -> dict[int,
 # -------------------------
 # Page
 # -------------------------
-st.title("Quantifying Player Style Archetypes")
+st.title("Season by Season Breakdown")
 
 
 season_keys = available_seasons()  # e.g. ["20242025","20232024",...], newest first
@@ -526,16 +530,7 @@ conf_q67 = float(_conf.quantile(0.67)) if len(_conf) else 90.0
 # -------------------------
 # Full intro section you referenced (restored)
 # -------------------------
-with st.expander("What is a 'Player Archetype' and How is it Calculated?", expanded=False):
-
-    st.markdown(
-        """
-In hockey, we often talk about a player's "identity" - enforcer or finisher or playmaker or even "two-way guy". 
-It's one of hockey's most treasured features because what often separates an NHL/AHL tweener from an NHL regular or even an NHL great is being able to develop and truly own their identity.
-
-**But, is identity truly a data-indpendent property or can we generate a data-driven approach to assigning identity?** That is the core question I sought to answer here.
-"""
-    )
+with st.expander("A Quick Review of How Player Archetype is Calculated", expanded=False):
 
     st.subheader("Data used")
     st.markdown(
@@ -559,16 +554,16 @@ Each data point contributes to “style” like this:
     st.markdown("I also compute special-teams usage share:")
     st.latex(r"\text{PP Share}=\frac{\text{PP TOI}}{\text{Total TOI}} \qquad \text{PK Share}=\frac{\text{PK TOI}}{\text{Total TOI}}")
 
-    st.subheader("Step 2 — Put every feature on the same scale (robust scaling)")
+    st.subheader("Step 2 — Put every feature on the same scale")
     st.markdown("To keep extreme values from dominating the model, I robust-scale each feature:")
     st.latex(r"x^{*}=\frac{x-\mathrm{median}(x)}{\mathrm{IQR}(x)}")
 
-    st.subheader("Step 3 — Compress the stats into a smaller “style fingerprint” (NMF)")
+    st.subheader("Step 3 — Compress the stats into a smaller “style fingerprint”")
     st.markdown("I reduce each skill block using Non-negative Matrix Factorization (NMF):")
     st.latex(r"X \approx WH")
     st.markdown("You can think of each row of **W** as a compact *style fingerprint* for that player.")
 
-    st.subheader("Step 4 — Learn archetypes and assign probabilities (GMM)")
+    st.subheader("Step 4 — Learn archetypes and assign probabilities")
     st.markdown("I fit a Gaussian Mixture Model (GMM) to those fingerprints:")
     st.latex(r"p(z)=\sum_{k=1}^{K}\pi_k\,\mathcal{N}(z\mid \mu_k,\Sigma_k)")
     st.markdown("For each player \(i\), the model outputs a probability for each archetype:")
@@ -592,7 +587,7 @@ st.markdown(
     f"## For the {season_key_to_label(season)} season, the model found **K = {K}** archetypes (A0–A{K-1})."
 )
 st.markdown(
-    "Every season, the model comes up with different archetype definitions. So an A0 archetype in one season might be a Puck Pressure Two-Way Creator but in another season, A0 might be an Agitating Heavy-Contact Forward. The table below explains what each archetype “means” for this season’s model."
+    "Every season, the model comes up with different archetype definitions. So an **A0** archetype in one season might be a **Puck Pressure Two-Way Creator** but in another season, **A0** might be an **Agitating Heavy-Contact Forward.** The table below breaks down each archetype for this season’s model."
 )
 
 st.markdown(f"### Archetype definitions — {season_key_to_label(season)}")
@@ -991,3 +986,10 @@ with tabs[2]:
         extra_styles={"Target similarity (%)": similarity_js_fixed_bins()},
         key_suffix=f"needfinder_target_{target}"
     )
+
+st.sidebar.caption(
+    "Data updated: " +
+    datetime.datetime.fromtimestamp(
+        Path(f"data/app/players_{group}_{season}.parquet").stat().st_mtime
+    ).strftime("%Y-%m-%d %H:%M:%S")
+)
