@@ -4,3 +4,7 @@ __pycache__/
 .venv/
 data/raw/
 logs/
+data/processed/
+data/features/
+data/raw/
+
