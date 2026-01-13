@@ -2,7 +2,7 @@ name: Daily Update 2025-2026
 
 on:
   schedule:
-    # GitHub Actions cron uses UTC.
+    # GitHub Actions cron is UTC.
     # 09:30 UTC = 04:30 America/New_York during EST (winter).
     - cron: "30 9 * * *"
   workflow_dispatch: {}
@@ -52,6 +52,7 @@ jobs:
         run: |
           echo "END_DATE=$(date +%F)" >> $GITHUB_OUTPUT
           echo "START_DATE=$(date -d '2 days ago' +%F)" >> $GITHUB_OUTPUT
+          echo "Computed window:"
           echo "START_DATE=$(date -d '2 days ago' +%F)"
           echo "END_DATE=$(date +%F)"
 
@@ -67,22 +68,25 @@ jobs:
         run: |
           SCHEDULE="data/processed/schedule_${SEASON_LABEL}_${{ steps.window.outputs.START_DATE }}_${{ steps.window.outputs.END_DATE }}.parquet"
 
+          echo "Expecting: $SCHEDULE"
           if [ -f "$SCHEDULE" ]; then
             echo "schedule_parquet=$SCHEDULE" >> $GITHUB_OUTPUT
             echo "Using schedule parquet: $SCHEDULE"
             exit 0
           fi
 
-          # Fallback: pick the newest schedule parquet for this season (in case your naming differs)
+          echo "Expected file not found. Listing candidates:"
+          ls -lah data/processed || true
+          ls -1 data/processed/schedule_${SEASON_LABEL}_*.parquet 2>/dev/null || true
+
           FOUND="$(ls -1t data/processed/schedule_${SEASON_LABEL}_*.parquet 2>/dev/null | head -n 1 || true)"
           if [ -n "$FOUND" ] && [ -f "$FOUND" ]; then
             echo "schedule_parquet=$FOUND" >> $GITHUB_OUTPUT
-            echo "Expected file not found; using newest schedule parquet: $FOUND"
+            echo "Falling back to newest schedule parquet: $FOUND"
             exit 0
           fi
 
-          echo "Could not find schedule parquet in data/processed."
-          ls -lah data/processed || true
+          echo "Could not find any schedule parquet to pass into 02_pull_game_data.py."
           exit 1
 
       - name: Pull/process game data (from schedule parquet)
@@ -91,19 +95,8 @@ jobs:
             --schedule_parquet "${{ steps.schedule.outputs.schedule_parquet }}" \
             --season_label "${SEASON_LABEL}"
 
-      - name: Run any downstream build/aggregation (optional)
-        run: |
-          if [ -f pipelines/03_build_app_tables.py ]; then
-            python pipelines/03_build_app_tables.py --season_label "${SEASON_LABEL}"
-          else
-            echo "No pipelines/03_build_app_tables.py found. Skipping."
-          fi
-
       - name: Commit and push changes (if any)
         run: |
-          set -e
-          git status --porcelain
-
           if [ -z "$(git status --porcelain)" ]; then
             echo "No changes to commit."
             exit 0
@@ -113,5 +106,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git add -A
-          git commit -m "Daily update: ${SEASON_LABEL} (last 48h schedule) [skip ci]"
+          git commit -m "Daily update: ${SEASON_LABEL} (last 48h) [skip ci]"
           git push
