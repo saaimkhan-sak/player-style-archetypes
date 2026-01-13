@@ -123,11 +123,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          SEASON="${{ steps.season.outputs.season_label }}"
 
-          # Run the rest of the pipeline. If some steps are intentionally optional,
-          # keep them "|| true" — otherwise let them fail loudly.
-          python pipelines/02_pull_game_data.py --season_label "${SEASON}"
+          SEASON="${{ steps.season.outputs.season_label }}"
+          START="${{ steps.season.outputs.start }}"
+          END="${{ steps.season.outputs.end }}"
+
+          SCHEDULE_PARQUET="data/processed/schedule_${SEASON}_${START}_${END}.parquet"
+
+          if [ ! -f "${SCHEDULE_PARQUET}" ]; then
+            echo "ERROR: schedule parquet not found: ${SCHEDULE_PARQUET}"
+            echo "Available schedules in data/processed:"
+            ls -ლა data/processed || true
+            exit 1
+          fi
+
+          python pipelines/02_pull_game_data.py \
+            --season_label "${SEASON}" \
+            --schedule_parquet "${SCHEDULE_PARQUET}"
+
           python pipelines/03_build_player_season_features_boxscore.py --season_label "${SEASON}"
           python pipelines/04_build_model_matrices.py --season_label "${SEASON}"
           python pipelines/05_fit_nmf_gmm.py --season_label "${SEASON}"
