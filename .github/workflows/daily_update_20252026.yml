@@ -40,13 +40,16 @@ jobs:
             data/raw/season_schedules/20252026
             data/raw/player_landing/20252026
             data/processed
+            data/features
           key: raw-20252026-${{ github.run_id }}
           restore-keys: |
             raw-20252026-
 
+      - name: Build player-season boxscore features (2025-2026)
+        run: python pipelines/03_build_player_season_features_boxscore.py --season_label 20252026
+
       - name: Build player directory (2025-2026)
         run: python pipelines/06_build_player_directory.py --season_label 20252026
-
 
       - name: Build app tables (2025-2026)
         run: python pipelines/08_build_app_tables.py --season_label 20252026
