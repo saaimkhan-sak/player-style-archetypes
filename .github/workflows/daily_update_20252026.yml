@@ -39,6 +39,7 @@ jobs:
             data/raw/season/20252026/games
             data/raw/season_schedules/20252026
             data/raw/player_landing/20252026
+            data/processed
           key: raw-20252026-${{ github.run_id }}
           restore-keys: |
             raw-20252026-
