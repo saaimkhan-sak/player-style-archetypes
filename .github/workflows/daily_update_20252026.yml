@@ -43,9 +43,9 @@ jobs:
           restore-keys: |
             raw-20252026-
 
-      - name: Update current season
-        run: |
-          bash scripts/update_20252026.sh
+      - name: Build app tables (2025-2026)
+        run: python pipelines/08_build_app_tables.py --season_label 20252026
+
 
       - name: Commit & push changes
         run: |
