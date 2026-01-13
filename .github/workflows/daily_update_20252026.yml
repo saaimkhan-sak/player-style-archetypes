@@ -32,7 +32,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Restore raw game cache (20252026)
+      - name: Restore raw/game cache (20252026)
         uses: actions/cache@v4
         with:
           path: |
@@ -41,12 +41,60 @@ jobs:
             data/raw/player_landing/20252026
             data/processed
             data/features
-          key: raw-20252026-${{ github.run_id }}
+          key: raw-20252026-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
           restore-keys: |
+            raw-20252026-${{ runner.os }}-
             raw-20252026-
 
+      # Ensures data/processed/schedule_20252026.parquet exists.
+      # If your repo uses a different pipeline name for schedule creation,
+      # add it to the list below.
+      - name: Ensure schedule parquet exists (2025-2026)
+        run: |
+          set -euo pipefail
+          SCHED="data/processed/schedule_20252026.parquet"
+
+          if [ -f "$SCHED" ]; then
+            echo "Found schedule parquet: $SCHED"
+            exit 0
+          fi
+
+          echo "Schedule parquet missing: $SCHED"
+          echo "Attempting to build schedule for season 20252026..."
+
+          CANDIDATES=(
+            "pipelines/01_build_season_schedule.py"
+            "pipelines/01_build_schedule.py"
+            "pipelines/02_build_season_schedule.py"
+            "pipelines/02_build_schedule.py"
+            "pipelines/00_build_schedule.py"
+          )
+
+          for s in "${CANDIDATES[@]}"; do
+            if [ -f "$s" ]; then
+              echo "Trying: $s"
+              python "$s" --season_label 20252026 || true
+            fi
+            if [ -f "$SCHED" ]; then
+              echo "Built schedule parquet: $SCHED"
+              break
+            fi
+          done
+
+          if [ ! -f "$SCHED" ]; then
+            echo "ERROR: Still missing $SCHED after attempts."
+            echo "Pipelines present:"
+            ls -la pipelines || true
+            echo "Processed dir contents:"
+            ls -la data/processed || true
+            exit 1
+          fi
+
       - name: Build player-season boxscore features (2025-2026)
-        run: python pipelines/03_build_player_season_features_boxscore.py --season_label 20252026
+        run: |
+          python pipelines/03_build_player_season_features_boxscore.py \
+            --season_label 20252026 \
+            --schedule_parquet data/processed/schedule_20252026.parquet
 
       - name: Build player directory (2025-2026)
         run: python pipelines/06_build_player_directory.py --season_label 20252026
@@ -54,14 +102,15 @@ jobs:
       - name: Build app tables (2025-2026)
         run: python pipelines/08_build_app_tables.py --season_label 20252026
 
-
       - name: Commit & push changes
         run: |
+          set -euo pipefail
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           # Stage ONLY what the app serves / needs
-          git add -A data/app reports data/processed/schedule_20252026*.parquet
+          git add -A data/app reports data/processed/schedule_20252026*.parquet data/features
 
           if git diff --cached --quiet; then
             echo "No changes to commit."
