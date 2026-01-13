@@ -1,41 +1,45 @@
-name: Daily update (2025-2026)
+name: Daily Update (2025-26)
 
 on:
-  workflow_dispatch:
   schedule:
-    # Runs daily (08:30 UTC). Adjust as desired.
-    - cron: "30 8 * * *"
+    - cron: "15 6 * * *" # 6:15am UTC daily
+  workflow_dispatch:
+    inputs:
+      season_label:
+        description: "Season label like 20252026"
+        required: false
+        default: "20252026"
 
 permissions:
   contents: write
 
 concurrency:
-  group: daily-update-20252026
+  group: daily-update-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   update:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+
+    env:
+      DEFAULT_SEASON: "20252026"
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Restore raw/game cache (20252026)
+      - name: Cache pip + data folders
         uses: actions/cache@v4
         with:
           path: |
+            ~/.cache/pip
             data/raw/season/20252026/games
             data/raw/season_schedules/20252026
             data/raw/player_landing/20252026
@@ -46,93 +50,104 @@ jobs:
             raw-20252026-${{ runner.os }}-
             raw-20252026-
 
-      - name: Pull schedule (2025–2026)
-        run: |
-          python pipelines/01_pull_schedule.py --season_label 20252026
-
-      - name: Reconcile schedule (2025–2026)
-        run: |
-          python pipelines/00_reconcile_season_schedule.py --season_label 20252026
-
-      - name: Pull game data (2025–2026)
-        run: |
-          python pipelines/02_pull_game_data.py --season_label 20252026
-
-      # Ensures data/processed/schedule_20252026.parquet exists.
-      # If your repo uses a different pipeline name for schedule creation,
-      # add it to the list below.
-      - name: Ensure schedule parquet exists (2025-2026)
+      - name: Install dependencies
+        shell: bash
         run: |
           set -euo pipefail
-          SCHED="data/processed/schedule_20252026.parquet"
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-          if [ -f "$SCHED" ]; then
-            echo "Found schedule parquet: $SCHED"
-            exit 0
-          fi
-
-          echo "Schedule parquet missing: $SCHED"
-          echo "Attempting to build schedule for season 20252026..."
-
-          CANDIDATES=(
-            "pipelines/01_build_season_schedule.py"
-            "pipelines/01_build_schedule.py"
-            "pipelines/02_build_season_schedule.py"
-            "pipelines/02_build_schedule.py"
-            "pipelines/00_build_schedule.py"
-          )
-
-          for s in "${CANDIDATES[@]}"; do
-            if [ -f "$s" ]; then
-              echo "Trying: $s"
-              python "$s" --season_label 20252026 || true
-            fi
-            if [ -f "$SCHED" ]; then
-              echo "Built schedule parquet: $SCHED"
-              break
-            fi
-          done
-
-          if [ ! -f "$SCHED" ]; then
-            echo "ERROR: Still missing $SCHED after attempts."
-            echo "Pipelines present:"
-            ls -la pipelines || true
-            echo "Processed dir contents:"
-            ls -la data/processed || true
-            exit 1
-          fi
-
-      - name: Build player-season boxscore features (2025-2026)
+      - name: Prepare directories
+        shell: bash
         run: |
-          python pipelines/03_build_player_season_features_boxscore.py \
-            --season_label 20252026 \
-            --schedule_parquet data/processed/schedule_20252026.parquet
+          set -euo pipefail
+          mkdir -p data/processed
+          mkdir -p data/features
+          mkdir -p data/raw/season
+          mkdir -p data/raw/season_schedules
+          mkdir -p data/raw/player_landing
 
-      - name: Build player directory (2025-2026)
-        run: python pipelines/06_build_player_directory.py --season_label 20252026
-
-      - name: Build app tables (2025-2026)
-        run: python pipelines/08_build_app_tables.py --season_label 20252026
-
-      - name: Commit & push changes
+      - name: Resolve season + date window
+        id: season
+        shell: bash
         run: |
           set -euo pipefail
 
+          SEASON="${{ github.event.inputs.season_label }}"
+          if [ -z "${SEASON}" ]; then
+            SEASON="${DEFAULT_SEASON}"
+          fi
+
+          START_YEAR="${SEASON:0:4}"
+          END_YEAR="${SEASON:4:4}"
+
+          # Default (generic) window if we don't have a hard-coded season
+          START="${START_YEAR}-09-01"
+          END="${END_YEAR}-06-30"
+
+          # Hard-code 2025-26 key dates (official source)
+          if [ "${SEASON}" = "20252026" ]; then
+            START="2025-10-03"
+            END="2026-04-16"
+          fi
+
+          echo "season_label=${SEASON}" >> "$GITHUB_OUTPUT"
+          echo "start=${START}" >> "$GITHUB_OUTPUT"
+          echo "end=${END}" >> "$GITHUB_OUTPUT"
+
+          echo "Using season=${SEASON}, start=${START}, end=${END}"
+
+      - name: Pull schedule (creates processed schedule parquet)
+        shell: bash
+        run: |
+          set -euo pipefail
+          SEASON="${{ steps.season.outputs.season_label }}"
+          START="${{ steps.season.outputs.start }}"
+          END="${{ steps.season.outputs.end }}"
+
+          python pipelines/01_pull_schedule.py \
+            --season_label "${SEASON}" \
+            --start "${START}" \
+            --end "${END}"
+
+          ls -la data/processed || true
+
+      - name: Reconcile schedule (optional but recommended)
+        shell: bash
+        run: |
+          set -euo pipefail
+          SEASON="${{ steps.season.outputs.season_label }}"
+          python pipelines/00_reconcile_season_schedule.py --season_label "${SEASON}" || true
+
+      - name: Pull game data + build features + update outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          SEASON="${{ steps.season.outputs.season_label }}"
+
+          # Run the rest of the pipeline. If some steps are intentionally optional,
+          # keep them "|| true" — otherwise let them fail loudly.
+          python pipelines/02_pull_game_data.py --season_label "${SEASON}"
+          python pipelines/03_build_player_season_features_boxscore.py --season_label "${SEASON}"
+          python pipelines/04_build_model_matrices.py --season_label "${SEASON}"
+          python pipelines/05_fit_nmf_gmm.py --season_label "${SEASON}"
+          python pipelines/06_build_player_directory.py --season_label "${SEASON}"
+          python pipelines/06b_enrich_player_names.py --season_label "${SEASON}" || true
+          python pipelines/07_make_archetype_cards.py --season_label "${SEASON}"
+          python pipelines/08_build_app_tables.py --season_label "${SEASON}"
+
+      - name: Commit & push changes (if any)
+        shell: bash
+        run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Stage ONLY what the app serves / needs
-          git add -A data/app reports data/processed/schedule_20252026*.parquet data/features
-
-          if git diff --cached --quiet; then
+          # Only commit if there are changes
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "Daily update: ${{ steps.season.outputs.season_label }} ($(date -u +'%Y-%m-%d'))"
+            git push
+          else
             echo "No changes to commit."
-            exit 0
           fi
-
-          git commit -m "Daily update 20252026 ($(date -u '+%Y-%m-%d %H:%M UTC'))"
-
-          # Prevent non-fast-forward failures if main advanced while job ran
-          git fetch origin main
-          git rebase origin/main
-
-          git push origin HEAD:main
