@@ -46,6 +46,18 @@ jobs:
             raw-20252026-${{ runner.os }}-
             raw-20252026-
 
+      - name: Pull schedule (2025–2026)
+        run: |
+          python pipelines/01_pull_schedule.py --season_label 20252026
+
+      - name: Reconcile schedule (2025–2026)
+        run: |
+          python pipelines/00_reconcile_season_schedule.py --season_label 20252026
+
+      - name: Pull game data (2025–2026)
+        run: |
+          python pipelines/02_pull_game_data.py --season_label 20252026
+
       # Ensures data/processed/schedule_20252026.parquet exists.
       # If your repo uses a different pipeline name for schedule creation,
       # add it to the list below.
