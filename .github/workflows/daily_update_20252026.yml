@@ -4,7 +4,6 @@ on:
   schedule:
     # GitHub Actions cron uses UTC.
     # 09:30 UTC = 04:30 America/New_York during EST (winter).
-    # If you want (e.g.) 07:00 AM New York (EST) -> 12:00 UTC.
     - cron: "30 9 * * *"
   workflow_dispatch: {}
 
@@ -53,7 +52,6 @@ jobs:
         run: |
           echo "END_DATE=$(date +%F)" >> $GITHUB_OUTPUT
           echo "START_DATE=$(date -d '2 days ago' +%F)" >> $GITHUB_OUTPUT
-          echo "Computed window:"
           echo "START_DATE=$(date -d '2 days ago' +%F)"
           echo "END_DATE=$(date +%F)"
 
@@ -64,19 +62,37 @@ jobs:
             --start "${{ steps.window.outputs.START_DATE }}" \
             --end "${{ steps.window.outputs.END_DATE }}"
 
-      - name: Pull/process game data (last 48 hours)
+      - name: Resolve schedule parquet path
+        id: schedule
         run: |
-          # If your pipeline has a specific script for updating games, use it here.
-          # Common pattern:
+          SCHEDULE="data/processed/schedule_${SEASON_LABEL}_${{ steps.window.outputs.START_DATE }}_${{ steps.window.outputs.END_DATE }}.parquet"
+
+          if [ -f "$SCHEDULE" ]; then
+            echo "schedule_parquet=$SCHEDULE" >> $GITHUB_OUTPUT
+            echo "Using schedule parquet: $SCHEDULE"
+            exit 0
+          fi
+
+          # Fallback: pick the newest schedule parquet for this season (in case your naming differs)
+          FOUND="$(ls -1t data/processed/schedule_${SEASON_LABEL}_*.parquet 2>/dev/null | head -n 1 || true)"
+          if [ -n "$FOUND" ] && [ -f "$FOUND" ]; then
+            echo "schedule_parquet=$FOUND" >> $GITHUB_OUTPUT
+            echo "Expected file not found; using newest schedule parquet: $FOUND"
+            exit 0
+          fi
+
+          echo "Could not find schedule parquet in data/processed."
+          ls -lah data/processed || true
+          exit 1
+
+      - name: Pull/process game data (from schedule parquet)
+        run: |
           python pipelines/02_pull_game_data.py \
-            --season_label "${SEASON_LABEL}" \
-            --start "${{ steps.window.outputs.START_DATE }}" \
-            --end "${{ steps.window.outputs.END_DATE }}"
+            --schedule_parquet "${{ steps.schedule.outputs.schedule_parquet }}" \
+            --season_label "${SEASON_LABEL}"
 
       - name: Run any downstream build/aggregation (optional)
         run: |
-          # If you have a script that rebuilds derived tables used by the app, call it here.
-          # If not, you can delete this step.
           if [ -f pipelines/03_build_app_tables.py ]; then
             python pipelines/03_build_app_tables.py --season_label "${SEASON_LABEL}"
           else
@@ -86,8 +102,6 @@ jobs:
       - name: Commit and push changes (if any)
         run: |
           set -e
-
-          # Show what changed (helpful for debugging)
           git status --porcelain
 
           if [ -z "$(git status --porcelain)" ]; then
@@ -99,5 +113,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git add -A
-          git commit -m "Daily update: ${SEASON_LABEL} (last 48h window) [skip ci]"
+          git commit -m "Daily update: ${SEASON_LABEL} (last 48h schedule) [skip ci]"
           git push
