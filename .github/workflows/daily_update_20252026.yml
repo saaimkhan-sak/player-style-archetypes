@@ -92,7 +92,7 @@ jobs:
       - name: Pull/process game data (from schedule parquet)
         run: |
           python pipelines/02_pull_game_data.py \
-            --schedule_parquet "${{ steps.schedule.outputs.schedule_parquet }}" \
+            --schedule_parquet "data/processed/schedule_${SEASON_LABEL}_${{ steps.window.outputs.START_DATE }}_${{ steps.window.outputs.END_DATE }}.parquet" \
             --season_label "${SEASON_LABEL}"
 
       - name: Commit and push changes (if any)
