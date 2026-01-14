@@ -1,0 +1,114 @@
+name: Daily Update
+
+on:
+  schedule:
+    - cron: "30 9 * * *"   # 04:30 America/New_York during EST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      SEASON_LABEL: "20252026"
+      TZ: "America/New_York"
+
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Optional but recommended: ensures you're not accidentally on some stale SHA
+      - name: Guard: ensure HEAD == origin/main
+        run: |
+          git fetch origin main
+          echo "HEAD:        $(git rev-parse HEAD)"
+          echo "origin/main: $(git rev-parse origin/main)"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          elif [ -f pyproject.toml ]; then
+            pip install .
+          else
+            echo "No requirements.txt or pyproject.toml found. Add one of them."
+            exit 1
+          fi
+
+      - name: Compute 48h window (NY time)
+        id: window
+        run: |
+          echo "END_DATE=$(date +%F)" >> "$GITHUB_OUTPUT"
+          echo "START_DATE=$(date -d '2 days ago' +%F)" >> "$GITHUB_OUTPUT"
+          echo "START_DATE=$(date -d '2 days ago' +%F)"
+          echo "END_DATE=$(date +%F)"
+
+      - name: Pull schedule for last 48 hours
+        run: |
+          python pipelines/01_pull_schedule.py \
+            --season_label "${SEASON_LABEL}" \
+            --start "${{ steps.window.outputs.START_DATE }}" \
+            --end "${{ steps.window.outputs.END_DATE }}"
+
+      - name: Resolve schedule parquet path
+        id: schedule
+        run: |
+          set -euo pipefail
+          SCHEDULE="data/processed/schedule_${SEASON_LABEL}_${{ steps.window.outputs.START_DATE }}_${{ steps.window.outputs.END_DATE }}.parquet"
+
+          echo "Expecting: $SCHEDULE"
+          if [ -f "$SCHEDULE" ]; then
+            echo "schedule_parquet=$SCHEDULE" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Expected file not found; falling back to newest matching schedule parquet..."
+          FOUND="$(ls -1t data/processed/schedule_${SEASON_LABEL}_*.parquet 2>/dev/null | head -n 1 || true)"
+          if [ -n "$FOUND" ] && [ -f "$FOUND" ]; then
+            echo "schedule_parquet=$FOUND" >> "$GITHUB_OUTPUT"
+            echo "Using: $FOUND"
+            exit 0
+          fi
+
+          echo "No schedule parquet found."
+          ls -lah data/processed || true
+          exit 1
+
+      - name: Pull/process game data (from schedule parquet)
+        run: |
+          python pipelines/02_pull_game_data.py \
+            --schedule_parquet "${{ steps.schedule.outputs.schedule_parquet }}" \
+            --season_label "${SEASON_LABEL}"
+
+      - name: Commit and push changes (if any)
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          git commit -m "Daily update: ${SEASON_LABEL} (last 48h) [skip ci]"
+          git push
+
