@@ -1,0 +1,104 @@
+name: Daily Update
+
+on:
+  schedule:
+    - cron: "30 9 * * *"   # 09:30 UTC = 04:30 America/New_York during EST
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      SEASON_LABEL: "20252026"
+      TZ: "America/New_York"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compute 48h window (NY time)
+        id: window
+        run: |
+          set -euo pipefail
+          echo "END_DATE=$(date +%F)" >> "$GITHUB_OUTPUT"
+          echo "START_DATE=$(date -d '2 days ago' +%F)" >> "$GITHUB_OUTPUT"
+          echo "START_DATE=$(date -d '2 days ago' +%F)"
+          echo "END_DATE=$(date +%F)"
+
+      - name: Pull schedule for last 48 hours
+        run: |
+          set -euo pipefail
+          python pipelines/01_pull_schedule.py \
+            --season_label "${SEASON_LABEL}" \
+            --start "${{ steps.window.outputs.START_DATE }}" \
+            --end "${{ steps.window.outputs.END_DATE }}"
+
+      - name: Resolve schedule parquet path
+        id: schedule
+        run: |
+          set -euo pipefail
+          EXPECTED="data/processed/schedule_${SEASON_LABEL}_${{ steps.window.outputs.START_DATE }}_${{ steps.window.outputs.END_DATE }}.parquet"
+          echo "Expected: $EXPECTED"
+
+          if [ -f "$EXPECTED" ]; then
+            echo "schedule_parquet=$EXPECTED" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Expected file not found; searching newest schedule parquet..."
+          ls -lah data/processed || true
+          FOUND="$(ls -1t data/processed/schedule_${SEASON_LABEL}_*.parquet 2>/dev/null | head -n 1 || true)"
+
+          if [ -n "$FOUND" ] && [ -f "$FOUND" ]; then
+            echo "schedule_parquet=$FOUND" >> "$GITHUB_OUTPUT"
+            echo "Using newest: $FOUND"
+            exit 0
+          fi
+
+          echo "No schedule parquet found."
+          exit 1
+
+      - name: Pull/process game data (from schedule parquet)
+        run: |
+          set -euo pipefail
+          python pipelines/02_pull_game_data.py \
+            --schedule_parquet "${{ steps.schedule.outputs.schedule_parquet }}" \
+            --season_label "${SEASON_LABEL}"
+
+      - name: Commit and push changes (if any)
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          git commit -m "Daily update: ${SEASON_LABEL} (last 48h) [skip ci]"
+          git push
