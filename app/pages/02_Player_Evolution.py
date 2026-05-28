@@ -14,6 +14,7 @@ if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
 
 from lib import (
+    ARCHETYPE_LABEL_VERSION,
     available_seasons,
     build_archetype_name_summary,
     season_key_to_label,
@@ -91,6 +92,12 @@ def archetype_description_from_traits(name: str, top_traits: str, low_traits: st
         return "Contact-driven role: creates disruption through physical pressure more than scoring volume."
     if "shot suppressor" in n.lower():
         return "Defense-first role: takes on prevention minutes and blocks shots, with value showing up away from the scoresheet."
+    if "deployment" in n.lower() or "role specialist" in n.lower():
+        return "Usage-defined specialist: the statistical footprint is driven by matchup duties, draws, and role minutes more than pure scoring."
+    if "low-contact scoring profile" in n.lower():
+        return "Skill-first scorer: produces offense while staying lighter on hits, blocks, and penalty-driven physical play."
+    if "shooting / scoring profile" in n.lower():
+        return "Shot-volume scorer: drives offense by getting pucks on net and turning that pressure into goals or points."
     if "agitating" in n.lower() or ("reg_pim_per60" in top and "reg_hits_per60" in top):
         return "Physical, high-edge profile: plays a heavy game and tends to take more penalties. Often lower offensive creation than scoring archetypes."
     if "shot-blocking" in n.lower() or "reg_blocked_shots_per60" in top:
@@ -119,7 +126,10 @@ def load_traits_csv(group: str, season_key: str) -> pd.DataFrame:
     return df
 
 @st.cache_data
-def build_season_cluster_to_name(group: str) -> dict[tuple[str,int], str]:
+def build_season_cluster_to_name(
+    group: str,
+    label_version: str = ARCHETYPE_LABEL_VERSION,
+) -> dict[tuple[str,int], str]:
     """
     Returns mapping (season_key, cluster_id) -> descriptive archetype name.
     """

@@ -5,6 +5,7 @@ from typing import Iterable
 
 
 TraitToken = tuple[str, float]
+ARCHETYPE_LABEL_VERSION = "role-names-v2"
 
 
 def parse_trait_string(value: str) -> list[TraitToken]:

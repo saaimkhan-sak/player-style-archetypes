@@ -23,7 +23,7 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.archetype_labels import build_archetype_name_summary, parse_trait_string
+from src.archetype_labels import ARCHETYPE_LABEL_VERSION, build_archetype_name_summary, parse_trait_string
 
 
 
@@ -415,7 +415,11 @@ def load_all_seasons_group(group: str) -> pd.DataFrame:
     return out
 
 @st.cache_data(ttl=3600)
-def load_archetype_name_map_for_season(group: str, season_key: str) -> dict[int, str]:
+def load_archetype_name_map_for_season(
+    group: str,
+    season_key: str,
+    label_version: str = ARCHETYPE_LABEL_VERSION,
+) -> dict[int, str]:
     """
     Returns {cluster_id -> archetype_name} for a given season & group,
     derived from that season's traits CSV (so names are season-specific).
