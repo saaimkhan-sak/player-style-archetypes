@@ -143,6 +143,36 @@ function(params) {
 }
 """
 
+ARCH_BADGE_RENDERER_JS = """
+function(params) {
+  const v = params.value || "";
+  const map = {
+    "A0": ["#CFFAFE", "#155E75"],
+    "A1": ["#FFEDD5", "#9A3412"],
+    "A2": ["#DBEAFE", "#1D4ED8"],
+    "A3": ["#EDE9FE", "#6D28D9"],
+  };
+  const c = map[v] || ["#E5E7EB", "#111827"];
+  const el = document.createElement("div");
+  el.textContent = v;
+  el.title = params.data && params.data["Archetype details"] ? params.data["Archetype details"] : v;
+  el.style.backgroundColor = c[0];
+  el.style.color = c[1];
+  el.style.border = "1px solid rgba(0,0,0,0.10)";
+  el.style.borderRadius = "999px";
+  el.style.padding = "3px 10px";
+  el.style.fontWeight = "800";
+  el.style.display = "flex";
+  el.style.alignItems = "center";
+  el.style.justifyContent = "center";
+  el.style.height = "100%";
+  el.style.width = "100%";
+  el.style.textAlign = "center";
+  el.style.cursor = "help";
+  return el;
+}
+"""
+
 def conf_js_fixed_thresholds():
     # Player Explorer: >90 green, 80-90 yellow, <80 red
     return """
@@ -294,12 +324,11 @@ def make_badge_grid(df, height=560, pin_cols=("Player","Teams"), player_width_of
             gb.configure_column(c, pinned="left")
 
     if archetype_col in df.columns:
-        archetype_opts = {
-            "cellStyle": JsCode(ARCH_BADGE_JS),
-            "width": max(130, col_width(df, archetype_col, 110, 170)),
-        }
+        archetype_opts = {"width": max(130, col_width(df, archetype_col, 110, 170))}
         if archetype_tooltip_col in df.columns:
-            archetype_opts["tooltipField"] = archetype_tooltip_col
+            archetype_opts["cellRenderer"] = JsCode(ARCH_BADGE_RENDERER_JS)
+        else:
+            archetype_opts["cellStyle"] = JsCode(ARCH_BADGE_JS)
         gb.configure_column(archetype_col, **archetype_opts)
     if confidence_col in df.columns:
         js = conf_js_fixed_thresholds() if conf_mode == "fixed" else conf_js_relative(conf_q33, conf_q67)
@@ -352,6 +381,14 @@ def format_traits_multiline(tokens, max_items=5):
         lines.append(f"{arrow} {label} ({z:+.1f}σ)")
     return "\n".join(lines)
 
+def format_traits_inline(tokens, max_items=5):
+    pieces = []
+    for feat, z in tokens[:max_items]:
+        label = TRAIT_LABELS.get(feat, feat.replace("reg_", "").replace("_", " ").title())
+        arrow = "higher" if z >= 0 else "lower"
+        pieces.append(f"{label} ({arrow}, {z:+.1f}σ)")
+    return "; ".join(pieces)
+
 def format_examples_multiline(s: str, max_players=7):
     if not isinstance(s, str) or not s.strip():
         return ""
@@ -371,13 +408,13 @@ def build_archetype_detail_map(traits_df: pd.DataFrame | None) -> dict[int, str]
         high_tokens = parse_trait_string(getattr(r, "top_traits", ""))
         low_tokens = parse_trait_string(getattr(r, "low_traits", ""))
         name, summary = build_archetype_name_summary(k, high_tokens, low_tokens)
-        higher = format_traits_multiline(high_tokens, max_items=5) or "None"
-        lower = format_traits_multiline(low_tokens, max_items=4) or "None"
+        higher = format_traits_inline(high_tokens, max_items=5) or "None"
+        lower = format_traits_inline(low_tokens, max_items=4) or "None"
         details[k] = (
-            f"A{k}: {name}\n\n"
-            f"{summary}\n\n"
-            f"Higher than peers:\n{higher}\n\n"
-            f"Lower than peers:\n{lower}"
+            f"A{k}: {name}\n"
+            f"{summary}\n"
+            f"Higher traits: {higher}\n"
+            f"Lower traits: {lower}"
         )
     return details
 
