@@ -25,6 +25,16 @@ except ImportError:
         "PK-Leaning Defensive Role": ("#4F46E5", "#FFFFFF"),
         "High-Touch Risk/Reward Playmaker": ("#9333EA", "#FFFFFF"),
         "Checking-Line Disruptor": ("#BE123C", "#FFFFFF"),
+        "Physical Shutdown Defenseman": ("#DC2626", "#FFFFFF"),
+        "Shot-Blocking Defensive Defenseman": ("#0891B2", "#FFFFFF"),
+        "Offensive Puck-Moving Defenseman": ("#2563EB", "#FFFFFF"),
+        "Low-Event Puck-Moving Defenseman": ("#F97316", "#111827"),
+        "Point-Usage Power-Play Defenseman": ("#D97706", "#111827"),
+        "Penalty-Kill Defensive Defenseman": ("#4F46E5", "#FFFFFF"),
+        "Transition Risk/Reward Defenseman": ("#9333EA", "#FFFFFF"),
+        "Defensive Role Defenseman": ("#64748B", "#FFFFFF"),
+        "Puck-Pressure Transition Defenseman": ("#16A34A", "#FFFFFF"),
+        "High-Event Physical Defenseman": ("#BE123C", "#FFFFFF"),
     }
     PROFILE_ORDER = list(PROFILE_COLOR_MAP.keys())
 
@@ -87,7 +97,7 @@ def load_archetype_name_map_for_season(
         kk = int(tr["cluster"])
         high = parse_trait_string(tr.get("top_traits", ""))
         low  = parse_trait_string(tr.get("low_traits", ""))
-        m[kk], _ = build_archetype_name_summary(kk, high, low)
+        m[kk], _ = build_archetype_name_summary(kk, high, low, group=group)
 
     return m
 

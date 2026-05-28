@@ -50,7 +50,7 @@ def build_season_cluster_to_name(
             k = int(tr["cluster"])
             ht = parse_trait_string(tr.get("top_traits", ""))
             lt = parse_trait_string(tr.get("low_traits", ""))
-            nm, _ = build_archetype_name_summary(k, ht, lt)
+            nm, _ = build_archetype_name_summary(k, ht, lt, group=group)
             mapping[(sk, k)] = nm
     return mapping
 

@@ -18,6 +18,16 @@ PROFILE_COLOR_MAP: dict[str, tuple[str, str]] = {
     "PK-Leaning Defensive Role": ("#4F46E5", "#FFFFFF"),
     "High-Touch Risk/Reward Playmaker": ("#9333EA", "#FFFFFF"),
     "Checking-Line Disruptor": ("#BE123C", "#FFFFFF"),
+    "Physical Shutdown Defenseman": ("#DC2626", "#FFFFFF"),
+    "Shot-Blocking Defensive Defenseman": ("#0891B2", "#FFFFFF"),
+    "Offensive Puck-Moving Defenseman": ("#2563EB", "#FFFFFF"),
+    "Low-Event Puck-Moving Defenseman": ("#F97316", "#111827"),
+    "Point-Usage Power-Play Defenseman": ("#D97706", "#111827"),
+    "Penalty-Kill Defensive Defenseman": ("#4F46E5", "#FFFFFF"),
+    "Transition Risk/Reward Defenseman": ("#9333EA", "#FFFFFF"),
+    "Defensive Role Defenseman": ("#64748B", "#FFFFFF"),
+    "Puck-Pressure Transition Defenseman": ("#16A34A", "#FFFFFF"),
+    "High-Event Physical Defenseman": ("#BE123C", "#FFFFFF"),
 }
 
 PROFILE_ORDER = list(PROFILE_COLOR_MAP.keys())
@@ -141,9 +151,59 @@ def _fallback_role_name(cluster: int, high_tokens: list[TraitToken], low_feature
     return f"Balanced Role Contributor {cluster}", "Does not lean heavily into one boxscore trait, so the cluster reads as a balanced role."
 
 
-def build_archetype_name_summary(cluster: int, high_tokens: list[TraitToken], low_tokens: list[TraitToken]) -> tuple[str, str]:
+def _build_defense_name_summary(cluster: int, high_features: set[str], low_features: set[str], high_tokens: list[TraitToken]) -> tuple[str, str]:
+    offense_hi = _has(high_features, ["reg_points_per60", "reg_goals_per60", "reg_assists_per60", "reg_shots_per60"])
+    playmaking_hi = "reg_assists_per60" in high_features
+    shooting_hi = "reg_shots_per60" in high_features
+    blocks_hi = "reg_blocked_shots_per60" in high_features
+    hits_hi = "reg_hits_per60" in high_features
+    pim_hi = "reg_pim_per60" in high_features
+    takeaways_hi = "reg_takeaways_per60" in high_features
+    giveaways_hi = "reg_giveaways_per60" in high_features
+    giveaways_lo = "reg_giveaways_per60" in low_features
+    pk_hi = "reg_pk_share" in high_features
+    pp_hi = "reg_pp_share" in high_features
+
+    if pim_hi and giveaways_hi:
+        return "High-Event Physical Defenseman", "High-event defense profile: plays physically and handles enough puck touches to carry added turnover risk."
+    if blocks_hi and hits_hi:
+        return "Shot-Blocking Defensive Defenseman", "Defense-first profile: blocks shots, plays through contact, and absorbs hard minutes."
+    if pim_hi and (hits_hi or blocks_hi):
+        return "Physical Shutdown Defenseman", "Defense profile built around contact, crease-area resistance, and a higher-penalty edge."
+    if takeaways_hi and (giveaways_lo or offense_hi):
+        return "Puck-Pressure Transition Defenseman", "Transition defender: pressures puck carriers and turns recoveries into clean exits."
+    if giveaways_hi and offense_hi:
+        return "Transition Risk/Reward Defenseman", "High-touch defense profile: moves the puck often, with turnover risk attached."
+    if offense_hi and (playmaking_hi or shooting_hi):
+        return "Offensive Puck-Moving Defenseman", "Blue-line offense driver: creates through point shots, exits, and puck movement."
+    if pk_hi and not pp_hi:
+        return "Penalty-Kill Defensive Defenseman", "Shorthanded defense profile: value is tied to defensive usage and penalty-kill minutes."
+    if pp_hi and not pk_hi:
+        return "Point-Usage Power-Play Defenseman", "Power-play defense profile: offense is tied to point usage and special-teams deployment."
+    if blocks_hi and not offense_hi:
+        return "Shot-Blocking Defensive Defenseman", "Stay-at-home profile: suppression, blocked shots, and defensive-zone work drive the role."
+    if hits_hi and not offense_hi:
+        return "Physical Shutdown Defenseman", "Physical defense profile: contact and disruption matter more than puck production."
+    if offense_hi:
+        return "Low-Event Puck-Moving Defenseman", "Puck-moving defense profile with offense showing up without a heavy-contact footprint."
+
+    categories = _ordered_categories(high_tokens)
+    if categories:
+        return "Defensive Role Defenseman", "Role-driven defense profile whose statistical lean is moderate rather than extreme."
+    return f"Defensive Role Defenseman {cluster}", "Balanced defense profile without one dominant statistical trait."
+
+
+def build_archetype_name_summary(
+    cluster: int,
+    high_tokens: list[TraitToken],
+    low_tokens: list[TraitToken],
+    group: str = "forwards",
+) -> tuple[str, str]:
     high_features = {feature for feature, _ in high_tokens}
     low_features = {feature for feature, _ in low_tokens}
+
+    if group == "defense":
+        return _build_defense_name_summary(cluster, high_features, low_features, high_tokens)
 
     offense_hi = _has(high_features, ["reg_points_per60", "reg_goals_per60", "reg_assists_per60", "reg_shots_per60"])
     playmaking_hi = "reg_assists_per60" in high_features

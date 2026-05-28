@@ -54,6 +54,16 @@ except ImportError:
         "PK-Leaning Defensive Role": ("#4F46E5", "#FFFFFF"),
         "High-Touch Risk/Reward Playmaker": ("#9333EA", "#FFFFFF"),
         "Checking-Line Disruptor": ("#BE123C", "#FFFFFF"),
+        "Physical Shutdown Defenseman": ("#DC2626", "#FFFFFF"),
+        "Shot-Blocking Defensive Defenseman": ("#0891B2", "#FFFFFF"),
+        "Offensive Puck-Moving Defenseman": ("#2563EB", "#FFFFFF"),
+        "Low-Event Puck-Moving Defenseman": ("#F97316", "#111827"),
+        "Point-Usage Power-Play Defenseman": ("#D97706", "#111827"),
+        "Penalty-Kill Defensive Defenseman": ("#4F46E5", "#FFFFFF"),
+        "Transition Risk/Reward Defenseman": ("#9333EA", "#FFFFFF"),
+        "Defensive Role Defenseman": ("#64748B", "#FFFFFF"),
+        "Puck-Pressure Transition Defenseman": ("#16A34A", "#FFFFFF"),
+        "High-Event Physical Defenseman": ("#BE123C", "#FFFFFF"),
     }
 
 ARCHETYPE_LABEL_CACHE_KEY = "profile-colors-v2"
@@ -422,7 +432,7 @@ def build_archetype_detail_map(traits_df: pd.DataFrame | None) -> dict[int, str]
         k = int(r.cluster)
         high_tokens = parse_trait_string(getattr(r, "top_traits", ""))
         low_tokens = parse_trait_string(getattr(r, "low_traits", ""))
-        name, summary = build_archetype_name_summary(k, high_tokens, low_tokens)
+        name, summary = build_archetype_name_summary(k, high_tokens, low_tokens, group=group)
         name = normalize_profile_name(name)
         higher = format_traits_inline(high_tokens, max_items=5) or "None"
         lower = format_traits_inline(low_tokens, max_items=4) or "None"
@@ -538,7 +548,7 @@ def load_archetype_name_map_for_season(
         kk = int(tr["cluster"])
         ht = parse_trait_string(tr.get("top_traits", ""))
         lt = parse_trait_string(tr.get("low_traits", ""))
-        nm, _ = build_archetype_name_summary(kk, ht, lt)
+        nm, _ = build_archetype_name_summary(kk, ht, lt, group=group)
         m[kk] = nm
     return m
 
@@ -610,7 +620,7 @@ if traits is not None:
         kk = int(tr["cluster"])
         ht = parse_trait_string(tr.get("top_traits", ""))
         lt = parse_trait_string(tr.get("low_traits", ""))
-        nm, _ = build_archetype_name_summary(kk, ht, lt)
+        nm, _ = build_archetype_name_summary(kk, ht, lt, group=group)
         archetype_name_map[kk] = normalize_profile_name(nm)
 archetype_detail_map = build_archetype_detail_map(traits)
 
@@ -690,7 +700,7 @@ if traits is not None:
         k = int(r.cluster)
         high_tokens = parse_trait_string(getattr(r, "top_traits", ""))
         low_tokens  = parse_trait_string(getattr(r, "low_traits", ""))
-        name, summary = build_archetype_name_summary(k, high_tokens, low_tokens)
+        name, summary = build_archetype_name_summary(k, high_tokens, low_tokens, group=group)
         name = normalize_profile_name(name)
         legend_rows.append({
             "Archetype": name,
