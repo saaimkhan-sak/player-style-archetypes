@@ -11,7 +11,6 @@ REQUIRED_MODULES = [
     "numpy",
     "pandas",
     "pyarrow",
-    "sklearn",
     "st_aggrid",
     "streamlit",
 ]
