@@ -14,7 +14,7 @@ if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
 
 from lib import (
-    ARCHETYPE_LABEL_VERSION,
+    ARCHETYPE_LABEL_CACHE_KEY,
     available_seasons,
     build_archetype_name_summary,
     season_key_to_label,
@@ -128,7 +128,7 @@ def load_traits_csv(group: str, season_key: str) -> pd.DataFrame:
 @st.cache_data
 def build_season_cluster_to_name(
     group: str,
-    label_version: str = ARCHETYPE_LABEL_VERSION,
+    label_version: str = ARCHETYPE_LABEL_CACHE_KEY,
 ) -> dict[tuple[str,int], str]:
     """
     Returns mapping (season_key, cluster_id) -> descriptive archetype name.
