@@ -168,7 +168,7 @@ To answer the question above, I had to find a way to tackle the following:
 Everything here is generated from **public NHL game data** that I sourced from the NHL Stats API.
 """)
 
-st.info("Use the left navigation to explore **Season Level Trends** (season by season) and **Player Evolution** (over their career).")
+st.info("Use the left navigation to explore **Season Level Trends**, **Player Evolution**, and **Playoff Style Shifts**.")
 
 st.markdown("---")
 
