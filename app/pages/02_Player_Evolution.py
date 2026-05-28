@@ -116,6 +116,22 @@ def archetype_description_from_traits(name: str, top_traits: str, low_traits: st
     return "Balanced contributor: has a recognizable statistical lean, but not one extreme enough to dominate the whole role."
 
 
+def normalize_legacy_archetype_name(name: str) -> str:
+    """
+    Clean up older generated labels that may still appear in cached Streamlit
+    tables or user sessions.
+    """
+    replacements = {
+        "Low-Contact Scoring Profile": "Low-Contact Scorer",
+        "Shooting / Scoring Profile": "Shot-Volume Scorer",
+        "Checking-Line Contact Profile": "Checking-Line Disruptor",
+        "Puck-Pressure Scoring Profile": "Puck-Pressure Scorer",
+    }
+    if name is None or pd.isna(name):
+        return None
+    return replacements.get(str(name), str(name))
+
+
 @st.cache_data
 def load_traits_csv(group: str, season_key: str) -> pd.DataFrame:
     p = REPORTS_DIR / f"archetype_traits_{group}_{season_key}.csv"
@@ -143,6 +159,7 @@ def build_season_cluster_to_name(
             ht = parse_trait_string(tr.get("top_traits", ""))
             lt = parse_trait_string(tr.get("low_traits", ""))
             nm, _ = build_archetype_name_summary(kk, ht, lt)
+            nm = normalize_legacy_archetype_name(nm)
             mapping[(sk, kk)] = nm
     return mapping
 
@@ -293,7 +310,7 @@ def traits_registry(group: str, mapping: dict[tuple[str,int], str]) -> dict[str,
             continue
         for _, tr in t.iterrows():
             kk = int(tr["cluster"])
-            name = mapping.get((sk, kk))
+            name = normalize_legacy_archetype_name(mapping.get((sk, kk)))
             if not name:
                 continue
 
@@ -333,7 +350,10 @@ def build_glossary(group: str, all_df: pd.DataFrame, mapping: dict[tuple[str,int
         tmp = all_df[["season","player_id","full_name","position", pc]].copy()
         tmp = tmp.rename(columns={pc: "prob"})
         tmp["k"] = k
-        tmp["archetype_name"] = tmp.apply(lambda r: mapping.get((r["season"], int(r["k"])), None), axis=1)
+        tmp["archetype_name"] = tmp.apply(
+            lambda r: normalize_legacy_archetype_name(mapping.get((r["season"], int(r["k"])), None)),
+            axis=1,
+        )
         tmp = tmp.dropna(subset=["archetype_name"])
         parts.append(tmp)
 
@@ -397,6 +417,8 @@ def build_glossary(group: str, all_df: pd.DataFrame, mapping: dict[tuple[str,int
         })
 
     out = pd.DataFrame(rows).sort_values("Archetype name")
+    if not out.empty:
+        out["Archetype name"] = out["Archetype name"].map(normalize_legacy_archetype_name)
     return out
 
 traits_f = traits_registry("forwards", map_f)

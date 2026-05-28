@@ -25,7 +25,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from src.archetype_labels import build_archetype_name_summary, parse_trait_string
 
-ARCHETYPE_LABEL_CACHE_KEY = "role-names-v2"
+ARCHETYPE_LABEL_CACHE_KEY = "role-names-v3"
 
 
 
