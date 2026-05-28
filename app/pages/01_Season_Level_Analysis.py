@@ -5,6 +5,7 @@ import streamlit as st
 import altair as alt
 from pathlib import Path
 import datetime
+import json
 
 
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
@@ -38,9 +39,9 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.archetype_labels import build_archetype_name_summary, parse_trait_string
+from src.archetype_labels import PROFILE_COLOR_MAP, build_archetype_name_summary, parse_trait_string
 
-ARCHETYPE_LABEL_CACHE_KEY = "role-names-v3"
+ARCHETYPE_LABEL_CACHE_KEY = "profile-colors-v2"
 
 
 
@@ -120,12 +121,7 @@ def col_width(df, col, min_w=90, max_w=240, char_px=8, pad=26, sample_n=400):
 ARCH_BADGE_JS = """
 function(params) {
   const v = params.value || "";
-  const map = {
-    "A0": ["#CFFAFE", "#155E75"],  // light red / dark red
-    "A1": ["#FFEDD5", "#9A3412"],  // light amber / dark amber
-    "A2": ["#DBEAFE", "#1D4ED8"],  // light blue / dark blue
-    "A3": ["#EDE9FE", "#6D28D9"],  // light purple / dark purple
-  };
+  const map = __PROFILE_COLOR_MAP__;
   const c = map[v] || ["#E5E7EB", "#111827"];
   return {
     backgroundColor: c[0],
@@ -133,7 +129,7 @@ function(params) {
     border: "1px solid rgba(0,0,0,0.10)",
     borderRadius: "999px",
     padding: "3px 10px",
-    fontWeight: "800",
+    fontWeight: "750",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -141,7 +137,10 @@ function(params) {
     textAlign: "center"
   };
 }
-"""
+""".replace("__PROFILE_COLOR_MAP__", json.dumps(PROFILE_COLOR_MAP))
+
+ARCHETYPE_COLOR_DOMAIN = list(PROFILE_COLOR_MAP.keys())
+ARCHETYPE_COLOR_RANGE = [PROFILE_COLOR_MAP[name][0] for name in ARCHETYPE_COLOR_DOMAIN]
 
 def conf_js_fixed_thresholds():
     # Player Explorer: >90 green, 80-90 yellow, <80 red
@@ -297,7 +296,7 @@ def make_badge_grid(df, height=560, pin_cols=("Player","Teams"), player_width_of
     if archetype_col in df.columns:
         archetype_opts = {
             "cellStyle": JsCode(ARCH_BADGE_JS),
-            "width": max(130, col_width(df, archetype_col, 110, 170)),
+            "width": max(230, col_width(df, archetype_col, 190, 340)),
         }
         if archetype_tooltip_col in df.columns:
             archetype_opts["tooltipValueGetter"] = JsCode(
@@ -390,7 +389,7 @@ def build_archetype_detail_map(traits_df: pd.DataFrame | None) -> dict[int, str]
         higher = format_traits_inline(high_tokens, max_items=5) or "None"
         lower = format_traits_inline(low_tokens, max_items=4) or "None"
         details[k] = (
-            f"A{k}: {name}\n"
+            f"{name}\n"
             f"{summary}\n"
             f"Higher traits: {higher}\n"
             f"Lower traits: {lower}"
@@ -411,8 +410,7 @@ def make_legend_grid(df: pd.DataFrame):
     gb.configure_grid_options(domLayout="autoHeight", suppressSizeToFit=True, alwaysShowHorizontalScroll=True)
 
     # Summary fixed at 250px (per request)
-    gb.configure_column("Archetype", width=150, pinned="left", cellStyle=CENTER)
-    gb.configure_column("Name", width=220, pinned="left", cellStyle=PRELINE_CENTER)
+    gb.configure_column("Archetype", width=280, pinned="left", cellStyle=JsCode(ARCH_BADGE_JS))
     gb.configure_column("Summary", width=420, wrapText=True, autoHeight=True, cellStyle=PRELINE_CENTER)
     gb.configure_column("Traits that tend to be higher", width=360, wrapText=True, autoHeight=True, cellStyle=PRELINE_CENTER)
     gb.configure_column("Traits that tend to be lower", width=360, wrapText=True, autoHeight=True, cellStyle=PRELINE_CENTER)
@@ -425,7 +423,7 @@ def make_legend_grid(df: pd.DataFrame):
         theme="streamlit",
         height=340,
         fit_columns_on_grid_load=False,
-        allow_unsafe_jscode=False
+        allow_unsafe_jscode=True
     )
 
 def wrap_label(s: str, width: int = 16) -> str:
@@ -568,7 +566,7 @@ traits = load_traits(group, season)
 pcols = prob_cols(df)
 K = len(pcols)
 
-archetype_name_map = {k: f"A{k}" for k in range(K)}
+archetype_name_map = {k: f"Archetype {k}" for k in range(K)}
 if traits is not None:
     for _, tr in traits.iterrows():
         kk = int(tr["cluster"])
@@ -634,16 +632,16 @@ Some players genuinely combine traits that sit between multiple clusters (e.g., 
     )
     st.markdown(
     f"""
-**Interpretation:** if a player’s probabilities are (0.1, 87.3, 6.4, 6.3)% then the player is **mostly Archetype 1** with **87.3% confidence**.
+**Interpretation:** if a player’s probabilities are (0.1, 87.3, 6.4, 6.3)% then the player is mostly aligned to one profile with **87.3% confidence**.
 """
     )
 
     
 st.markdown(
-    f"## For the {season_key_to_label(season)} season, the model found **K = {K}** archetypes (A0–A{K-1})."
+    f"## For the {season_key_to_label(season)} season, the model found **{K}** style profiles."
 )
 st.markdown(
-    "Every season, the model comes up with different archetype definitions. So an **A0** archetype in one season might be a **Puck Pressure Two-Way Creator** but in another season, **A0** might be an **Agitating Heavy-Contact Forward.** The table below breaks down each archetype for this season’s model."
+    "Profile colors are consistent across seasons, so the same archetype title keeps the same visual identity wherever it appears."
 )
 
 st.markdown(f"### Archetype definitions — {season_key_to_label(season)}")
@@ -656,8 +654,7 @@ if traits is not None:
         low_tokens  = parse_trait_string(getattr(r, "low_traits", ""))
         name, summary = build_archetype_name_summary(k, high_tokens, low_tokens)
         legend_rows.append({
-            "Archetype": f"A{k}",
-            "Name": name,
+            "Archetype": name,
             "Summary": summary,
             "Traits that tend to be higher": format_traits_multiline(high_tokens, max_items=5),
             "Traits that tend to be lower": format_traits_multiline(low_tokens, max_items=4),
@@ -676,7 +673,7 @@ with tabs[0]:
 **What you’re looking at**
 - A scrollable table of players in the selected group for the chosen season.
 - Regular-season and playoff totals + average time on ice (ATOI).
-- Each player’s top archetype (A0–A3) and a confidence score.
+- Each player’s top style profile and a confidence score.
 
 **What you can do**
 - Use the search box to quickly filter by player name.
@@ -689,9 +686,9 @@ with tabs[0]:
         view = view[view["full_name"].str.contains(q, case=False, na=False)]
 
     disp = view.copy()
-    disp["Archetype"] = disp["top_cluster"].apply(lambda x: f"A{safe_int(x)}")
+    disp["Archetype"] = disp["top_cluster"].apply(lambda x: archetype_name_map.get(safe_int(x), f"Archetype {safe_int(x)}"))
     disp["Archetype details"] = disp["top_cluster"].apply(
-        lambda x: archetype_detail_map.get(safe_int(x), f"A{safe_int(x)}")
+        lambda x: archetype_detail_map.get(safe_int(x), archetype_name_map.get(safe_int(x), f"Archetype {safe_int(x)}"))
     )
     disp["Confidence"] = (disp["confidence"].astype(float) * 100).round(1).astype(str) + "%"
     disp["REG ATOI"] = disp["reg_avg_toi_min"].apply(min_to_mmss)
@@ -748,9 +745,9 @@ with tabs[0]:
         st.markdown("### Closest comps (by archetype mix)")
 
         comps_disp = comps.copy()
-        comps_disp["Archetype"] = comps_disp["top_cluster"].apply(lambda x: f"A{safe_int(x)}")
+        comps_disp["Archetype"] = comps_disp["top_cluster"].apply(lambda x: archetype_name_map.get(safe_int(x), f"Archetype {safe_int(x)}"))
         comps_disp["Archetype details"] = comps_disp["top_cluster"].apply(
-            lambda x: archetype_detail_map.get(safe_int(x), f"A{safe_int(x)}")
+            lambda x: archetype_detail_map.get(safe_int(x), archetype_name_map.get(safe_int(x), f"Archetype {safe_int(x)}"))
         )
         comps_disp["Confidence"] = (comps_disp["confidence"].astype(float) * 100).round(1).astype(str) + "%"
         comps_disp["REG ATOI"] = comps_disp["reg_avg_toi_min"].apply(min_to_mmss)
@@ -823,24 +820,23 @@ with tabs[1]:
             shares.append(float(np.average(team_df[pcols[k]].to_numpy(dtype=float), weights=w)))
 
         comp_df = pd.DataFrame({
-            "A": [f"A{k}" for k in range(K)],
-            "Name": [wrap_label(archetype_name_map[k], width=16) for k in range(K)],  # archetype_name_map[k] should be just the NAME now
+            "Archetype": [archetype_name_map.get(k, f"Archetype {k}") for k in range(K)],
+            "Name": [wrap_label(archetype_name_map.get(k, f"Archetype {k}"), width=18) for k in range(K)],
             "Share": shares,
         })
         top_k = int(comp_df["Share"].to_numpy().argmax())
-        comp_df["is_top"] = comp_df["A"] == f"A{top_k}"
+        comp_df["is_top"] = comp_df["Archetype"] == archetype_name_map.get(top_k, f"Archetype {top_k}")
         comp_df["Share (%)"] = (comp_df["Share"] * 100).round(1)
 
         bars = (
             alt.Chart(comp_df)
             .mark_bar(size=55, cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
             .encode(
-                x=alt.X("A:O", axis=alt.Axis(labelAngle=0, labelFontSize=16, title=None)),
+                x=alt.X("Archetype:O", axis=alt.Axis(labelAngle=0, labels=False, title=None)),
                 y=alt.Y("Share:Q", axis=nice_axis(), title="REG-TOI-weighted share", scale=alt.Scale(domain=[0, 1])),
-                color=alt.condition(alt.datum.is_top, alt.value("#16A34A"), alt.value("#BBF7D0")),
+                color=alt.Color("Archetype:N", legend=None, scale=alt.Scale(domain=ARCHETYPE_COLOR_DOMAIN, range=ARCHETYPE_COLOR_RANGE)),
                 tooltip=[
-                    alt.Tooltip("A:O", title="Archetype"),
-                    alt.Tooltip("Name:N", title="Archetype name"),
+                    alt.Tooltip("Archetype:N", title="Archetype"),
                     alt.Tooltip("Share (%):Q", format=".1f", title="Share (%)"),
                 ]
 
@@ -856,10 +852,10 @@ with tabs[1]:
                 color="#111827"
             )
             .encode(
-                x=alt.X("A:O"),
+                x=alt.X("Archetype:O"),
                 y=alt.value(0),      # anchor at bottom
                 text=alt.Text("Name:N"),
-                tooltip=["A", "Name"]
+                tooltip=["Archetype"]
             )
         )
 
@@ -921,8 +917,7 @@ with tabs[1]:
             me["risk"] = (-me["z"]) + np.maximum(0, 0.35 - me["cov_rank"]) * 2.0 + np.maximum(0, me["conc_rank"] - 0.75) * 1.5
             me = me.sort_values("risk", ascending=False)
 
-            me["Archetype"] = me["k"].apply(lambda x: f"A{int(x)}")
-            me["Archetype name"] = me["k"].apply(lambda x: archetype_name_map[int(x)])
+            me["Archetype"] = me["k"].apply(lambda x: archetype_name_map.get(int(x), f"Archetype {int(x)}"))
             me["Team share (%)"] = (me["share"] * 100).round(1)
             me["League avg (%)"] = (me["mean_share"] * 100).round(1)
             me["Strong coverage (%)"] = (me["coverage"] * 100).round(1)
@@ -934,7 +929,7 @@ with tabs[1]:
             me.loc[(me["Note"] == "") & (me["conc_rank"] > 0.75) & (me["cov_rank"] < 0.5), "Note"] = "Thin coverage"
 
             show = me[[
-                "Archetype","Archetype name","Team share (%)","League avg (%)","Z-score","Strong coverage (%)","Reliance on top 2 (%)","Note"
+                "Archetype","Team share (%)","League avg (%)","Z-score","Strong coverage (%)","Reliance on top 2 (%)","Note"
             ]].reset_index(drop=True)
             st.dataframe(show.reset_index(drop=True), use_container_width=True, hide_index=True)
 
@@ -942,9 +937,9 @@ with tabs[1]:
         # --- Roster list (restored; includes reg/po stats, order like Player Explorer) ---
         st.markdown("### Roster list")
         r = team_df.copy()
-        r["Archetype"] = r["top_cluster"].apply(lambda x: f"A{safe_int(x)}")
+        r["Archetype"] = r["top_cluster"].apply(lambda x: archetype_name_map.get(safe_int(x), f"Archetype {safe_int(x)}"))
         r["Archetype details"] = r["top_cluster"].apply(
-            lambda x: archetype_detail_map.get(safe_int(x), f"A{safe_int(x)}")
+            lambda x: archetype_detail_map.get(safe_int(x), archetype_name_map.get(safe_int(x), f"Archetype {safe_int(x)}"))
         )
         r["Confidence"] = (r["confidence"].astype(float) * 100).round(1).astype(str) + "%"
         r["REG ATOI"] = r["reg_avg_toi_min"].apply(min_to_mmss)
@@ -984,7 +979,7 @@ with tabs[2]:
     st.subheader("Need Finder (find players who match a target archetype)")
     st.markdown("""
 **What you’re looking at**
-- A ranked list of players who best match a selected archetype (A0–A3).
+- A ranked list of players who best match a selected style profile.
 
 **How to use it**
 - Pick the archetype you want to add to a roster.
@@ -995,11 +990,11 @@ with tabs[2]:
 
     all_teams = sorted({t for s in df["teams_played"].dropna().unique() for t in str(s).split("/")})
     exclude_team = st.selectbox("Exclude team (optional)", ["(none)"] + all_teams)
-    target_options = [f"A{k} - {archetype_name_map.get(k, 'Unknown')}" for k in range(K)]
-    target_choice = st.selectbox("Target archetype", target_options, key=f"target_archetype_{season}_{group}")
+    target_options = {archetype_name_map.get(k, f"Archetype {k}"): k for k in range(K)}
+    target_choice = st.selectbox("Target archetype", list(target_options.keys()), key=f"target_archetype_{season}_{group}")
 
     # convert the selected label back to the integer k
-    target = int(target_choice.split(" - ")[0].replace("A", ""))
+    target = target_options[target_choice]
 
 
     min_reg_games = st.slider("Min REG games", 0, 82, 20, step=5)
@@ -1013,9 +1008,9 @@ with tabs[2]:
     out = view.sort_values(["Target similarity (%)","reg_points"], ascending=False).head(80).copy()
 
     o = out.copy()
-    o["Archetype"] = o["top_cluster"].apply(lambda x: f"A{safe_int(x)}")
+    o["Archetype"] = o["top_cluster"].apply(lambda x: archetype_name_map.get(safe_int(x), f"Archetype {safe_int(x)}"))
     o["Archetype details"] = o["top_cluster"].apply(
-        lambda x: archetype_detail_map.get(safe_int(x), f"A{safe_int(x)}")
+        lambda x: archetype_detail_map.get(safe_int(x), archetype_name_map.get(safe_int(x), f"Archetype {safe_int(x)}"))
     )
     o["Confidence"] = (o["confidence"].astype(float) * 100).round(1).astype(str) + "%"
     o["REG ATOI"] = o["reg_avg_toi_min"].apply(min_to_mmss)

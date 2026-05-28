@@ -14,6 +14,7 @@ if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
 
 from lib import (  # noqa: E402
+    PROFILE_COLOR_MAP,
     available_seasons,
     load_all_seasons_group,
     load_archetype_name_map_for_season,
@@ -23,6 +24,8 @@ from lib import (  # noqa: E402
 
 st.set_page_config(page_title="Playoff Style Shifts", layout="wide")
 st.title("Playoff Style Shifts")
+ARCHETYPE_COLOR_DOMAIN = list(PROFILE_COLOR_MAP.keys())
+ARCHETYPE_COLOR_RANGE = [PROFILE_COLOR_MAP[name][0] for name in ARCHETYPE_COLOR_DOMAIN]
 
 
 def safe_rate(num: pd.Series, den: pd.Series) -> pd.Series:
@@ -118,7 +121,7 @@ def load_playoff_shift_data() -> pd.DataFrame:
         k = int(getattr(row, "top_cluster", 0))
         names.append(mapping.get(k, f"Archetype {k}"))
     df["regular_archetype"] = names
-    df["archetype_label"] = "A" + df["top_cluster"].astype(int).astype(str) + " - " + df["regular_archetype"]
+    df["archetype_label"] = df["regular_archetype"]
 
     projections: list[pd.DataFrame] = []
     for group in ("forwards", "defense"):
@@ -166,7 +169,7 @@ def load_playoff_shift_data() -> pd.DataFrame:
             continue
         mapping = load_archetype_name_map_for_season(row.group, row.season)
         po_k_int = int(po_k)
-        po_names.append(f"A{po_k_int} - {mapping.get(po_k_int, f'Archetype {po_k_int}')}")
+        po_names.append(mapping.get(po_k_int, f"Archetype {po_k_int}"))
     df["playoff_archetype_label"] = po_names
     return df
 
@@ -267,7 +270,12 @@ with tab_season:
         .encode(
             x=alt.X("P/GP change:Q", title="Playoff P/GP minus regular-season P/GP"),
             y=alt.Y("TOI change:Q", title="Playoff ATOI minus regular-season ATOI"),
-            color=alt.Color("model_shift_band:N", title="Model shift band"),
+            color=alt.Color(
+                "archetype_label:N",
+                title="REG archetype",
+                scale=alt.Scale(domain=ARCHETYPE_COLOR_DOMAIN, range=ARCHETYPE_COLOR_RANGE),
+            ),
+            shape=alt.Shape("model_shift_band:N", title="Model shift band"),
             size=alt.Size("po_games:Q", title="PO GP", scale=alt.Scale(range=[40, 240])),
             tooltip=[
                 alt.Tooltip("full_name:N", title="Player"),

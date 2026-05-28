@@ -10,9 +10,16 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.archetype_labels import build_archetype_name_summary, parse_trait_string
+from src.archetype_labels import (
+    PROFILE_COLOR_MAP,
+    PROFILE_ORDER,
+    build_archetype_name_summary,
+    canonical_profile_name,
+    parse_trait_string,
+    profile_colors,
+)
 
-ARCHETYPE_LABEL_CACHE_KEY = "role-names-v3"
+ARCHETYPE_LABEL_CACHE_KEY = "profile-colors-v2"
 
 def season_key_to_label(k: str) -> str:
     k = str(k).strip()
@@ -74,7 +81,7 @@ def archetype_math_explainer():
     st.markdown(
         """
 This page describes player “styles” (archetypes) learned from boxscore + usage features.
-Archetypes are learned per season, so **A0 in one season is not necessarily the same as A0 in another**.
+Archetypes are learned per season, then translated into descriptive titles with consistent colors across seasons.
 """
     )
     st.markdown("I normalize for ice time, create per-60 rates, then cluster players into archetypes using a mixture model.")

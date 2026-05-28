@@ -1,4 +1,5 @@
 import sys
+import json
 from pathlib import Path
 
 import numpy as np
@@ -15,6 +16,7 @@ if str(APP_DIR) not in sys.path:
 
 from lib import (
     ARCHETYPE_LABEL_CACHE_KEY,
+    PROFILE_COLOR_MAP,
     available_seasons,
     build_archetype_name_summary,
     season_key_to_label,
@@ -23,6 +25,29 @@ from lib import (
 )
 
 REPORTS_DIR = Path("reports")
+ARCHETYPE_COLOR_DOMAIN = list(PROFILE_COLOR_MAP.keys())
+ARCHETYPE_COLOR_RANGE = [PROFILE_COLOR_MAP[name][0] for name in ARCHETYPE_COLOR_DOMAIN]
+ARCHETYPE_CELL_JS = JsCode(
+    """
+function(params) {
+  const map = __PROFILE_COLOR_MAP__;
+  const c = map[params.value] || ["#E5E7EB", "#111827"];
+  return {
+    backgroundColor: c[0],
+    color: c[1],
+    border: "1px solid rgba(0,0,0,0.10)",
+    borderRadius: "999px",
+    padding: "3px 10px",
+    fontWeight: "750",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    height: "100%",
+    textAlign: "center"
+  };
+}
+""".replace("__PROFILE_COLOR_MAP__", json.dumps(PROFILE_COLOR_MAP))
+)
 
 st.set_page_config(page_title="Player Archetype Evolution", layout="wide")
 st.title("Player Archetype Evolution")
@@ -241,6 +266,9 @@ def show_multiline_table(df: pd.DataFrame, height: int = 420):
     # Apply multi-line style to *every* column
     for c in df.columns:
         gb.configure_column(c, cellStyle=PRELINE_CELL)
+    for c in ("Archetype name", "Top archetype (season-specific)"):
+        if c in df.columns:
+            gb.configure_column(c, width=300, cellStyle=ARCHETYPE_CELL_JS)
 
     AgGrid(
         df,
@@ -498,7 +526,7 @@ hist["Mixedness"] = (1.0 - hist["confidence"].astype(float)).round(3)
 def top_label(row) -> str:
     k = int(row.get("top_cluster", 0))
     nm = mapping.get((row["season"], k), f"Archetype {k}")
-    return f"A{k} — {nm}"
+    return nm
 
 hist["Top archetype (season-specific)"] = hist.apply(top_label, axis=1)
 
@@ -546,8 +574,25 @@ base = alt.Chart(hist).encode(
     x=alt.X("Season:O", axis=alt.Axis(labelAngle=0), title="Season")
 )
 
-line = base.mark_line(point=True).encode(
+line = base.mark_line(color="#9CA3AF").encode(
     y=alt.Y("Confidence (%):Q", title="Top-archetype confidence (%)", scale=alt.Scale(domain=[0, 100])),
+    tooltip=[
+        alt.Tooltip("Season:O", title="Season"),
+        alt.Tooltip("Top archetype (season-specific):N", title="Top archetype"),
+        alt.Tooltip("Confidence (%):Q", title="Confidence", format=".1f"),
+        alt.Tooltip("Mixedness:Q", title="Mixedness", format=".3f"),
+        alt.Tooltip("teams_played:N", title="Teams"),
+        alt.Tooltip("position:N", title="Pos"),
+    ],
+).properties(height=280)
+
+points = base.mark_circle(size=90).encode(
+    y=alt.Y("Confidence (%):Q", title="Top-archetype confidence (%)", scale=alt.Scale(domain=[0, 100])),
+    color=alt.Color(
+        "Top archetype (season-specific):N",
+        title="Top archetype",
+        scale=alt.Scale(domain=ARCHETYPE_COLOR_DOMAIN, range=ARCHETYPE_COLOR_RANGE),
+    ),
     tooltip=[
         alt.Tooltip("Season:O", title="Season"),
         alt.Tooltip("Top archetype (season-specific):N", title="Top archetype"),
@@ -562,6 +607,11 @@ line = base.mark_line(point=True).encode(
 change_pts = alt.Chart(hist[hist["changed"]]).mark_point(size=160).encode(
     x="Season:O",
     y="Confidence (%):Q",
+    color=alt.Color(
+        "Top archetype (season-specific):N",
+        title="Top archetype",
+        scale=alt.Scale(domain=ARCHETYPE_COLOR_DOMAIN, range=ARCHETYPE_COLOR_RANGE),
+    ),
     tooltip=[
         alt.Tooltip("Season:O", title="Season"),
         alt.Tooltip("Top archetype (season-specific):N", title="New archetype"),
@@ -572,7 +622,7 @@ change_pts = alt.Chart(hist[hist["changed"]]).mark_point(size=160).encode(
     ],
 )
 
-st.altair_chart((line + change_pts).properties(height=340), use_container_width=True)
+st.altair_chart((line + points + change_pts).properties(height=340), use_container_width=True)
 
 
 # 2) A readable per-season “archetype strip” underneath (no overlap)
@@ -582,7 +632,7 @@ strip = hist[["Season", "Top archetype (season-specific)", "Confidence (%)"]].co
 strip["Top archetype (season-specific)"] = strip["Top archetype (season-specific)"].astype(str)
 
 # Optional: shorten display just a bit (keeps readability)
-# e.g. "A2 — High-Volume Playmaking Scorer" stays fine, but you can truncate if you want:
+# e.g. "High-Volume Playmaking Scorer" stays fine, but you can truncate if you want:
 # strip["Top archetype (season-specific)"] = strip["Top archetype (season-specific)"].str.slice(0, 42)
 
 # Show as a clean table (no scroll, very readable)
@@ -662,4 +712,4 @@ final_cols = [
 final_cols = [c for c in final_cols if c in strip.columns]
 strip = strip[final_cols]
 
-st.dataframe(strip, use_container_width=True, hide_index=True)
+show_multiline_table(strip, height=max(260, 42 * len(strip)))

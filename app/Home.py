@@ -253,7 +253,7 @@ st.markdown("For each player-season, the model outputs archetype probabilities u
 st.latex(r"p_{ik}=P(\text{Archetype}=k \mid z_i)")
 
 st.markdown("""
-Because this is **soft clustering**, a player can be “70% archetype A2, 20% A1, 10% A0” rather than being forced into a single bucket.
+Because this is **soft clustering**, a player can be “70% Playmaking Scorer, 20% Two-Way Creator, 10% Role Specialist” rather than being forced into a single bucket.
 
 I summarize how “mixed” a player is using:
 """)

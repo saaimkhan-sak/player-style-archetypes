@@ -7,6 +7,51 @@ from typing import Iterable
 TraitToken = tuple[str, float]
 ARCHETYPE_LABEL_VERSION = "role-names-v2"
 
+PROFILE_COLOR_MAP: dict[str, tuple[str, str]] = {
+    "High-Volume Playmaking Scorer": ("#2563EB", "#FFFFFF"),
+    "Low-Contact Scorer": ("#F97316", "#111827"),
+    "Shot-Blocking Contact Specialist": ("#0891B2", "#FFFFFF"),
+    "Agitating Heavy-Contact Forward": ("#DC2626", "#FFFFFF"),
+    "Puck-Pressure Two-Way Creator": ("#16A34A", "#FFFFFF"),
+    "Deployment / Role Specialist": ("#64748B", "#FFFFFF"),
+    "PP-Leaning Offensive Role": ("#D97706", "#111827"),
+    "PK-Leaning Defensive Role": ("#4F46E5", "#FFFFFF"),
+    "High-Touch Risk/Reward Playmaker": ("#9333EA", "#FFFFFF"),
+    "Checking-Line Disruptor": ("#BE123C", "#FFFFFF"),
+}
+
+PROFILE_ORDER = list(PROFILE_COLOR_MAP.keys())
+
+
+def canonical_profile_name(name: str) -> str:
+    replacements = {
+        "Shot-Creating Playmaker": "High-Volume Playmaking Scorer",
+        "Setup Playmaker": "High-Volume Playmaking Scorer",
+        "Shot-Volume Scorer": "Low-Contact Scorer",
+        "Volume Shooter": "Low-Contact Scorer",
+        "Finisher": "Low-Contact Scorer",
+        "Defense-First Shot Suppressor": "Shot-Blocking Contact Specialist",
+        "Shot Suppressor": "Shot-Blocking Contact Specialist",
+        "Puck Hunter": "Puck-Pressure Two-Way Creator",
+        "Puck-Pressure Scorer": "Puck-Pressure Two-Way Creator",
+        "Physical Disruptor": "Checking-Line Disruptor",
+        "Checking Forward": "Checking-Line Disruptor",
+        "Penalty-Drawn Edge Player": "Agitating Heavy-Contact Forward",
+        "Power-Play Specialist": "PP-Leaning Offensive Role",
+        "Penalty-Kill Specialist": "PK-Leaning Defensive Role",
+        "Role-Center Specialist": "Deployment / Role Specialist",
+        "Low-Contact Scoring Profile": "Low-Contact Scorer",
+        "Shooting / Scoring Profile": "Low-Contact Scorer",
+    }
+    text = str(name)
+    if text in PROFILE_COLOR_MAP:
+        return text
+    return replacements.get(text, text)
+
+
+def profile_colors(name: str) -> tuple[str, str]:
+    return PROFILE_COLOR_MAP.get(canonical_profile_name(name), ("#E5E7EB", "#111827"))
+
 
 def parse_trait_string(value: str) -> list[TraitToken]:
     if not isinstance(value, str):
@@ -129,14 +174,15 @@ def build_archetype_name_summary(cluster: int, high_tokens: list[TraitToken], lo
     if pp_hi and not pk_hi:
         return "PP-Leaning Offensive Role", "Power-play leaning: production is driven by scoring-role deployment."
     if blocks_hi and not offense_hi:
-        return "Defense-First Shot Suppressor", "Low-offense profile built around blocked shots and defensive minutes."
+        return "Shot-Blocking Contact Specialist", "Low-offense profile built around blocked shots and defensive minutes."
     if hits_hi and not offense_hi:
         return "Checking-Line Disruptor", "Physical depth role: contact and disruption matter more than scoring."
     if scoring_hi and not hits_hi:
         return "Low-Contact Scorer", "Skill-leaning scorer: creates offense without much physical play."
     if takeaways_hi and scoring_hi:
-        return "Puck-Pressure Scorer", "Creates offense while pressuring puck carriers."
+        return "Puck-Pressure Two-Way Creator", "Creates offense while pressuring puck carriers."
     if giveaways_hi and playmaking_hi:
         return "High-Touch Risk/Reward Playmaker", "High-event puck profile: creates plays while carrying turnover risk."
 
-    return _fallback_role_name(cluster, high_tokens, low_features)
+    name, summary = _fallback_role_name(cluster, high_tokens, low_features)
+    return canonical_profile_name(name), summary
