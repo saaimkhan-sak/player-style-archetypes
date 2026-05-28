@@ -6,5 +6,5 @@ data/raw/
 logs/
 data/processed/
 data/features/
-data/raw/
-
+dir-structure.txt
+.streamlit/secrets.toml

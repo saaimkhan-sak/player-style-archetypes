@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import sys
 from pathlib import Path
 from typing import List, Optional, Sequence
 
@@ -53,7 +54,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("==============================")
 
         # 0) Authoritative schedule (no dates) + optionally download missing games
-        cmd = ["python", "pipelines/00_reconcile_season_schedule.py", "--season_label", season]
+        cmd = [sys.executable, "pipelines/00_reconcile_season_schedule.py", "--season_label", season]
         if args.download_missing:
             cmd.append("--download_missing")
         run(cmd)
@@ -66,16 +67,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         sp = str(schedule_path(season))
 
         # 1) Build season features from the authoritative schedule
-        run(["python", "pipelines/03_build_player_season_features_boxscore.py", "--schedule_parquet", sp, "--season_label", season])
+        run([sys.executable, "pipelines/03_build_player_season_features_boxscore.py", "--schedule_parquet", sp, "--season_label", season])
 
         # 2) Directory + teams played (season-specific directory created by your updated 06)
-        run(["python", "pipelines/06_build_player_directory.py", "--season_label", season])
+        run([sys.executable, "pipelines/06_build_player_directory.py", "--season_label", season])
 
         # 3) Matrices + models + reports + app tables
-        run(["python", "pipelines/04_build_model_matrices.py", "--season_label", season])
-        run(["python", "pipelines/05_fit_nmf_gmm.py", "--season_label", season])
-        run(["python", "pipelines/07_make_archetype_cards.py", "--season_label", season])
-        run(["python", "pipelines/08_build_app_tables.py", "--season_label", season])
+        run([sys.executable, "pipelines/04_build_model_matrices.py", "--season_label", season])
+        run([sys.executable, "pipelines/05_fit_nmf_gmm.py", "--season_label", season])
+        run([sys.executable, "pipelines/07_make_archetype_cards.py", "--season_label", season])
+        run([sys.executable, "pipelines/08_build_app_tables.py", "--season_label", season])
 
         print(f"\n✅ Finished season {season}")
 
