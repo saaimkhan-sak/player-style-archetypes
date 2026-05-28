@@ -1,5 +1,4 @@
 import sys
-import re
 from pathlib import Path
 
 import numpy as np
@@ -12,63 +11,17 @@ APP_DIR = Path(__file__).resolve().parent
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
 
-from lib import available_seasons, season_key_to_label, load_all_seasons_group
+from lib import (
+    available_seasons,
+    build_archetype_name_summary,
+    load_all_seasons_group,
+    parse_trait_string,
+    season_key_to_label,
+)
 
 REPORTS_DIR = Path("reports")
 
 st.set_page_config(page_title="NHL Player Style Archetypes", layout="wide")
-
-# ----------------------------
-# Helpers: naming + traits
-# ----------------------------
-def parse_trait_string(s: str):
-    # "reg_shots_per60(+1.23),reg_points_per60(+0.77)"
-    if not isinstance(s, str):
-        return []
-    out = []
-    for part in s.split(","):
-        part = part.strip()
-        m = re.match(r"^([A-Za-z0-9_]+)\(([+-]?\d+\.?\d*)\)$", part)
-        if m:
-            out.append((m.group(1), float(m.group(2))))
-    return out
-
-def build_unique_name_summary(cluster: int, high_tokens, low_tokens):
-    """
-    Same naming logic as the Season-Level Trends page: returns (name, summary).
-    If no strong signature is detected, we label it as a Mixed Profile archetype.
-    """
-    high_feats = {f for f, _ in high_tokens}
-    low_feats = {f for f, _ in low_tokens}
-
-    offense_hi = any(f in high_feats for f in ["reg_points_per60","reg_goals_per60","reg_assists_per60","reg_shots_per60"])
-    playmaking_hi = "reg_assists_per60" in high_feats
-    shooting_hi = "reg_shots_per60" in high_feats
-    blocks_hi = "reg_blocked_shots_per60" in high_feats
-    hits_hi = "reg_hits_per60" in high_feats
-    pim_hi = "reg_pim_per60" in high_feats
-    takeaways_hi = "reg_takeaways_per60" in high_feats
-    giveaways_lo = "reg_giveaways_per60" in low_feats
-    pk_hi = "reg_pk_share" in high_feats
-    pp_hi = "reg_pp_share" in high_feats
-    fo_hi = ("reg_fo_taken_per_game" in high_feats) or ("reg_fo_pct" in high_feats)
-
-    if pim_hi and hits_hi:
-        return "Agitating Heavy-Contact Forward", "High-contact profile: delivers hits and takes more penalties."
-    if blocks_hi and hits_hi:
-        return "Shot-Blocking Contact Specialist", "Defense-tilted profile: blocks shots and plays physically."
-    if offense_hi and playmaking_hi and shooting_hi:
-        return "High-Volume Playmaking Scorer", "Offense driver: generates shots and assists at high rates."
-    if takeaways_hi and giveaways_lo:
-        return "Puck-Pressure Two-Way Creator", "Pressure-and-recover profile: creates takeaways while limiting giveaways."
-    if fo_hi and not offense_hi:
-        return "Deployment / Faceoff Specialist", "Deployment-driven: reflects coach usage (draws/role minutes)."
-    if pk_hi and not pp_hi:
-        return "PK-Leaning Defensive Role", "Shorthanded-leaning: value shows up in defensive usage."
-    if pp_hi and not pk_hi:
-        return "PP-Leaning Offensive Role", "Power-play leaning: production is driven by scoring-role deployment."
-
-    return f"Mixed Profile Archetype {cluster}", "Mixed profile: blends multiple style signatures rather than one extreme."
 
 @st.cache_data(ttl=3600)
 def load_traits_csv(group: str, season_key: str) -> pd.DataFrame:
@@ -93,38 +46,25 @@ def build_season_cluster_to_name(group: str) -> dict[tuple[str, int], str]:
             k = int(tr["cluster"])
             ht = parse_trait_string(tr.get("top_traits", ""))
             lt = parse_trait_string(tr.get("low_traits", ""))
-            nm, _ = build_unique_name_summary(k, ht, lt)
+            nm, _ = build_archetype_name_summary(k, ht, lt)
             mapping[(sk, k)] = nm
     return mapping
 
 @st.cache_data(ttl=3600)
 def count_archetype_definitions() -> dict:
     """
-    Counts total archetype definitions (clusters) across all seasons, and how many are
-    'Mixed Profile' vs not, for each group and overall.
+    Counts total named archetype definitions (clusters) across all seasons.
     """
-    out = {"forwards": {"total": 0, "mixed": 0},
-           "defense": {"total": 0, "mixed": 0}}
+    out = {"forwards": {"total": 0}, "defense": {"total": 0}}
     for group in ["forwards", "defense"]:
         for sk in available_seasons():
             t = load_traits_csv(group, sk)
             if t.empty:
                 continue
-            for _, tr in t.iterrows():
-                k = int(tr["cluster"])
-                ht = parse_trait_string(tr.get("top_traits", ""))
-                lt = parse_trait_string(tr.get("low_traits", ""))
-                nm, _ = build_unique_name_summary(k, ht, lt)
-                out[group]["total"] += 1
-                if nm.startswith("Mixed Profile"):
-                    out[group]["mixed"] += 1
+            out[group]["total"] += int(t["cluster"].nunique())
     out["overall"] = {
         "total": out["forwards"]["total"] + out["defense"]["total"],
-        "mixed": out["forwards"]["mixed"] + out["defense"]["mixed"],
     }
-    out["forwards"]["pure"] = out["forwards"]["total"] - out["forwards"]["mixed"]
-    out["defense"]["pure"] = out["defense"]["total"] - out["defense"]["mixed"]
-    out["overall"]["pure"] = out["overall"]["total"] - out["overall"]["mixed"]
     return out
 
 def switch_rate_series(df: pd.DataFrame) -> pd.Series:
@@ -219,14 +159,13 @@ with c1:
 with c2:
     st.metric("Total NHL players", f"{unique_players:,}")
 with c3:
-    st.metric("Pure archetypes", "6")
+    st.metric("Forward profiles", f"{defs['forwards']['total']:,}")
 with c4:
-    st.metric("Mixed archetypes", "4")
+    st.metric("Defense profiles", f"{defs['defense']['total']:,}")
 
 st.markdown(f"""
-**What “pure vs mixed archetype definitions” means:**  
-Each season’s model learns **K** archetypes. Some have a clear, interpretable signature (i.e., offense-driving, shot-blocking, puck-pressure).  
-Others don’t strongly match a single signature and are labeled **Mixed Profile** — they tend to blend multiple styles rather than sitting at one extreme.
+**What “style profile definitions” means:**  
+Each season’s model learns **K** archetypes, then names them from the traits that are unusually high or low for that cluster. Some are clean roles like offense-driving, shot-blocking, or puck-pressure profiles; others are blended profiles whose names describe the strongest trait combination instead of using generic numbered labels.
 """)
 
 c5, c6 = st.columns(2)

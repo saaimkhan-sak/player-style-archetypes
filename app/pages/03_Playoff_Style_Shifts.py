@@ -119,6 +119,55 @@ def load_playoff_shift_data() -> pd.DataFrame:
         names.append(mapping.get(k, f"Archetype {k}"))
     df["regular_archetype"] = names
     df["archetype_label"] = "A" + df["top_cluster"].astype(int).astype(str) + " - " + df["regular_archetype"]
+
+    projections: list[pd.DataFrame] = []
+    for group in ("forwards", "defense"):
+        for season in available_seasons():
+            p = Path("data/app") / f"playoff_archetype_projection_{group}_{season}.parquet"
+            if not p.exists():
+                continue
+            proj = pd.read_parquet(p)
+            if proj.empty:
+                continue
+            proj["group"] = group
+            projections.append(proj)
+
+    if projections:
+        proj = pd.concat(projections, ignore_index=True)
+        keep_cols = [
+            "season",
+            "player_id",
+            "group",
+            "reg_top_cluster",
+            "po_top_cluster",
+            "reg_confidence",
+            "po_confidence",
+            "archetype_changed",
+            "probability_distance",
+        ]
+        proj = proj[[c for c in keep_cols if c in proj.columns]].copy()
+        df = df.merge(proj, on=["season", "player_id", "group"], how="left")
+    else:
+        df["probability_distance"] = np.nan
+
+    df["model_shift_score"] = pd.to_numeric(df.get("probability_distance", np.nan), errors="coerce")
+    df["model_shift_band"] = pd.cut(
+        df["model_shift_score"],
+        bins=[-0.01, 0.25, 0.75, 2.0],
+        labels=["Held steady", "Moderate shift", "Major shift"],
+    ).astype(str)
+    df.loc[df["model_shift_score"].isna(), "model_shift_band"] = "Not projected"
+
+    po_names: list[str] = []
+    for row in df.itertuples(index=False):
+        po_k = getattr(row, "po_top_cluster", np.nan)
+        if pd.isna(po_k):
+            po_names.append("Not projected")
+            continue
+        mapping = load_archetype_name_map_for_season(row.group, row.season)
+        po_k_int = int(po_k)
+        po_names.append(f"A{po_k_int} - {mapping.get(po_k_int, f'Archetype {po_k_int}')}")
+    df["playoff_archetype_label"] = po_names
     return df
 
 
@@ -135,6 +184,7 @@ def compact_table(df: pd.DataFrame) -> pd.DataFrame:
             "teams_played",
             "position",
             "archetype_label",
+            "playoff_archetype_label",
             "reg_games",
             "po_games",
             "REG P/GP",
@@ -144,6 +194,8 @@ def compact_table(df: pd.DataFrame) -> pd.DataFrame:
             "po_avg_toi_min",
             "TOI change",
             "playoff_shift_score",
+            "model_shift_score",
+            "model_shift_band",
             "changed_bucket",
         ]
     ].copy()
@@ -156,9 +208,12 @@ def compact_table(df: pd.DataFrame) -> pd.DataFrame:
             "teams_played": "Team(s)",
             "position": "Pos",
             "archetype_label": "REG archetype",
+            "playoff_archetype_label": "Projected PO archetype",
             "reg_games": "REG GP",
             "po_games": "PO GP",
             "playoff_shift_score": "Shift score",
+            "model_shift_score": "Model shift",
+            "model_shift_band": "Model shift band",
             "changed_bucket": "Shift band",
         }
     )
@@ -175,6 +230,8 @@ st.markdown(
 This page compares a player's regular-season profile with their playoff profile. The archetype shown is still the regular-season model assignment; the shift score measures how much their tracked playoff production, shot volume, ice time, penalty rate, and plus-minus move relative to regular season.
 """
 )
+if data["model_shift_score"].notna().any():
+    st.caption("For seasons with projection files, the playoff archetype is calculated by running playoff feature vectors through that season's regular-season NMF/GMM model.")
 
 with st.sidebar:
     group = st.selectbox("Group", ["forwards", "defense"], index=0)
@@ -197,8 +254,12 @@ with tab_season:
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Players", f"{len(season_df):,}")
     c2.metric("Median shift score", f"{season_df['playoff_shift_score'].median():.2f}")
-    c3.metric("Major shifts", f"{int((season_df['changed_bucket'] == 'Major shift').sum()):,}")
-    c4.metric("Median P/GP change", f"{season_df['P/GP change'].median():+.2f}")
+    if season_df["model_shift_score"].notna().any():
+        c3.metric("Projected archetype changes", f"{int(season_df['archetype_changed'].fillna(False).sum()):,}")
+        c4.metric("Median model shift", f"{season_df['model_shift_score'].median():.2f}")
+    else:
+        c3.metric("Major shifts", f"{int((season_df['changed_bucket'] == 'Major shift').sum()):,}")
+        c4.metric("Median P/GP change", f"{season_df['P/GP change'].median():+.2f}")
 
     scatter = (
         alt.Chart(season_df)
@@ -206,16 +267,18 @@ with tab_season:
         .encode(
             x=alt.X("P/GP change:Q", title="Playoff P/GP minus regular-season P/GP"),
             y=alt.Y("TOI change:Q", title="Playoff ATOI minus regular-season ATOI"),
-            color=alt.Color("changed_bucket:N", title="Shift band"),
+            color=alt.Color("model_shift_band:N", title="Model shift band"),
             size=alt.Size("po_games:Q", title="PO GP", scale=alt.Scale(range=[40, 240])),
             tooltip=[
                 alt.Tooltip("full_name:N", title="Player"),
                 alt.Tooltip("teams_played:N", title="Team"),
                 alt.Tooltip("archetype_label:N", title="REG archetype"),
+                alt.Tooltip("playoff_archetype_label:N", title="Projected PO archetype"),
                 alt.Tooltip("reg_games:Q", title="REG GP"),
                 alt.Tooltip("po_games:Q", title="PO GP"),
                 alt.Tooltip("P/GP change:Q", format="+.2f"),
                 alt.Tooltip("TOI change:Q", format="+.1f"),
+                alt.Tooltip("model_shift_score:Q", title="Model shift", format=".2f"),
                 alt.Tooltip("playoff_shift_score:Q", title="Shift score", format=".2f"),
             ],
         )
@@ -239,6 +302,8 @@ with tab_archetypes:
         .agg(
             players=("player_id", "nunique"),
             median_shift=("playoff_shift_score", "median"),
+            median_model_shift=("model_shift_score", "median"),
+            archetype_change_rate=("archetype_changed", "mean"),
             median_pgp_change=("P/GP change", "median"),
             median_toi_change=("TOI change", "median"),
         )
@@ -251,12 +316,14 @@ with tab_archetypes:
         .encode(
             x=alt.X("Season:O", title="Season", sort=[season_key_to_label(s) for s in sorted(base["season"].unique())]),
             y=alt.Y("archetype_label:N", title="REG archetype", sort="-x"),
-            color=alt.Color("median_shift:Q", title="Median shift", scale=alt.Scale(scheme="redyellowgreen", reverse=True)),
+            color=alt.Color("median_model_shift:Q", title="Median model shift", scale=alt.Scale(scheme="redyellowgreen", reverse=True)),
             tooltip=[
                 alt.Tooltip("Season:O"),
                 alt.Tooltip("archetype_label:N", title="REG archetype"),
                 alt.Tooltip("players:Q", title="Players"),
-                alt.Tooltip("median_shift:Q", title="Median shift", format=".2f"),
+                alt.Tooltip("median_model_shift:Q", title="Median model shift", format=".2f"),
+                alt.Tooltip("archetype_change_rate:Q", title="Archetype change rate", format=".0%"),
+                alt.Tooltip("median_shift:Q", title="Median stat shift", format=".2f"),
                 alt.Tooltip("median_pgp_change:Q", title="Median P/GP change", format="+.2f"),
                 alt.Tooltip("median_toi_change:Q", title="Median TOI change", format="+.1f"),
             ],
@@ -266,16 +333,18 @@ with tab_archetypes:
     st.altair_chart(heat, use_container_width=True)
 
     st.dataframe(
-        arch.sort_values(["season", "median_shift"], ascending=[False, False]).rename(
+        arch.sort_values(["season", "median_model_shift"], ascending=[False, False]).rename(
             columns={
                 "Season": "Season",
                 "archetype_label": "REG archetype",
                 "players": "Players",
-                "median_shift": "Median shift",
+                "median_model_shift": "Median model shift",
+                "archetype_change_rate": "Archetype change rate",
+                "median_shift": "Median stat shift",
                 "median_pgp_change": "Median P/GP change",
                 "median_toi_change": "Median TOI change",
             }
-        )[["Season", "REG archetype", "Players", "Median shift", "Median P/GP change", "Median TOI change"]],
+        )[["Season", "REG archetype", "Players", "Median model shift", "Archetype change rate", "Median stat shift", "Median P/GP change", "Median TOI change"]],
         use_container_width=True,
         hide_index=True,
     )

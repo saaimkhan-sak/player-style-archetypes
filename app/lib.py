@@ -1,11 +1,16 @@
 from __future__ import annotations
-import re
+import sys
 from pathlib import Path
 import pandas as pd
 import streamlit as st
 
 DATA_DIR = Path("data/app")
 REPORTS_DIR = Path("reports")
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from src.archetype_labels import build_archetype_name_summary, parse_trait_string
 
 def season_key_to_label(k: str) -> str:
     k = str(k).strip()
@@ -49,56 +54,12 @@ def load_archetype_name_map_for_season(group: str, season_key: str) -> dict[int,
 
     traits_df = pd.read_csv(p)
 
-    def parse_trait_string(s: str):
-        if not isinstance(s, str):
-            return []
-        out = []
-        for part in s.split(","):
-            part = part.strip()
-            m = re.match(r"^([A-Za-z0-9_]+)\(([+-]?\d+\.?\d*)\)$", part)
-            if m:
-                out.append((m.group(1), float(m.group(2))))
-        return out
-
-    def build_name(high_tokens, low_tokens, k: int) -> str:
-        high_feats = {f for f, _ in high_tokens}
-        low_feats  = {f for f, _ in low_tokens}
-
-        offense_hi = any(f in high_feats for f in ["reg_points_per60","reg_goals_per60","reg_assists_per60","reg_shots_per60"])
-        playmaking_hi = "reg_assists_per60" in high_feats
-        shooting_hi = "reg_shots_per60" in high_feats
-        blocks_hi = "reg_blocked_shots_per60" in high_feats
-        hits_hi = "reg_hits_per60" in high_feats
-        pim_hi = "reg_pim_per60" in high_feats
-        takeaways_hi = "reg_takeaways_per60" in high_feats
-        giveaways_lo = "reg_giveaways_per60" in low_feats
-        fo_hi = ("reg_fo_taken_per_game" in high_feats) or ("reg_fo_pct" in high_feats)
-        pk_hi = "reg_pk_share" in high_feats
-        pp_hi = "reg_pp_share" in high_feats
-
-        if pim_hi and hits_hi:
-            return "Agitating Heavy-Contact Forward"
-        if blocks_hi and hits_hi:
-            return "Shot-Blocking Contact Specialist"
-        if offense_hi and playmaking_hi and shooting_hi:
-            return "High-Volume Playmaking Scorer"
-        if takeaways_hi and giveaways_lo:
-            return "Puck-Pressure Two-Way Creator"
-        if fo_hi and not offense_hi:
-            return "Deployment / Faceoff Specialist"
-        if pk_hi and not pp_hi:
-            return "PK-Leaning Defensive Role"
-        if pp_hi and not pk_hi:
-            return "PP-Leaning Offensive Role"
-
-        return f"Mixed Profile Archetype {k}"
-
     m: dict[int, str] = {}
     for _, tr in traits_df.iterrows():
         kk = int(tr["cluster"])
         high = parse_trait_string(tr.get("top_traits", ""))
         low  = parse_trait_string(tr.get("low_traits", ""))
-        m[kk] = build_name(high, low, kk)
+        m[kk], _ = build_archetype_name_summary(kk, high, low)
 
     return m
 

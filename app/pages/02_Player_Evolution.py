@@ -1,5 +1,4 @@
 import sys
-import re
 from pathlib import Path
 
 import numpy as np
@@ -16,8 +15,10 @@ if str(APP_DIR) not in sys.path:
 
 from lib import (
     available_seasons,
+    build_archetype_name_summary,
     season_key_to_label,
     load_all_seasons_group,
+    parse_trait_string,
 )
 
 REPORTS_DIR = Path("reports")
@@ -50,18 +51,6 @@ def era5(season_key: str) -> str:
         return "2015–2019"
     return "2020–2025"
 
-def parse_trait_string(s: str):
-    # "reg_shots_per60(+1.23),reg_points_per60(+0.77)"
-    if not isinstance(s, str):
-        return []
-    out = []
-    for part in s.split(","):
-        part = part.strip()
-        m = re.match(r"^([A-Za-z0-9_]+)\(([+-]?\d+\.?\d*)\)$", part)
-        if m:
-            out.append((m.group(1), float(m.group(2))))
-    return out
-
 def prettify_traits_lines(s: str, max_items: int = 4) -> str:
     """
     Convert a traits string like:
@@ -74,43 +63,6 @@ def prettify_traits_lines(s: str, max_items: int = 4) -> str:
         arrow = "↑" if z >= 0 else "↓"
         lines.append(f"{arrow} {feat} ({z:+.1f}σ)")
     return "\n".join(lines)
-
-
-def build_unique_name_summary(cluster: int, high_tokens, low_tokens):
-    """
-    Same naming logic as your main app: generates a descriptive archetype name.
-    """
-    high_feats = {f for f, _ in high_tokens}
-    low_feats = {f for f, _ in low_tokens}
-
-    offense_hi = any(f in high_feats for f in ["reg_points_per60","reg_goals_per60","reg_assists_per60","reg_shots_per60"])
-    playmaking_hi = "reg_assists_per60" in high_feats
-    shooting_hi = "reg_shots_per60" in high_feats
-    blocks_hi = "reg_blocked_shots_per60" in high_feats
-    hits_hi = "reg_hits_per60" in high_feats
-    pim_hi = "reg_pim_per60" in high_feats
-    takeaways_hi = "reg_takeaways_per60" in high_feats
-    giveaways_lo = "reg_giveaways_per60" in low_feats
-    pk_hi = "reg_pk_share" in high_feats
-    pp_hi = "reg_pp_share" in high_feats
-    fo_hi = ("reg_fo_taken_per_game" in high_feats) or ("reg_fo_pct" in high_feats)
-
-    if pim_hi and hits_hi:
-        return "Agitating Heavy-Contact Forward", ""
-    if blocks_hi and hits_hi:
-        return "Shot-Blocking Contact Specialist", ""
-    if offense_hi and playmaking_hi and shooting_hi:
-        return "High-Volume Playmaking Scorer", ""
-    if takeaways_hi and giveaways_lo:
-        return "Puck-Pressure Two-Way Creator", ""
-    if fo_hi and not offense_hi:
-        return "Deployment / Faceoff Specialist", ""
-    if pk_hi and not pp_hi:
-        return "PK-Leaning Defensive Role", ""
-    if pp_hi and not pk_hi:
-        return "PP-Leaning Offensive Role", ""
-
-    return f"Mixed Profile Archetype {cluster}", ""
 
 def archetype_description_from_traits(name: str, top_traits: str, low_traits: str) -> str:
     """
@@ -136,7 +88,7 @@ def archetype_description_from_traits(name: str, top_traits: str, low_traits: st
     if "pp-leaning" in n.lower() or "reg_pp_share" in top:
         return "Power-play leaning profile: production is driven by scoring-role deployment and PP usage."
 
-    return "Mixed profile: blends multiple trait patterns rather than cleanly matching one extreme archetype."
+    return "Blended profile: combines multiple trait patterns rather than cleanly matching one extreme archetype."
 
 
 @st.cache_data
@@ -162,7 +114,7 @@ def build_season_cluster_to_name(group: str) -> dict[tuple[str,int], str]:
             kk = int(tr["cluster"])
             ht = parse_trait_string(tr.get("top_traits", ""))
             lt = parse_trait_string(tr.get("low_traits", ""))
-            nm, _ = build_unique_name_summary(kk, ht, lt)
+            nm, _ = build_archetype_name_summary(kk, ht, lt)
             mapping[(sk, kk)] = nm
     return mapping
 
@@ -661,4 +613,3 @@ final_cols = [c for c in final_cols if c in strip.columns]
 strip = strip[final_cols]
 
 st.dataframe(strip, use_container_width=True, hide_index=True)
-

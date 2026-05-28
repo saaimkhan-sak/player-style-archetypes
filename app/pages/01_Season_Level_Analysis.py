@@ -1,4 +1,4 @@
-import re
+import sys
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -19,6 +19,11 @@ except Exception:
 
 DATA_DIR = Path("data/app")
 REPORTS_DIR = Path("reports")
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from src.archetype_labels import build_archetype_name_summary, parse_trait_string
 
 
 
@@ -306,17 +311,6 @@ TRAIT_LABELS = {
     "reg_fo_taken_per_game": "Faceoffs / game",
 }
 
-def parse_trait_string(s: str):
-    if not isinstance(s, str):
-        return []
-    out = []
-    for part in s.split(","):
-        part = part.strip()
-        m = re.match(r"^([A-Za-z0-9_]+)\(([+-]?\d+\.?\d*)\)$", part)
-        if m:
-            out.append((m.group(1), float(m.group(2))))
-    return out
-
 def format_traits_multiline(tokens, max_items=5):
     lines = []
     for feat, z in tokens[:max_items]:
@@ -333,53 +327,6 @@ def format_examples_multiline(s: str, max_players=7):
     for it in items[:max_players]:
         cleaned.append(it.split(" p=")[0].strip())
     return "\n".join(cleaned)
-
-def build_unique_name_summary(cluster: int, high_tokens, low_tokens):
-    high_feats = {f for f, _ in high_tokens}
-    low_feats = {f for f, _ in low_tokens}
-
-    offense_hi = any(f in high_feats for f in ["reg_points_per60","reg_goals_per60","reg_assists_per60","reg_shots_per60"])
-    playmaking_hi = "reg_assists_per60" in high_feats
-    shooting_hi = "reg_shots_per60" in high_feats
-    blocks_hi = "reg_blocked_shots_per60" in high_feats
-    hits_hi = "reg_hits_per60" in high_feats
-    pim_hi = "reg_pim_per60" in high_feats
-    takeaways_hi = "reg_takeaways_per60" in high_feats
-    giveaways_lo = "reg_giveaways_per60" in low_feats
-    pk_hi = "reg_pk_share" in high_feats
-    pp_hi = "reg_pp_share" in high_feats
-    fo_hi = ("reg_fo_taken_per_game" in high_feats) or ("reg_fo_pct" in high_feats)
-
-    if pim_hi and hits_hi:
-        name = "Agitating Heavy-Contact Forward"
-        summary = "High-contact profile that plays on the edge: delivers hits and takes more penalties, with lower scoring involvement."
-    elif blocks_hi and hits_hi:
-        name = "Shot-Blocking Contact Specialist"
-        summary = "Defense-tilted role profile: blocks shots and plays physically; offensive creation is typically lower."
-    elif offense_hi and playmaking_hi and shooting_hi:
-        name = "High-Volume Playmaking Scorer"
-        summary = "Offense driver: creates shots and playmaking at high rates, producing strong points/60."
-    elif takeaways_hi and giveaways_lo:
-        name = "Puck-Pressure Two-Way Creator"
-        summary = "Pressure-and-recover style: generates takeaways while keeping giveaways relatively low, and still contributes offensively."
-    elif fo_hi and not offense_hi:
-        name = "Deployment / Faceoff Specialist"
-        summary = "Usage-driven profile: takes many draws and plays role minutes; style reflects deployment more than pure scoring."
-    elif pk_hi and not pp_hi:
-        name = "PK-Leaning Defensive Role"
-        summary = "Shorthanded-usage anchored profile: more value shows up in role/defensive usage than scoring."
-    elif pp_hi and not pk_hi:
-        name = "PP-Leaning Offensive Role"
-        summary = "Power-play usage anchored profile: production is driven by scoring-role deployment."
-    else:
-        name = f"Mixed Profile Archetype {cluster}"
-        summary = "Distinct statistical footprint relative to peers (see the trait deltas for what stands out)."
-
-    if high_tokens and low_tokens:
-        hi1 = TRAIT_LABELS.get(high_tokens[0][0], high_tokens[0][0])
-        lo1 = TRAIT_LABELS.get(low_tokens[0][0], low_tokens[0][0])
-        summary += f" Key signature: higher {hi1}, lower {lo1}."
-    return name, summary
 
 PRELINE_CENTER = {
     "whiteSpace": "pre-line",
@@ -482,7 +429,7 @@ def load_archetype_name_map_for_season(group: str, season_key: str) -> dict[int,
         kk = int(tr["cluster"])
         ht = parse_trait_string(tr.get("top_traits", ""))
         lt = parse_trait_string(tr.get("low_traits", ""))
-        nm, _ = build_unique_name_summary(kk, ht, lt)
+        nm, _ = build_archetype_name_summary(kk, ht, lt)
         m[kk] = nm
     return m
 
@@ -554,7 +501,7 @@ if traits is not None:
         kk = int(tr["cluster"])
         ht = parse_trait_string(tr.get("top_traits", ""))
         lt = parse_trait_string(tr.get("low_traits", ""))
-        nm, _ = build_unique_name_summary(kk, ht, lt)
+        nm, _ = build_archetype_name_summary(kk, ht, lt)
         archetype_name_map[kk] = nm
 
 # Relative confidence thresholds for non-Player-Explorer tables
@@ -606,9 +553,9 @@ Each data point contributes to “style” like this:
 
     st.markdown(
     """
-**Why do “Mixed Profile” archetypes exist?**  
+**Why do blended style profiles exist?**  
 The model is probabilistic: instead of forcing every player into exactly one bucket, it assigns a probability over archetypes.  
-Some players genuinely combine traits that sit between multiple clusters (e.g., moderate scoring + moderate physical play), so they appear as “mixed” because their probability mass is spread across archetypes rather than concentrated in one.
+Some players genuinely combine traits that sit between multiple clusters (e.g., moderate scoring + moderate physical play), so their profile names describe the strongest trait combination rather than pretending every cluster is one clean role.
 """
     )
     st.markdown(
@@ -633,7 +580,7 @@ if traits is not None:
         k = int(r.cluster)
         high_tokens = parse_trait_string(getattr(r, "top_traits", ""))
         low_tokens  = parse_trait_string(getattr(r, "low_traits", ""))
-        name, summary = build_unique_name_summary(k, high_tokens, low_tokens)
+        name, summary = build_archetype_name_summary(k, high_tokens, low_tokens)
         legend_rows.append({
             "Archetype": f"A{k}",
             "Name": name,
@@ -1021,4 +968,3 @@ with tabs[2]:
         extra_styles={"Target similarity (%)": similarity_js_fixed_bins()},
         key_suffix=f"needfinder_target_{target}"
     )
-
