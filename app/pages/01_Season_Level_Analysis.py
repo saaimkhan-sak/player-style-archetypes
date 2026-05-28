@@ -6,6 +6,7 @@ import altair as alt
 from pathlib import Path
 import datetime
 import json
+import html
 
 
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
@@ -861,16 +862,16 @@ with tabs[0]:
 # Team Roster Fit
 # -------------------------
 with tabs[1]:
-    st.subheader("Team Roster Fit")
+    st.subheader("Team Roster Construction")
     st.markdown("""
 **What you’re looking at**
-- A team-level style breakdown: each bar is the team’s share of each archetype, weighted by regular-season minutes.
-- A roster list showing who is driving each archetype on that team.
+- A depth-chart view of the selected team using the 12 forwards or 8 defensemen with the most regular-season ice time.
+- Style concentration rings showing the dominant archetype overall and how much of it lives in the top half vs bottom half of the roster.
 
 **What you can learn**
-- Which archetypes the team leans on most.
-- Which archetypes are underrepresented (potential roster “gaps”).
-- Which players contribute to those archetypes (and with what confidence).
+- Whether the team identity is concentrated in stars or spread through depth.
+- Which lines/pairs carry each profile.
+- Where the roster construction is balanced or thin.
 """)
 
     all_teams = sorted({t for s in df["teams_played"].dropna().unique() for t in str(s).split("/")})
@@ -880,62 +881,138 @@ with tabs[1]:
     if team_df.empty:
         st.warning("No players found for that team.")
     else:
-        # --- Team archetype share bar chart (restored) ---
-        w = (team_df["reg_avg_toi_min"].to_numpy(dtype=float) * team_df["reg_games"].to_numpy(dtype=float)) + 1e-9
+        slot_size = 3 if group == "forwards" else 2
+        roster_n = 12 if group == "forwards" else 8
+        top_n = 6 if group == "forwards" else 4
+        slot_label = "Line" if group == "forwards" else "Pair"
+        top_label = "Top 6" if group == "forwards" else "Top 4"
+        bottom_label = "Bottom 6" if group == "forwards" else "Bottom 4"
+
+        roster = team_df.copy()
+        roster["reg_toi_total"] = pd.to_numeric(roster["reg_avg_toi_min"], errors="coerce").fillna(0) * pd.to_numeric(roster["reg_games"], errors="coerce").fillna(0)
+        roster = roster.sort_values(["reg_toi_total", "confidence"], ascending=False).head(roster_n).reset_index(drop=True)
+        roster["Depth"] = roster.index + 1
+        roster["Unit"] = roster.index // slot_size + 1
+        roster["Archetype"] = roster["top_cluster"].apply(lambda x: archetype_name_map.get(safe_int(x), f"Archetype {safe_int(x)}"))
+        roster["Confidence (%)"] = (roster["confidence"].astype(float) * 100).round(1)
+
+        weights = roster["reg_toi_total"].to_numpy(dtype=float) + 1e-9
         shares = []
         for k in range(K):
-            shares.append(float(np.average(team_df[pcols[k]].to_numpy(dtype=float), weights=w)))
+            shares.append(float(np.average(roster[pcols[k]].to_numpy(dtype=float), weights=weights)))
+        top_k = int(np.argmax(shares))
+        dominant = archetype_name_map.get(top_k, f"Archetype {top_k}")
+        dom_color, dom_fg = PROFILE_COLOR_MAP.get(dominant, ("#64748B", "#FFFFFF"))
 
-        comp_df = pd.DataFrame({
-            "Archetype": [archetype_name_map.get(k, f"Archetype {k}") for k in range(K)],
-            "Name": [wrap_label(archetype_name_map.get(k, f"Archetype {k}"), width=18) for k in range(K)],
-            "Share": shares,
-        })
-        top_k = int(comp_df["Share"].to_numpy().argmax())
-        comp_df["is_top"] = comp_df["Archetype"] == archetype_name_map.get(top_k, f"Archetype {top_k}")
-        comp_df["Share (%)"] = (comp_df["Share"] * 100).round(1)
+        top_half = roster.head(top_n)
+        bottom_half = roster.iloc[top_n:roster_n]
 
-        bars = (
-            alt.Chart(comp_df)
-            .mark_bar(size=55, cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
-            .encode(
-                x=alt.X("Archetype:O", axis=alt.Axis(labelAngle=0, labels=False, title=None)),
-                y=alt.Y("Share:Q", axis=nice_axis(), title="REG-TOI-weighted share", scale=alt.Scale(domain=[0, 1])),
-                color=alt.Color("Archetype:N", legend=None, scale=alt.Scale(domain=ARCHETYPE_COLOR_DOMAIN, range=ARCHETYPE_COLOR_RANGE)),
-                tooltip=[
-                    alt.Tooltip("Archetype:N", title="Archetype"),
-                    alt.Tooltip("Share (%):Q", format=".1f", title="Share (%)"),
-                ]
+        def weighted_share(sub: pd.DataFrame, k: int) -> float:
+            if sub.empty:
+                return 0.0
+            wt = sub["reg_toi_total"].to_numpy(dtype=float) + 1e-9
+            return float(np.average(sub[f"p{k}"].to_numpy(dtype=float), weights=wt))
 
-            )
-            .properties(height=260)
-        )
+        overall_pct = shares[top_k] * 100
+        top_pct = weighted_share(top_half, top_k) * 100
+        bottom_pct = weighted_share(bottom_half, top_k) * 100
+        spread_gap = abs(top_pct - bottom_pct)
+        identity_note = "star-loaded" if top_pct - bottom_pct >= 15 else "depth-loaded" if bottom_pct - top_pct >= 15 else "balanced through the roster"
 
-        name_labels = (
-            alt.Chart(comp_df)
-            .mark_text(
-                dy=18,               # pushes text below axis baseline
-                fontSize=14,
-                color="#111827"
-            )
-            .encode(
-                x=alt.X("Archetype:O"),
-                y=alt.value(0),      # anchor at bottom
-                text=alt.Text("Name:N"),
-                tooltip=["Archetype"]
-            )
-        )
+        def ring(label: str, pct: float, sub: str) -> str:
+            pct = max(0, min(100, float(pct)))
+            return f"""
+<div class="identity-ring">
+  <div class="ring" style="background:conic-gradient({dom_color} {pct:.1f}%, #E5E7EB 0);">
+    <div class="ring-core"><div class="ring-pct">{pct:.0f}%</div><div class="ring-label">{html.escape(label)}</div></div>
+  </div>
+  <div class="ring-sub">{html.escape(sub)}</div>
+</div>
+"""
 
-
-
-        st.altair_chart((bars + name_labels).properties(height=320), use_container_width=True)
-
-        # --- Underrepresented archetypes (roster gaps) table (restored) ---
-        st.markdown("### Underrepresented archetypes (Roster Gaps)")
         st.markdown(
-            "I flag gaps by comparing this team’s archetype mix to the league distribution, and checking whether the archetype has "
-            "strong minutes coverage (players with high membership) or is concentrated in only 1–2 players."
+            f"""
+<style>
+.construction-wrap {{display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:16px; margin: 8px 0 18px;}}
+.identity-ring {{border:1px solid #E5E7EB; border-radius:8px; padding:18px; background:#FFFFFF; text-align:center;}}
+.ring {{width:154px; height:154px; border-radius:50%; margin:0 auto 10px; display:grid; place-items:center;}}
+.ring-core {{width:108px; height:108px; border-radius:50%; background:#FFFFFF; display:grid; place-items:center; align-content:center; box-shadow: inset 0 0 0 1px #E5E7EB;}}
+.ring-pct {{font-size:30px; line-height:1; font-weight:800; color:#111827;}}
+.ring-label {{font-size:12px; color:#4B5563; margin-top:4px;}}
+.ring-sub {{font-size:13px; color:#374151;}}
+.line-grid {{display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:12px;}}
+.unit-card {{border:1px solid #E5E7EB; border-radius:8px; background:#FFFFFF; overflow:hidden;}}
+.unit-head {{padding:10px 12px; font-weight:800; background:#F9FAFB; border-bottom:1px solid #E5E7EB;}}
+.player-row {{padding:10px 12px; border-bottom:1px solid #F3F4F6;}}
+.player-row:last-child {{border-bottom:0;}}
+.player-name {{font-weight:750; color:#111827;}}
+.player-meta {{font-size:12px; color:#6B7280; margin-top:2px;}}
+.profile-chip {{display:inline-flex; margin-top:7px; padding:3px 8px; border-radius:999px; font-size:12px; font-weight:750;}}
+@media (max-width: 900px) {{.construction-wrap,.line-grid {{grid-template-columns:1fr;}}}}
+</style>
+<div class="construction-wrap">
+{ring("Overall", overall_pct, dominant)}
+{ring(top_label, top_pct, f"{dominant} concentration")}
+{ring(bottom_label, bottom_pct, f"{dominant} concentration")}
+</div>
+""",
+            unsafe_allow_html=True,
         )
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Dominant profile", dominant)
+        c2.metric("Construction read", identity_note)
+        c3.metric("Top/bottom gap", f"{spread_gap:.0f} pts")
+
+        st.markdown(f"### {team} {slot_label.lower()} construction")
+        st.caption("Currently ordered by regular-season TOI. This can ingest MoneyPuck line/pairing TOI when that data is added to the repo.")
+
+        unit_html = ['<div class="line-grid">']
+        for unit, sub in roster.groupby("Unit", sort=True):
+            unit_html.append(f'<div class="unit-card"><div class="unit-head">{slot_label} {int(unit)}</div>')
+            for _, r in sub.iterrows():
+                arch = r["Archetype"]
+                bg, fg = PROFILE_COLOR_MAP.get(arch, ("#E5E7EB", "#111827"))
+                unit_html.append(
+                    f"""<div class="player-row">
+  <div class="player-name">{html.escape(str(r["full_name"]))}</div>
+  <div class="player-meta">{html.escape(str(r["position"]))} · {int(r.get("reg_games", 0))} GP · {min_to_mmss(r.get("reg_avg_toi_min", 0))} ATOI · {r["Confidence (%)"]:.1f}%</div>
+  <span class="profile-chip" style="background:{bg};color:{fg};">{html.escape(arch)}</span>
+</div>"""
+                )
+            unit_html.append("</div>")
+        unit_html.append("</div>")
+        st.markdown("".join(unit_html), unsafe_allow_html=True)
+
+        st.markdown("### Roster profile mix")
+        mix_rows = []
+        for k, share in enumerate(shares):
+            name = archetype_name_map.get(k, f"Archetype {k}")
+            mix_rows.append({
+                "Archetype": name,
+                "Overall (%)": round(share * 100, 1),
+                f"{top_label} (%)": round(weighted_share(top_half, k) * 100, 1),
+                f"{bottom_label} (%)": round(weighted_share(bottom_half, k) * 100, 1),
+            })
+        st.dataframe(pd.DataFrame(mix_rows).sort_values("Overall (%)", ascending=False), use_container_width=True, hide_index=True)
+
+        st.markdown("### Depth chart table")
+        show_roster = roster[["Unit", "Depth", "full_name", "position", "Archetype", "Confidence (%)", "reg_games", "reg_avg_toi_min", "reg_points", "reg_goals", "reg_assists"]].rename(columns={
+            "Unit": slot_label,
+            "full_name": "Player",
+            "position": "Pos",
+            "reg_games": "REG GP",
+            "reg_avg_toi_min": "REG ATOI",
+            "reg_points": "REG P",
+            "reg_goals": "REG G",
+            "reg_assists": "REG A",
+        })
+        show_roster["REG ATOI"] = show_roster["REG ATOI"].apply(min_to_mmss)
+        st.dataframe(show_roster, use_container_width=True, hide_index=True)
+
+        st.divider()
+        st.markdown("### League-context roster gaps")
+        st.caption("Gap score compares this team's profile mix to the rest of the league using the same selected group.")
 
         def _team_metrics(team_abbrev: str):
             tdf = df[df["teams_played"].fillna("").str.contains(team_abbrev)].copy()
@@ -999,45 +1076,6 @@ with tabs[1]:
                 "Archetype","Team share (%)","League avg (%)","Z-score","Strong coverage (%)","Reliance on top 2 (%)","Note"
             ]].reset_index(drop=True)
             st.dataframe(show.reset_index(drop=True), use_container_width=True, hide_index=True)
-
-
-        # --- Roster list (restored; includes reg/po stats, order like Player Explorer) ---
-        st.markdown("### Roster list")
-        r = team_df.copy()
-        r["Archetype"] = r["top_cluster"].apply(lambda x: archetype_name_map.get(safe_int(x), f"Archetype {safe_int(x)}"))
-        r["Archetype details"] = r["top_cluster"].apply(
-            lambda x: archetype_detail_map.get(safe_int(x), archetype_name_map.get(safe_int(x), f"Archetype {safe_int(x)}"))
-        )
-        r["Confidence"] = (r["confidence"].astype(float) * 100).round(1).astype(str) + "%"
-        r["REG ATOI"] = r["reg_avg_toi_min"].apply(min_to_mmss)
-        r["PO ATOI"] = r["po_avg_toi_min"].apply(min_to_mmss)
-
-        roster_tbl = pd.DataFrame({
-            "Player": r["full_name"],
-            "Teams": r["teams_played"],
-            "Archetype": r["Archetype"],
-            "Archetype details": r["Archetype details"],
-            "Confidence": r["Confidence"],
-            "Pos": r["position"],
-            "REG GP": r["reg_games"],
-            "REG ATOI": r["REG ATOI"],
-            "REG P": r["reg_points"],
-            "REG G": r["reg_goals"],
-            "REG A": r["reg_assists"],
-            "REG SOG": r["reg_shots"],
-            "REG +/-": r["reg_plus_minus"],
-            "REG PIM": r.get("reg_pim", 0),
-            "PO GP": r["po_games"],
-            "PO ATOI": r["PO ATOI"],
-            "PO P": r["po_points"],
-            "PO G": r["po_goals"],
-            "PO A": r["po_assists"],
-            "PO SOG": r["po_shots"],
-            "PO +/-": r["po_plus_minus"],
-            "PO PIM": r.get("po_pim", 0),
-        }).sort_values(["REG P","REG GP"], ascending=False)
-
-        make_badge_grid(roster_tbl, height=600, pin_cols=("Player","Teams"), conf_mode="fixed", conf_q33=conf_q33, conf_q67=conf_q67, player_min_px=120, player_max_px=150)
 
 # -------------------------
 # Need Finder
