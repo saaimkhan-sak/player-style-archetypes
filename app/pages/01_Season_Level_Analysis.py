@@ -39,7 +39,22 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.archetype_labels import PROFILE_COLOR_MAP, build_archetype_name_summary, parse_trait_string
+from src.archetype_labels import build_archetype_name_summary, parse_trait_string
+try:
+    from src.archetype_labels import PROFILE_COLOR_MAP
+except ImportError:
+    PROFILE_COLOR_MAP = {
+        "High-Volume Playmaking Scorer": ("#2563EB", "#FFFFFF"),
+        "Low-Contact Scorer": ("#F97316", "#111827"),
+        "Shot-Blocking Contact Specialist": ("#0891B2", "#FFFFFF"),
+        "Agitating Heavy-Contact Forward": ("#DC2626", "#FFFFFF"),
+        "Puck-Pressure Two-Way Creator": ("#16A34A", "#FFFFFF"),
+        "Deployment / Role Specialist": ("#64748B", "#FFFFFF"),
+        "PP-Leaning Offensive Role": ("#D97706", "#111827"),
+        "PK-Leaning Defensive Role": ("#4F46E5", "#FFFFFF"),
+        "High-Touch Risk/Reward Playmaker": ("#9333EA", "#FFFFFF"),
+        "Checking-Line Disruptor": ("#BE123C", "#FFFFFF"),
+    }
 
 ARCHETYPE_LABEL_CACHE_KEY = "profile-colors-v2"
 
