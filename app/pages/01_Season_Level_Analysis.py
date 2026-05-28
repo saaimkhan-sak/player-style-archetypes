@@ -58,6 +58,28 @@ except ImportError:
 
 ARCHETYPE_LABEL_CACHE_KEY = "profile-colors-v2"
 
+def normalize_profile_name(name: str) -> str:
+    replacements = {
+        "Low-Contact Scoring Profile": "Low-Contact Scorer",
+        "Shooting / Scoring Profile": "Low-Contact Scorer",
+        "Shot-Creating Playmaker": "High-Volume Playmaking Scorer",
+        "Setup Playmaker": "High-Volume Playmaking Scorer",
+        "Shot-Volume Scorer": "Low-Contact Scorer",
+        "Volume Shooter": "Low-Contact Scorer",
+        "Finisher": "Low-Contact Scorer",
+        "Defense-First Shot Suppressor": "Shot-Blocking Contact Specialist",
+        "Shot Suppressor": "Shot-Blocking Contact Specialist",
+        "Puck Hunter": "Puck-Pressure Two-Way Creator",
+        "Puck-Pressure Scorer": "Puck-Pressure Two-Way Creator",
+        "Physical Disruptor": "Checking-Line Disruptor",
+        "Checking Forward": "Checking-Line Disruptor",
+        "Penalty-Drawn Edge Player": "Agitating Heavy-Contact Forward",
+        "Power-Play Specialist": "PP-Leaning Offensive Role",
+        "Penalty-Kill Specialist": "PK-Leaning Defensive Role",
+        "Role-Center Specialist": "Deployment / Role Specialist",
+    }
+    return replacements.get(str(name), str(name))
+
 
 
 def available_seasons() -> list[str]:
@@ -401,6 +423,7 @@ def build_archetype_detail_map(traits_df: pd.DataFrame | None) -> dict[int, str]
         high_tokens = parse_trait_string(getattr(r, "top_traits", ""))
         low_tokens = parse_trait_string(getattr(r, "low_traits", ""))
         name, summary = build_archetype_name_summary(k, high_tokens, low_tokens)
+        name = normalize_profile_name(name)
         higher = format_traits_inline(high_tokens, max_items=5) or "None"
         lower = format_traits_inline(low_tokens, max_items=4) or "None"
         details[k] = (
@@ -588,7 +611,7 @@ if traits is not None:
         ht = parse_trait_string(tr.get("top_traits", ""))
         lt = parse_trait_string(tr.get("low_traits", ""))
         nm, _ = build_archetype_name_summary(kk, ht, lt)
-        archetype_name_map[kk] = nm
+        archetype_name_map[kk] = normalize_profile_name(nm)
 archetype_detail_map = build_archetype_detail_map(traits)
 
 # Relative confidence thresholds for non-Player-Explorer tables
@@ -668,6 +691,7 @@ if traits is not None:
         high_tokens = parse_trait_string(getattr(r, "top_traits", ""))
         low_tokens  = parse_trait_string(getattr(r, "low_traits", ""))
         name, summary = build_archetype_name_summary(k, high_tokens, low_tokens)
+        name = normalize_profile_name(name)
         legend_rows.append({
             "Archetype": name,
             "Summary": summary,

@@ -452,14 +452,14 @@ def build_glossary(group: str, all_df: pd.DataFrame, mapping: dict[tuple[str,int
 traits_f = traits_registry("forwards", map_f)
 traits_d = traits_registry("defense", map_d)
 
-glossary_f = build_glossary("forwards", all_f, map_f, traits_f)
-glossary_d = build_glossary("defense", all_d, map_d, traits_d)
-
-map_any = build_season_cluster_to_name("forwards")
-traits_any = traits_registry("forwards", map_any)  # if you’re still adding traits/desc
-glossary = build_glossary("combined", all_combined, map_any, traits_any)
-
 st.markdown("")
+glossary_group = st.radio("Glossary group", ["forwards", "defense"], horizontal=True)
+glossary = build_glossary(
+    glossary_group,
+    all_f if glossary_group == "forwards" else all_d,
+    map_f if glossary_group == "forwards" else map_d,
+    traits_f if glossary_group == "forwards" else traits_d,
+)
 if glossary.empty:
     st.info("No glossary available yet.")
 else:
