@@ -36,7 +36,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = ap.parse_args(argv)
     season = args.season_label
 
-    directory = pd.read_parquet("data/processed/player_directory.parquet")
+    dir_path = Path(f"data/processed/player_directory_{season}.parquet")
+    if not dir_path.exists():
+        legacy_path = Path("data/processed/player_directory.parquet")
+        if legacy_path.exists():
+            dir_path = legacy_path
+        else:
+            raise FileNotFoundError(
+                f"Missing {dir_path}. Run pipelines/06_build_player_directory.py --season_label {season} first."
+            )
+    directory = pd.read_parquet(dir_path)
     teams = pd.read_parquet(f"data/processed/player_season_teams_{season}.parquet")
     base = pd.read_parquet(f"data/features/player_season_boxscore_{season}.parquet")
 
