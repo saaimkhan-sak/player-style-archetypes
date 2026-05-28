@@ -73,6 +73,24 @@ def archetype_description_from_traits(name: str, top_traits: str, low_traits: st
     top = str(top_traits).lower()
     low = str(low_traits).lower()
 
+    if "risk/reward" in n.lower() or "high-touch" in n.lower():
+        return "Puck-dominant creator: handles the puck often and drives plays, but the role comes with more turnover risk."
+    if "low-contact scorer" in n.lower():
+        return "Skill-first scorer: produces offense while staying lighter on hits, blocks, and penalty-driven physical play."
+    if "shot-volume scorer" in n.lower():
+        return "Volume-based scorer: creates offense by generating shots frequently and turning that pressure into goals or points."
+    if "volume shooter" in n.lower():
+        return "Shot-first attacker: stands out by putting pucks on net, even when the rest of the offensive profile is more moderate."
+    if "shot-creating playmaker" in n.lower():
+        return "Dual-threat creator: blends shot generation with setup play, so offense runs through both shooting and passing."
+    if "setup playmaker" in n.lower():
+        return "Pass-first creator: adds value by setting up teammates and driving assisted offense."
+    if "puck hunter" in n.lower():
+        return "Pressure player: hunts pucks, forces recoveries, and turns defensive pressure into possession."
+    if "checking-line disruptor" in n.lower() or "physical disruptor" in n.lower():
+        return "Contact-driven role: creates disruption through physical pressure more than scoring volume."
+    if "shot suppressor" in n.lower():
+        return "Defense-first role: takes on prevention minutes and blocks shots, with value showing up away from the scoresheet."
     if "agitating" in n.lower() or ("reg_pim_per60" in top and "reg_hits_per60" in top):
         return "Physical, high-edge profile: plays a heavy game and tends to take more penalties. Often lower offensive creation than scoring archetypes."
     if "shot-blocking" in n.lower() or "reg_blocked_shots_per60" in top:
@@ -88,7 +106,7 @@ def archetype_description_from_traits(name: str, top_traits: str, low_traits: st
     if "pp-leaning" in n.lower() or "reg_pp_share" in top:
         return "Power-play leaning profile: production is driven by scoring-role deployment and PP usage."
 
-    return "Blended profile: combines multiple trait patterns rather than cleanly matching one extreme archetype."
+    return "Balanced contributor: has a recognizable statistical lean, but not one extreme enough to dominate the whole role."
 
 
 @st.cache_data

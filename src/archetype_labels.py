@@ -56,18 +56,43 @@ def _ordered_categories(tokens: list[TraitToken]) -> list[str]:
     return deduped
 
 
-def _low_context(low_features: set[str]) -> str:
-    offense = {"reg_points_per60", "reg_goals_per60", "reg_assists_per60", "reg_shots_per60"}
-    physical = {"reg_hits_per60", "reg_blocked_shots_per60", "reg_pim_per60"}
-    puck_risk = {"reg_giveaways_per60"}
+def _fallback_role_name(cluster: int, high_tokens: list[TraitToken], low_features: set[str]) -> tuple[str, str]:
+    high_features = {feature for feature, _ in high_tokens}
+    categories = _ordered_categories(high_tokens)
 
-    if _has(low_features, offense):
-        return "Defensive"
-    if _has(low_features, physical):
-        return "Low-Contact"
-    if _has(low_features, puck_risk):
-        return "Controlled"
-    return "Balanced"
+    if _has(high_features, ["reg_shots_per60", "reg_points_per60", "reg_goals_per60"]):
+        if "reg_assists_per60" in high_features:
+            return "Shot-Creating Playmaker", "Creates offense through both shot volume and setup play, with scoring chances flowing through the puck on their stick."
+        if "reg_shots_per60" in high_features and _has(high_features, ["reg_points_per60", "reg_goals_per60"]):
+            return "Shot-Volume Scorer", "Generates offense by getting pucks on net and converting that shot volume into goals or points."
+        if "reg_shots_per60" in high_features:
+            return "Volume Shooter", "Looks to create through shot generation first, even when the broader scoring profile is less extreme."
+        return "Finisher", "Stands out most through goal and point production rather than physical play or defensive usage."
+
+    if "reg_assists_per60" in high_features:
+        return "Setup Playmaker", "Creates value primarily by setting up teammates and driving assisted offense."
+    if "reg_takeaways_per60" in high_features:
+        return "Puck Hunter", "Stands out by pressuring puck carriers and turning defensive pressure into regained possessions."
+    if "reg_giveaways_per60" in high_features:
+        return "High-Touch Puck Mover", "Handles the puck often enough to create plays, with more turnover risk attached to that responsibility."
+    if "reg_hits_per60" in high_features and _has(low_features, ["reg_points_per60", "reg_goals_per60", "reg_assists_per60"]):
+        return "Checking Forward", "Impacts games through contact and forechecking pressure more than scoring output."
+    if "reg_hits_per60" in high_features:
+        return "Physical Disruptor", "Creates separation through contact and pressure, adding value away from pure scoring."
+    if "reg_blocked_shots_per60" in high_features:
+        return "Shot Suppressor", "Absorbs defensive minutes and blocks shots, with value showing up in prevention work."
+    if "reg_pim_per60" in high_features:
+        return "Penalty-Drawn Edge Player", "Plays an abrasive style where penalties are part of the statistical footprint."
+    if "reg_pp_share" in high_features:
+        return "Power-Play Specialist", "Receives offensive-zone and power-play usage, so production is tied to scoring-role deployment."
+    if "reg_pk_share" in high_features:
+        return "Penalty-Kill Specialist", "Leans into shorthanded and defensive usage rather than scoring-role deployment."
+    if _has(high_features, ["reg_fo_taken_per_game", "reg_fo_pct"]):
+        return "Role-Center Specialist", "Shows up through deployment details like draws, matchups, and role minutes."
+
+    if categories:
+        return f"Balanced {categories[0]} Contributor", "Has a real statistical signature, but it is more moderate than the extreme archetypes."
+    return f"Balanced Role Contributor {cluster}", "Does not lean heavily into one boxscore trait, so the cluster reads as a balanced role."
 
 
 def build_archetype_name_summary(cluster: int, high_tokens: list[TraitToken], low_tokens: list[TraitToken]) -> tuple[str, str]:
@@ -105,23 +130,12 @@ def build_archetype_name_summary(cluster: int, high_tokens: list[TraitToken], lo
     if blocks_hi and not offense_hi:
         return "Defense-First Shot Suppressor", "Low-offense profile built around blocked shots and defensive minutes."
     if hits_hi and not offense_hi:
-        return "Checking-Line Contact Profile", "Physical depth profile: contact and disruption matter more than scoring."
+        return "Checking-Line Disruptor", "Physical depth role: contact and disruption matter more than scoring."
     if scoring_hi and not hits_hi:
-        return "Low-Contact Scoring Profile", "Skill-leaning profile: offense without much physical play."
+        return "Low-Contact Scorer", "Skill-leaning scorer: creates offense without much physical play."
     if takeaways_hi and scoring_hi:
-        return "Puck-Pressure Scoring Profile", "Creates offense while pressuring puck carriers."
+        return "Puck-Pressure Scorer", "Creates offense while pressuring puck carriers."
     if giveaways_hi and playmaking_hi:
         return "High-Touch Risk/Reward Playmaker", "High-event puck profile: creates plays while carrying turnover risk."
 
-    categories = _ordered_categories(high_tokens)
-    if not categories:
-        return f"Balanced Role Profile {cluster}", "Balanced profile: no single trait dominates the cluster."
-
-    context = _low_context(low_features)
-    if len(categories) == 1:
-        name = f"{context} {categories[0]} Profile"
-    else:
-        name = f"{categories[0]} / {categories[1]} Profile"
-
-    summary = "Blended profile: combines the listed high traits rather than fitting a single extreme role."
-    return name, summary
+    return _fallback_role_name(cluster, high_tokens, low_features)
