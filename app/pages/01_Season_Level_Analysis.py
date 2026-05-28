@@ -11,6 +11,21 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
 
 st.set_page_config(page_title="Season-Level Analysis", layout="wide")
 
+st.markdown(
+    """
+<style>
+.ag-tooltip {
+  white-space: pre-line !important;
+  max-width: 420px !important;
+  line-height: 1.35 !important;
+  padding: 12px 14px !important;
+  border-radius: 8px !important;
+}
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
 import datetime, hashlib
 try:
     _app_hash = hashlib.md5(Path(__file__).read_bytes()).hexdigest()[:10]
@@ -242,11 +257,17 @@ function(params) {
 def make_badge_grid(df, height=560, pin_cols=("Player","Teams"), player_width_offset_px=0, player_min_px=280, player_max_px=700,
                     archetype_col="Archetype", confidence_col="Confidence",
                     conf_mode="fixed", conf_q33=80.0, conf_q67=90.0,
-                    extra_styles=None, key_suffix=""):
+                    extra_styles=None, key_suffix="", archetype_tooltip_col="Archetype details"):
     extra_styles = extra_styles or {}
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_default_column(sortable=True, filter=True, resizable=True, minWidth=80, flex=0, suppressSizeToFit=True)
-    gb.configure_grid_options(domLayout="normal", alwaysShowHorizontalScroll=True, alwaysShowVerticalScroll=True)
+    gb.configure_grid_options(
+        domLayout="normal",
+        alwaysShowHorizontalScroll=True,
+        alwaysShowVerticalScroll=True,
+        tooltipShowDelay=150,
+        tooltipHideDelay=12000,
+    )
 
     # widths (special-case Player to avoid truncation)
     for c in df.columns:
@@ -256,6 +277,10 @@ def make_badge_grid(df, height=560, pin_cols=("Player","Teams"), player_width_of
             width = int(min(max(player_min_px, max_len * 8 + 40 + player_width_offset_px), player_max_px))
         else:
             width = col_width(df, c, min_w=85, max_w=260)
+
+        if c == archetype_tooltip_col:
+            gb.configure_column(c, hide=True)
+            continue
 
         if c == "Teams":
             width = max(width, 160)
@@ -269,7 +294,13 @@ def make_badge_grid(df, height=560, pin_cols=("Player","Teams"), player_width_of
             gb.configure_column(c, pinned="left")
 
     if archetype_col in df.columns:
-        gb.configure_column(archetype_col, cellStyle=JsCode(ARCH_BADGE_JS), width=max(130, col_width(df, archetype_col, 110, 170)))
+        archetype_opts = {
+            "cellStyle": JsCode(ARCH_BADGE_JS),
+            "width": max(130, col_width(df, archetype_col, 110, 170)),
+        }
+        if archetype_tooltip_col in df.columns:
+            archetype_opts["tooltipField"] = archetype_tooltip_col
+        gb.configure_column(archetype_col, **archetype_opts)
     if confidence_col in df.columns:
         js = conf_js_fixed_thresholds() if conf_mode == "fixed" else conf_js_relative(conf_q33, conf_q67)
         gb.configure_column(confidence_col, cellStyle=JsCode(js), width=max(150, col_width(df, confidence_col, 120, 200)))
@@ -329,6 +360,26 @@ def format_examples_multiline(s: str, max_players=7):
     for it in items[:max_players]:
         cleaned.append(it.split(" p=")[0].strip())
     return "\n".join(cleaned)
+
+def build_archetype_detail_map(traits_df: pd.DataFrame | None) -> dict[int, str]:
+    if traits_df is None or traits_df.empty:
+        return {}
+
+    details: dict[int, str] = {}
+    for r in traits_df.itertuples(index=False):
+        k = int(r.cluster)
+        high_tokens = parse_trait_string(getattr(r, "top_traits", ""))
+        low_tokens = parse_trait_string(getattr(r, "low_traits", ""))
+        name, summary = build_archetype_name_summary(k, high_tokens, low_tokens)
+        higher = format_traits_multiline(high_tokens, max_items=5) or "None"
+        lower = format_traits_multiline(low_tokens, max_items=4) or "None"
+        details[k] = (
+            f"A{k}: {name}\n\n"
+            f"{summary}\n\n"
+            f"Higher than peers:\n{higher}\n\n"
+            f"Lower than peers:\n{lower}"
+        )
+    return details
 
 PRELINE_CENTER = {
     "whiteSpace": "pre-line",
@@ -509,6 +560,7 @@ if traits is not None:
         lt = parse_trait_string(tr.get("low_traits", ""))
         nm, _ = build_archetype_name_summary(kk, ht, lt)
         archetype_name_map[kk] = nm
+archetype_detail_map = build_archetype_detail_map(traits)
 
 # Relative confidence thresholds for non-Player-Explorer tables
 _conf = (df["confidence"].astype(float) * 100.0).replace([np.inf, -np.inf], np.nan).dropna()
@@ -622,6 +674,9 @@ with tabs[0]:
 
     disp = view.copy()
     disp["Archetype"] = disp["top_cluster"].apply(lambda x: f"A{safe_int(x)}")
+    disp["Archetype details"] = disp["top_cluster"].apply(
+        lambda x: archetype_detail_map.get(safe_int(x), f"A{safe_int(x)}")
+    )
     disp["Confidence"] = (disp["confidence"].astype(float) * 100).round(1).astype(str) + "%"
     disp["REG ATOI"] = disp["reg_avg_toi_min"].apply(min_to_mmss)
     disp["PO ATOI"] = disp["po_avg_toi_min"].apply(min_to_mmss)
@@ -630,6 +685,7 @@ with tabs[0]:
         "Player": disp["full_name"],
         "Teams": disp["teams_played"],
         "Archetype": disp["Archetype"],
+        "Archetype details": disp["Archetype details"],
         "Confidence": disp["Confidence"],
         "Pos": disp["position"],
         "REG GP": disp["reg_games"],
@@ -677,6 +733,9 @@ with tabs[0]:
 
         comps_disp = comps.copy()
         comps_disp["Archetype"] = comps_disp["top_cluster"].apply(lambda x: f"A{safe_int(x)}")
+        comps_disp["Archetype details"] = comps_disp["top_cluster"].apply(
+            lambda x: archetype_detail_map.get(safe_int(x), f"A{safe_int(x)}")
+        )
         comps_disp["Confidence"] = (comps_disp["confidence"].astype(float) * 100).round(1).astype(str) + "%"
         comps_disp["REG ATOI"] = comps_disp["reg_avg_toi_min"].apply(min_to_mmss)
         comps_disp["PO ATOI"] = comps_disp["po_avg_toi_min"].apply(min_to_mmss)
@@ -685,6 +744,7 @@ with tabs[0]:
             "Player": comps_disp["full_name"],
             "Teams": comps_disp["teams_played"],
             "Archetype": comps_disp["Archetype"],
+            "Archetype details": comps_disp["Archetype details"],
             "Confidence": comps_disp["Confidence"],
             "Similarity (%)": comps_disp["Similarity (%)"],
             "Pos": comps_disp["position"],
@@ -867,6 +927,9 @@ with tabs[1]:
         st.markdown("### Roster list")
         r = team_df.copy()
         r["Archetype"] = r["top_cluster"].apply(lambda x: f"A{safe_int(x)}")
+        r["Archetype details"] = r["top_cluster"].apply(
+            lambda x: archetype_detail_map.get(safe_int(x), f"A{safe_int(x)}")
+        )
         r["Confidence"] = (r["confidence"].astype(float) * 100).round(1).astype(str) + "%"
         r["REG ATOI"] = r["reg_avg_toi_min"].apply(min_to_mmss)
         r["PO ATOI"] = r["po_avg_toi_min"].apply(min_to_mmss)
@@ -875,6 +938,7 @@ with tabs[1]:
             "Player": r["full_name"],
             "Teams": r["teams_played"],
             "Archetype": r["Archetype"],
+            "Archetype details": r["Archetype details"],
             "Confidence": r["Confidence"],
             "Pos": r["position"],
             "REG GP": r["reg_games"],
@@ -934,6 +998,9 @@ with tabs[2]:
 
     o = out.copy()
     o["Archetype"] = o["top_cluster"].apply(lambda x: f"A{safe_int(x)}")
+    o["Archetype details"] = o["top_cluster"].apply(
+        lambda x: archetype_detail_map.get(safe_int(x), f"A{safe_int(x)}")
+    )
     o["Confidence"] = (o["confidence"].astype(float) * 100).round(1).astype(str) + "%"
     o["REG ATOI"] = o["reg_avg_toi_min"].apply(min_to_mmss)
     o["PO ATOI"] = o["po_avg_toi_min"].apply(min_to_mmss)
@@ -942,6 +1009,7 @@ with tabs[2]:
         "Player": o["full_name"],
         "Teams": o["teams_played"],
         "Archetype": o["Archetype"],
+        "Archetype details": o["Archetype details"],
         "Confidence": o["Confidence"],
         "Target similarity (%)": o["Target similarity (%)"],
         "Pos": o["position"],
