@@ -156,6 +156,25 @@ def normalize_legacy_archetype_name(name: str) -> str:
         return None
     return replacements.get(str(name), str(name))
 
+def group_archetype_name_summary(cluster: int, high_tokens: list, low_tokens: list, group: str) -> tuple[str, str]:
+    try:
+        return build_archetype_name_summary(cluster, high_tokens, low_tokens, group=group)
+    except TypeError:
+        name, summary = build_archetype_name_summary(cluster, high_tokens, low_tokens)
+        name = normalize_legacy_archetype_name(name)
+        if group != "defense":
+            return name, summary
+        defense_names = {
+            "Agitating Heavy-Contact Forward": ("Physical Shutdown Defenseman", "Defense profile built around contact, crease-area resistance, and a higher-penalty edge."),
+            "High-Volume Playmaking Scorer": ("Offensive Puck-Moving Defenseman", "Blue-line offense driver: creates through point shots, exits, and puck movement."),
+            "Low-Contact Scorer": ("Low-Event Puck-Moving Defenseman", "Puck-moving defense profile with offense showing up without a heavy-contact footprint."),
+            "Shot-Blocking Contact Specialist": ("Shot-Blocking Defensive Defenseman", "Defense-first profile: blocks shots, plays through contact, and absorbs hard minutes."),
+            "Deployment / Role Specialist": ("Defensive Role Defenseman", "Role-driven defense profile whose statistical lean is moderate rather than extreme."),
+            "Puck-Pressure Two-Way Creator": ("Puck-Pressure Transition Defenseman", "Transition defender: pressures puck carriers and turns recoveries into clean exits."),
+            "High-Touch Risk/Reward Playmaker": ("Transition Risk/Reward Defenseman", "High-touch defense profile: moves the puck often, with turnover risk attached."),
+        }
+        return defense_names.get(name, (name, summary))
+
 
 @st.cache_data
 def load_traits_csv(group: str, season_key: str) -> pd.DataFrame:
@@ -183,7 +202,7 @@ def build_season_cluster_to_name(
             kk = int(tr["cluster"])
             ht = parse_trait_string(tr.get("top_traits", ""))
             lt = parse_trait_string(tr.get("low_traits", ""))
-            nm, _ = build_archetype_name_summary(kk, ht, lt, group=group)
+            nm, _ = group_archetype_name_summary(kk, ht, lt, group)
             nm = normalize_legacy_archetype_name(nm)
             mapping[(sk, kk)] = nm
     return mapping

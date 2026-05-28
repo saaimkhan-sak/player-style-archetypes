@@ -97,7 +97,10 @@ def load_archetype_name_map_for_season(
         kk = int(tr["cluster"])
         high = parse_trait_string(tr.get("top_traits", ""))
         low  = parse_trait_string(tr.get("low_traits", ""))
-        m[kk], _ = build_archetype_name_summary(kk, high, low, group=group)
+        try:
+            m[kk], _ = build_archetype_name_summary(kk, high, low, group=group)
+        except TypeError:
+            m[kk], _ = build_archetype_name_summary(kk, high, low)
 
     return m
 
