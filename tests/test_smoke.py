@@ -1,6 +1,6 @@
 import importlib
 
-from src.archetype_labels import build_archetype_name_summary
+from src.archetype_labels import ARCHETYPE_LABEL_VERSION, build_archetype_name_summary
 
 
 playoff_projection = importlib.import_module("pipelines.09_project_playoff_archetypes")
@@ -27,3 +27,10 @@ def test_enriched_forward_label_for_netfront_traits():
 
     assert name == "Interior Net-Front Finisher"
     assert "high-danger" in summary
+
+
+def test_app_lib_exposes_label_version_aliases():
+    app_lib = importlib.import_module("app.lib")
+
+    assert app_lib.ARCHETYPE_LABEL_VERSION == ARCHETYPE_LABEL_VERSION
+    assert app_lib.ARCHETYPE_LABEL_CACHE_KEY == ARCHETYPE_LABEL_VERSION

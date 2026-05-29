@@ -12,8 +12,15 @@ if str(ROOT_DIR) not in sys.path:
 
 from src.archetype_labels import build_archetype_name_summary, parse_trait_string
 try:
-    from src.archetype_labels import PROFILE_COLOR_MAP, PROFILE_ORDER, canonical_profile_name, profile_colors
+    from src.archetype_labels import (
+        ARCHETYPE_LABEL_VERSION,
+        PROFILE_COLOR_MAP,
+        PROFILE_ORDER,
+        canonical_profile_name,
+        profile_colors,
+    )
 except ImportError:
+    ARCHETYPE_LABEL_VERSION = "role-names-v2"
     PROFILE_COLOR_MAP = {
         "High-Volume Playmaking Scorer": ("#2563EB", "#FFFFFF"),
         "Low-Contact Scorer": ("#F97316", "#111827"),
@@ -44,7 +51,7 @@ except ImportError:
     def profile_colors(name: str) -> tuple[str, str]:
         return PROFILE_COLOR_MAP.get(canonical_profile_name(name), ("#E5E7EB", "#111827"))
 
-ARCHETYPE_LABEL_CACHE_KEY = "profile-colors-v2"
+ARCHETYPE_LABEL_CACHE_KEY = ARCHETYPE_LABEL_VERSION
 MIN_ADVANCED_SEASON_START = 2008
 
 def season_key_to_label(k: str) -> str:

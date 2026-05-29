@@ -708,7 +708,7 @@ Each data point contributes to “style” like this:
     st.subheader("Step 4 — Learn archetypes and assign probabilities")
     st.markdown("I fit a Gaussian Mixture Model (GMM) to those fingerprints:")
     st.latex(r"p(z)=\sum_{k=1}^{K}\pi_k\,\mathcal{N}(z\mid \mu_k,\Sigma_k)")
-    st.markdown("For each player \(i\), the model outputs a probability for each archetype:")
+    st.markdown(r"For each player \(i\), the model outputs a probability for each archetype:")
     st.latex(r"p_{ik}=P(\text{Archetype}=k \mid z_i)")
 
     st.markdown(
