@@ -509,6 +509,30 @@ def wrap_label(s: str, width: int = 16) -> str:
         lines.append(" ".join(cur))
     return "\n".join(lines)
 
+def last_name(name: str) -> str:
+    parts = str(name).replace(".", "").replace("'", "").split()
+    return parts[-1].lower() if parts else ""
+
+def xg_chip(value: float) -> tuple[str, str, str]:
+    if pd.isna(value):
+        return "n/a", "#E5E7EB", "#374151"
+    pct = float(value) * 100
+    if pct >= 55:
+        return f"{pct:.0f}% xG", "#DCFCE7", "#166534"
+    if pct >= 48:
+        return f"{pct:.0f}% xG", "#FEF9C3", "#854D0E"
+    return f"{pct:.0f}% xG", "#FEE2E2", "#991B1B"
+
+def pct_cell(value: float) -> str:
+    value = float(value)
+    if value >= 45:
+        bg, fg = "#DCFCE7", "#166534"
+    elif value >= 25:
+        bg, fg = "#FEF9C3", "#854D0E"
+    else:
+        bg, fg = "#FEE2E2", "#991B1B"
+    return f'<td style="background:{bg};color:{fg};font-weight:800;text-align:right;">{value:.1f}</td>'
+
 
 # -------------------------
 # Data loading
@@ -525,6 +549,13 @@ def read_parquet_fresh(path: str):
 @st.cache_data(ttl=3600)
 def load_group(group: str, season: str):
     return pd.read_parquet(DATA_DIR / f"players_{group}_{season}.parquet")
+
+@st.cache_data(ttl=3600)
+def load_line_combinations() -> pd.DataFrame:
+    p = DATA_DIR / "line_combinations.parquet"
+    if not p.exists():
+        return pd.DataFrame()
+    return pd.read_parquet(p)
 
 @st.cache_data(ttl=3600)
 def load_traits(group: str, season: str):
@@ -888,11 +919,60 @@ with tabs[1]:
         top_label = "Top 6" if group == "forwards" else "Top 4"
         bottom_label = "Bottom 6" if group == "forwards" else "Bottom 4"
 
-        roster = team_df.copy()
-        roster["reg_toi_total"] = pd.to_numeric(roster["reg_avg_toi_min"], errors="coerce").fillna(0) * pd.to_numeric(roster["reg_games"], errors="coerce").fillna(0)
-        roster = roster.sort_values(["reg_toi_total", "confidence"], ascending=False).head(roster_n).reset_index(drop=True)
+        base_roster = team_df.copy()
+        base_roster["reg_toi_total"] = pd.to_numeric(base_roster["reg_avg_toi_min"], errors="coerce").fillna(0) * pd.to_numeric(base_roster["reg_games"], errors="coerce").fillna(0)
+        base_roster = base_roster.sort_values(["reg_toi_total", "confidence"], ascending=False).reset_index(drop=True)
+        base_roster["last_key"] = base_roster["full_name"].map(last_name)
+        line_data = load_line_combinations()
+        combo_position = "line" if group == "forwards" else "pairing"
+        combo_df = pd.DataFrame()
+        if not line_data.empty:
+            combo_df = line_data[
+                (line_data["season_key"].astype(str) == str(season))
+                & (line_data["playerTeam"].astype(str) == str(team))
+                & (line_data["position"].astype(str) == combo_position)
+            ].sort_values("toi_min", ascending=False).copy()
+
+        used_last: set[str] = set()
+        unit_cards: list[dict] = []
+        roster_rows = []
+        if not combo_df.empty:
+            for combo in combo_df.itertuples(index=False):
+                names = [p.strip() for p in str(combo.name).split("-") if p.strip()]
+                if len(names) != slot_size:
+                    continue
+                keys = [last_name(n) for n in names]
+                if any(k in used_last for k in keys):
+                    continue
+                matched = []
+                for key, display_name in zip(keys, names):
+                    candidates = base_roster[(base_roster["last_key"] == key) & (~base_roster["last_key"].isin(used_last))]
+                    if candidates.empty:
+                        break
+                    matched.append(candidates.iloc[0].copy())
+                if len(matched) != slot_size:
+                    continue
+                unit = len(unit_cards) + 1
+                for m in matched:
+                    m["Unit"] = unit
+                    roster_rows.append(m)
+                    used_last.add(m["last_key"])
+                unit_cards.append({"unit": unit, "combo": combo, "players": matched})
+                if len(unit_cards) == roster_n // slot_size:
+                    break
+
+        if len(roster_rows) < roster_n:
+            for _, row in base_roster[~base_roster["last_key"].isin(used_last)].iterrows():
+                row = row.copy()
+                row["Unit"] = len(roster_rows) // slot_size + 1
+                roster_rows.append(row)
+                used_last.add(row["last_key"])
+                if len(roster_rows) == roster_n:
+                    break
+
+        roster = pd.DataFrame(roster_rows).head(roster_n).reset_index(drop=True)
         roster["Depth"] = roster.index + 1
-        roster["Unit"] = roster.index // slot_size + 1
+        roster["Unit"] = roster["Unit"].astype(int)
         roster["Archetype"] = roster["top_cluster"].apply(lambda x: archetype_name_map.get(safe_int(x), f"Archetype {safe_int(x)}"))
         roster["Confidence (%)"] = (roster["confidence"].astype(float) * 100).round(1)
 
@@ -941,13 +1021,19 @@ with tabs[1]:
 .ring-label {{font-size:12px; color:#4B5563; margin-top:4px;}}
 .ring-sub {{font-size:13px; color:#374151;}}
 .line-grid {{display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:12px;}}
-.unit-card {{border:1px solid #E5E7EB; border-radius:8px; background:#FFFFFF; overflow:hidden;}}
-.unit-head {{padding:10px 12px; font-weight:800; background:#F9FAFB; border-bottom:1px solid #E5E7EB;}}
+.unit-card {{border:1px solid #E5E7EB; border-left:6px solid #CBD5E1; border-radius:8px; background:#FFFFFF; overflow:hidden;}}
+.unit-head {{padding:10px 12px; font-weight:800; background:#F9FAFB; border-bottom:1px solid #E5E7EB; display:flex; justify-content:space-between; gap:8px; align-items:center;}}
+.unit-meta {{font-size:12px; font-weight:700; color:#64748B;}}
 .player-row {{padding:10px 12px; border-bottom:1px solid #F3F4F6;}}
 .player-row:last-child {{border-bottom:0;}}
 .player-name {{font-weight:750; color:#111827;}}
 .player-meta {{font-size:12px; color:#6B7280; margin-top:2px;}}
 .profile-chip {{display:inline-flex; margin-top:7px; padding:3px 8px; border-radius:999px; font-size:12px; font-weight:750;}}
+.xg-chip {{display:inline-flex; padding:2px 7px; border-radius:999px; font-size:12px; font-weight:800; white-space:nowrap;}}
+.mix-table {{width:100%; border-collapse:collapse; border:1px solid #E5E7EB; border-radius:8px; overflow:hidden;}}
+.mix-table th,.mix-table td {{padding:9px 10px; border-bottom:1px solid #E5E7EB;}}
+.mix-table th {{background:#F9FAFB; color:#4B5563; text-align:left;}}
+.mix-table tr:last-child td {{border-bottom:0;}}
 @media (max-width: 900px) {{.construction-wrap,.line-grid {{grid-template-columns:1fr;}}}}
 </style>
 <div class="construction-wrap">
@@ -965,11 +1051,23 @@ with tabs[1]:
         c3.metric("Top/bottom gap", f"{spread_gap:.0f} pts")
 
         st.markdown(f"### {team} {slot_label.lower()} construction")
-        st.caption("Currently ordered by regular-season TOI. This can ingest MoneyPuck line/pairing TOI when that data is added to the repo.")
+        source_msg = "MoneyPuck 5v5 line/pairing minutes" if unit_cards else "regular-season player TOI fallback"
+        st.caption(f"Units are selected from {source_msg}.")
 
         unit_html = ['<div class="line-grid">']
         for unit, sub in roster.groupby("Unit", sort=True):
-            unit_html.append(f'<div class="unit-card"><div class="unit-head">{slot_label} {int(unit)}</div>')
+            unit_arch = sub["Archetype"].mode().iloc[0] if not sub.empty else dominant
+            unit_color, _ = PROFILE_COLOR_MAP.get(unit_arch, ("#CBD5E1", "#111827"))
+            combo_match = next((u for u in unit_cards if u["unit"] == int(unit)), None)
+            if combo_match:
+                combo = combo_match["combo"]
+                chip_text, chip_bg, chip_fg = xg_chip(getattr(combo, "xg_pct", pd.NA))
+                meta = f'{getattr(combo, "toi_min", 0):.0f} min · <span class="xg-chip" style="background:{chip_bg};color:{chip_fg};">{chip_text}</span>'
+            else:
+                meta = "TOI fallback"
+            unit_html.append(
+                f'<div class="unit-card" style="border-left-color:{unit_color};"><div class="unit-head"><span>{slot_label} {int(unit)}</span><span class="unit-meta">{meta}</span></div>'
+            )
             for _, r in sub.iterrows():
                 arch = r["Archetype"]
                 bg, fg = PROFILE_COLOR_MAP.get(arch, ("#E5E7EB", "#111827"))
@@ -994,7 +1092,20 @@ with tabs[1]:
                 f"{top_label} (%)": round(weighted_share(top_half, k) * 100, 1),
                 f"{bottom_label} (%)": round(weighted_share(bottom_half, k) * 100, 1),
             })
-        st.dataframe(pd.DataFrame(mix_rows).sort_values("Overall (%)", ascending=False), use_container_width=True, hide_index=True)
+        mix_df = pd.DataFrame(mix_rows).sort_values("Overall (%)", ascending=False)
+        header = f"<tr><th>Archetype</th><th>Overall (%)</th><th>{top_label} (%)</th><th>{bottom_label} (%)</th></tr>"
+        rows_html = []
+        for r in mix_df.to_dict("records"):
+            bg, fg = PROFILE_COLOR_MAP.get(r["Archetype"], ("#E5E7EB", "#111827"))
+            rows_html.append(
+                "<tr>"
+                f'<td><span class="profile-chip" style="background:{bg};color:{fg};margin-top:0;">{html.escape(r["Archetype"])}</span></td>'
+                + pct_cell(r["Overall (%)"])
+                + pct_cell(r[f"{top_label} (%)"])
+                + pct_cell(r[f"{bottom_label} (%)"])
+                + "</tr>"
+            )
+        st.markdown(f'<table class="mix-table">{header}{"".join(rows_html)}</table>', unsafe_allow_html=True)
 
         st.markdown("### Depth chart table")
         show_roster = roster[["Unit", "Depth", "full_name", "position", "Archetype", "Confidence (%)", "reg_games", "reg_avg_toi_min", "reg_points", "reg_goals", "reg_assists"]].rename(columns={
@@ -1008,6 +1119,11 @@ with tabs[1]:
             "reg_assists": "REG A",
         })
         show_roster["REG ATOI"] = show_roster["REG ATOI"].apply(min_to_mmss)
+        show_roster["Confidence cue"] = pd.cut(
+            show_roster["Confidence (%)"],
+            bins=[-1, 80, 92, 101],
+            labels=["mixed", "solid", "clean fit"],
+        ).astype(str)
         st.dataframe(show_roster, use_container_width=True, hide_index=True)
 
         st.divider()
