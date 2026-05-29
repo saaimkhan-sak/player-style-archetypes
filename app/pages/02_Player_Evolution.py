@@ -22,8 +22,8 @@ from lib import (
     season_key_to_label,
     load_all_seasons_group,
     parse_trait_string,
+    readable_trait_label,
 )
-from src.archetype_labels import readable_trait_label
 
 REPORTS_DIR = Path("reports")
 ARCHETYPE_COLOR_DOMAIN = list(PROFILE_COLOR_MAP.keys())

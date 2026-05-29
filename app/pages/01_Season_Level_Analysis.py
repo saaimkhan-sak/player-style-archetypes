@@ -40,7 +40,8 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.archetype_labels import build_archetype_name_summary, parse_trait_string, readable_trait_label
+from src.archetype_labels import build_archetype_name_summary, parse_trait_string
+from app.lib import readable_trait_label
 try:
     from src.archetype_labels import PROFILE_COLOR_MAP
 except ImportError:
@@ -832,11 +833,15 @@ with tabs[0]:
         row = view[view["full_name"] == sel].iloc[0]
 
         # Closest comps
-        P = view[pcols].to_numpy(dtype=float)
-        v = np.array([safe_float(row[c]) for c in pcols], dtype=float)
-        v_norm = np.linalg.norm(v) + 1e-9
-        P_norm = np.linalg.norm(P, axis=1) + 1e-9
-        sim = (P @ v) / (P_norm * v_norm)
+        P = np.nan_to_num(view[pcols].to_numpy(dtype=float), nan=0.0, posinf=0.0, neginf=0.0)
+        v = np.nan_to_num(np.array([safe_float(row[c]) for c in pcols], dtype=float), nan=0.0, posinf=0.0, neginf=0.0)
+        P = np.clip(P, 0.0, 1.0)
+        v = np.clip(v, 0.0, 1.0)
+        v_norm = np.linalg.norm(v)
+        P_norm = np.linalg.norm(P, axis=1)
+        denom = P_norm * v_norm
+        numer = np.sum(P * v, axis=1)
+        sim = np.divide(numer, denom, out=np.zeros(len(P), dtype=float), where=denom > 0)
 
         comps = view.copy()
         comps["Similarity (%)"] = (sim * 100).round(1)
