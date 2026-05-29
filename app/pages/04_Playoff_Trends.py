@@ -285,7 +285,7 @@ This page compares a player's regular-season profile with their playoff profile.
 )
 st.info(
     """
-**Shift score, in plain English:** this is a "how different did this player look in the playoffs?" score. It compares playoff scoring rate, shot rate, ice time, penalty rate, and plus-minus rate against that same player's regular-season baseline, then combines those changes into one number. A **larger score** means the playoff version of the player looked more different from his regular-season version; a **smaller score** means his role and results stayed steadier. Directional stats still matter: a **positive change** in a column like P/GP or TOI means it went up in the playoffs, while a **negative change** means it went down.
+**Shift score:** this is a "how different did this player look in the playoffs?" score. It compares playoff scoring rate, shot rate, ice time, penalty rate, and plus-minus rate against that same player's regular-season baseline, then combines those changes into one number. A **larger score** means the playoff version of the player looked more different from his regular-season version; a **smaller score** means his role and results stayed steadier. Directionally, a **positive change** in a column like P/GP or TOI means it went up in the playoffs, while a **negative change** means it went down.
 """
 )
 if data["model_shift_score"].notna().any():
