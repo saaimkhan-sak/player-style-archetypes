@@ -29,6 +29,13 @@ section[data-testid="stSidebar"] [data-testid="stPageLink"] a {
   white-space: normal !important;
   line-height: 1.2 !important;
 }
+section[data-testid="stSidebar"] [data-testid="stPageLink"] a p,
+section[data-testid="stSidebar"] [data-testid="stPageLink"] a span,
+section[data-testid="stSidebar"] [data-testid="stPageLink"] a div {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
 </style>""",
     unsafe_allow_html=True,
 )

@@ -28,6 +28,13 @@ section[data-testid="stSidebar"] [data-testid="stPageLink"] a {
   white-space: normal !important;
   line-height: 1.2 !important;
 }
+section[data-testid="stSidebar"] [data-testid="stPageLink"] a p,
+section[data-testid="stSidebar"] [data-testid="stPageLink"] a span,
+section[data-testid="stSidebar"] [data-testid="stPageLink"] a div {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
 </style>
 """,
     unsafe_allow_html=True,
@@ -478,7 +485,7 @@ def make_legend_grid(df: pd.DataFrame):
     gb.configure_grid_options(domLayout="autoHeight", suppressSizeToFit=True, alwaysShowHorizontalScroll=True)
 
     gb.configure_column("Archetype", width=380, minWidth=340, pinned="left", wrapText=True, autoHeight=True, cellStyle=JsCode(ARCH_BADGE_JS))
-    gb.configure_column("Summary", width=420, wrapText=True, autoHeight=True, cellStyle=PRELINE_CENTER)
+    gb.configure_column("Summary", width=252, wrapText=True, autoHeight=True, cellStyle=PRELINE_CENTER)
     gb.configure_column("Traits that tend to be higher", width=360, wrapText=True, autoHeight=True, cellStyle=PRELINE_CENTER)
     gb.configure_column("Traits that tend to be lower", width=360, wrapText=True, autoHeight=True, cellStyle=PRELINE_CENTER)
     gb.configure_column("Example players", width=320, wrapText=True, autoHeight=True, cellStyle=PRELINE_CENTER)
@@ -543,12 +550,12 @@ def percentage_circle_chart(summary_df: pd.DataFrame, max_items: int = 8) -> alt
                 alt.Tooltip("AvgConfidence:Q", title="Avg confidence", format=".1f"),
             ],
         )
-        label = alt.Chart(pd.DataFrame({"Share": [share]})).mark_text(
+        label = alt.Chart(pd.DataFrame({"ShareLabel": [f"{share:.0f}%"]})).mark_text(
             fontSize=18, fontWeight="bold", color="#111827"
-        ).encode(text=alt.Text("Share:Q", format=".0f"))
+        ).encode(text="ShareLabel:N")
         title = alt.TitleParams(wrap_label(row["Archetype"], width=20), fontSize=11, dy=8, anchor="middle")
         charts.append((arc + label).properties(width=128, height=128, title=title))
-    rows = [alt.hconcat(*charts[i:i + 4], spacing=8) for i in range(0, len(charts), 4)]
+    rows = [alt.hconcat(*charts[i:i + 3], spacing=8) for i in range(0, len(charts), 3)]
     return alt.vconcat(*rows, spacing=4).configure_view(stroke=None)
 
 def wrap_label(s: str, width: int = 16) -> str:
@@ -838,7 +845,7 @@ if traits is not None:
         )
     make_legend_grid(legend_df)
 
-tabs = st.tabs(["Archetype Snapshot", "Player Explorer", "Team Roster Fit", "Need Finder"])
+tabs = st.tabs(["Archetype Snapshot", "Player Explorer", "Team Roster Construction", "Need Finder"])
 
 # -------------------------
 # Archetype Snapshot
@@ -1257,7 +1264,7 @@ with tabs[2]:
                 chip_text, chip_bg, chip_fg = xg_chip(getattr(combo, "xg_pct", pd.NA))
                 meta = f'{getattr(combo, "toi_min", 0):.0f} min · <span class="xg-chip" style="background:{chip_bg};color:{chip_fg};">{chip_text}</span>'
             else:
-                meta = "TOI fallback"
+                meta = f'{float(sub["reg_toi_total"].sum()):.0f} min · xG n/a*'
             unit_html.append(
                 f'<div class="unit-card" style="border-left-color:{unit_color};"><div class="unit-head"><span>{slot_label} {int(unit)}</span><span class="unit-meta">{meta}</span></div>'
             )
@@ -1274,6 +1281,8 @@ with tabs[2]:
             unit_html.append("</div>")
         unit_html.append("</div>")
         st.markdown("".join(unit_html), unsafe_allow_html=True)
+        if not unit_cards:
+            st.caption("* xG data not available for these units; units use regular-season player TOI.")
 
         st.markdown("### Roster profile mix")
         mix_rows = []
@@ -1285,7 +1294,12 @@ with tabs[2]:
                 f"{top_label} (%)": round(weighted_share(top_half, k) * 100, 1),
                 f"{bottom_label} (%)": round(weighted_share(bottom_half, k) * 100, 1),
             })
-        mix_df = pd.DataFrame(mix_rows).sort_values("Overall (%)", ascending=False)
+        mix_df = (
+            pd.DataFrame(mix_rows)
+            .groupby("Archetype", as_index=False)
+            .sum(numeric_only=True)
+            .sort_values("Overall (%)", ascending=False)
+        )
         header = f"<tr><th>Archetype</th><th>Overall (%)</th><th>{top_label} (%)</th><th>{bottom_label} (%)</th></tr>"
         rows_html = []
         for r in mix_df.to_dict("records"):
