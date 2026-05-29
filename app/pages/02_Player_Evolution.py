@@ -55,7 +55,7 @@ st.title("Player Archetype Evolution")
 # ----------------------------
 # Helpers
 # ----------------------------
-ERA_ORDER = ["2000–2004", "2005–2009", "2010–2014", "2015–2019", "2020–2025"]
+ERA_ORDER = ["2008-2009", "2010-2014", "2015-2019", "2020-2025"]
 
 def season_start_year(season_key: str) -> int:
     try:
@@ -65,17 +65,13 @@ def season_start_year(season_key: str) -> int:
 
 def era5(season_key: str) -> str:
     y = season_start_year(season_key)
-    if y < 2000:
-        return "pre-2000"
-    if y <= 2004:
-        return "2000–2004"
     if y <= 2009:
-        return "2005–2009"
+        return "2008-2009"
     if y <= 2014:
-        return "2010–2014"
+        return "2010-2014"
     if y <= 2019:
-        return "2015–2019"
-    return "2020–2025"
+        return "2015-2019"
+    return "2020-2025"
 
 def prettify_traits_lines(s: str, max_items: int = 4) -> str:
     """

@@ -13,6 +13,11 @@ PROFILE_COLOR_MAP: dict[str, tuple[str, str]] = {
     "Shot-Blocking Contact Specialist": ("#0891B2", "#FFFFFF"),
     "Agitating Heavy-Contact Forward": ("#DC2626", "#FFFFFF"),
     "Puck-Pressure Two-Way Creator": ("#16A34A", "#FFFFFF"),
+    "Interior Net-Front Finisher": ("#0D9488", "#FFFFFF"),
+    "Rush / Transition Chance Creator": ("#7C3AED", "#FFFFFF"),
+    "Cycle Pressure Play-Driver": ("#059669", "#FFFFFF"),
+    "Two-Way Shot-Share Driver": ("#0284C7", "#FFFFFF"),
+    "Shutdown Suppression Center": ("#1D4ED8", "#FFFFFF"),
     "Deployment / Role Specialist": ("#64748B", "#FFFFFF"),
     "PP-Leaning Offensive Role": ("#D97706", "#111827"),
     "PK-Leaning Defensive Role": ("#4F46E5", "#FFFFFF"),
@@ -27,6 +32,8 @@ PROFILE_COLOR_MAP: dict[str, tuple[str, str]] = {
     "Transition Risk/Reward Defenseman": ("#9333EA", "#FFFFFF"),
     "Defensive Role Defenseman": ("#64748B", "#FFFFFF"),
     "Puck-Pressure Transition Defenseman": ("#16A34A", "#FFFFFF"),
+    "Crease-Clearing Suppression Defenseman": ("#0F766E", "#FFFFFF"),
+    "Play-Driving Puck-Moving Defenseman": ("#0284C7", "#FFFFFF"),
     "High-Event Physical Defenseman": ("#BE123C", "#FFFFFF"),
 }
 
@@ -104,6 +111,14 @@ def _ordered_categories(tokens: list[TraitToken]) -> list[str]:
             categories.append("Penalty-Kill Usage")
         elif feature in {"reg_fo_taken_per_game", "reg_fo_pct"}:
             categories.append("Faceoff")
+        elif feature in {"mp_reg_5on5_I_F_highDangerShots_per60", "mp_reg_5on5_I_F_highDangerShotShare", "mp_reg_5on5_I_F_rebounds_per60", "mp_reg_5on5_I_F_reboundxGoals_per60"}:
+            categories.append("Net-Front")
+        elif feature in {"mp_reg_5on5_I_F_playContinuedInZone_per60", "mp_reg_5on5_I_F_playContinuedOutsideZone_per60"}:
+            categories.append("Puck-Carrying")
+        elif feature in {"mp_reg_5on5_OnIce_xGoalsPercentage_calc", "mp_reg_5on5_OnIce_F_xGoals_per60"}:
+            categories.append("Play-Driving")
+        elif feature in {"mp_reg_5on5_OnIce_A_xGoals_per60", "mp_reg_5on5_OnIce_A_shotAttempts_per60", "mp_reg_4on5_OnIce_A_xGoals_per60"}:
+            categories.append("Suppression")
 
     deduped = []
     for category in categories:
@@ -163,7 +178,17 @@ def _build_defense_name_summary(cluster: int, high_features: set[str], low_featu
     giveaways_lo = "reg_giveaways_per60" in low_features
     pk_hi = "reg_pk_share" in high_features
     pp_hi = "reg_pp_share" in high_features
+    netfront_hi = _has(high_features, ["mp_reg_5on5_shotsBlockedByPlayer_per60", "mp_reg_5on5_OnIce_A_xGoals_per60", "mp_reg_4on5_OnIce_A_xGoals_per60"])
+    xg_share_hi = "mp_reg_5on5_OnIce_xGoalsPercentage_calc" in high_features
+    xga_lo = _has(low_features, ["mp_reg_5on5_OnIce_A_xGoals_per60", "mp_reg_5on5_OnIce_A_shotAttempts_per60"])
+    continuation_hi = _has(high_features, ["mp_reg_5on5_I_F_playContinuedInZone_per60", "mp_reg_5on5_I_F_playContinuedOutsideZone_per60"])
 
+    if xg_share_hi and xga_lo:
+        return "Play-Driving Puck-Moving Defenseman", "Drives five-on-five shot quality while keeping chances against under control."
+    if blocks_hi and (xga_lo or pk_hi):
+        return "Crease-Clearing Suppression Defenseman", "Suppression profile: blocks shots, protects dangerous areas, and leans into defensive usage."
+    if continuation_hi and offense_hi:
+        return "Play-Driving Puck-Moving Defenseman", "Puck-moving profile: keeps plays alive and turns possession into offensive-zone pressure."
     if pim_hi and giveaways_hi:
         return "High-Event Physical Defenseman", "High-event defense profile: plays physically and handles enough puck touches to carry added turnover risk."
     if blocks_hi and hits_hi:
@@ -218,7 +243,26 @@ def build_archetype_name_summary(
     pk_hi = "reg_pk_share" in high_features
     pp_hi = "reg_pp_share" in high_features
     fo_hi = _has(high_features, ["reg_fo_taken_per_game", "reg_fo_pct"])
+    high_danger_hi = _has(high_features, ["mp_reg_5on5_I_F_highDangerShots_per60", "mp_reg_5on5_I_F_highDangerShotShare", "mp_reg_5on5_I_F_reboundxGoals_per60"])
+    rebound_hi = _has(high_features, ["mp_reg_5on5_I_F_rebounds_per60", "mp_reg_5on5_I_F_reboundxGoals_per60"])
+    xg_share_hi = "mp_reg_5on5_OnIce_xGoalsPercentage_calc" in high_features
+    xga_lo = _has(low_features, ["mp_reg_5on5_OnIce_A_xGoals_per60", "mp_reg_5on5_OnIce_A_shotAttempts_per60"])
+    xga_hi = _has(high_features, ["mp_reg_5on5_OnIce_A_xGoals_per60", "mp_reg_5on5_OnIce_A_shotAttempts_per60"])
+    in_zone_hi = "mp_reg_5on5_I_F_playContinuedInZone_per60" in high_features
+    outside_zone_hi = "mp_reg_5on5_I_F_playContinuedOutsideZone_per60" in high_features
 
+    if high_danger_hi and rebound_hi:
+        return "Interior Net-Front Finisher", "Interior scoring profile: creates high-danger chances and rebound-based offense around the net."
+    if outside_zone_hi and offense_hi:
+        return "Rush / Transition Chance Creator", "Transition-leaning creator: pushes plays forward and turns movement through the neutral zone into offense."
+    if in_zone_hi and xg_share_hi:
+        return "Cycle Pressure Play-Driver", "Cycle-pressure profile: keeps offensive-zone plays alive and tilts shot quality in his team's favor."
+    if xg_share_hi and xga_lo:
+        return "Two-Way Shot-Share Driver", "Two-way driver: wins the five-on-five chance-quality battle without giving much back defensively."
+    if fo_hi and pk_hi and xga_lo:
+        return "Shutdown Suppression Center", "Defensive-center profile: handles draws and shorthanded usage while suppressing chances against."
+    if xga_hi and blocks_hi:
+        return "Shot-Blocking Contact Specialist", "Defensive workload profile: absorbs heavy chance volume and shows up through blocked shots."
     if pim_hi and hits_hi:
         return "Agitating Heavy-Contact Forward", "High-contact profile: delivers hits and takes more penalties."
     if blocks_hi and hits_hi:

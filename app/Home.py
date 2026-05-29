@@ -99,7 +99,7 @@ st.markdown("""
 In hockey, we often talk about a player's "identity" - enforcer or finisher or playmaker. It's one of hockey's most treasured features because 
 a well-established identity is what often separates an NHL/AHL tweener from an NHL regular.
 
-**But, is identity truly a data-indpendent property or can we generate a data-driven approach to assigning identity?**
+**But, is identity truly a data-independent property or can we generate a data-driven approach to assigning identity?**
 
 To answer the question above, I had to find a way to tackle the following:
 
@@ -109,7 +109,7 @@ To answer the question above, I had to find a way to tackle the following:
 
 
 
-Everything here is generated from **public NHL game data** that I sourced from the NHL Stats API.
+Everything here is generated from **public NHL Gamecenter data** combined with **MoneyPuck player-level advanced metrics**. The advanced-data era begins in **2008-09**, which is the earliest season covered by the MoneyPuck files in this project.
 """)
 
 st.info("Use the left navigation to explore **Season Level Trends**, **Player Evolution**, and **Playoff Style Shifts**.")
@@ -223,6 +223,14 @@ From NHL game endpoints I aggregate per player:
 - time on ice and special-teams usage
 - boxscore counting stats (goals/assists/points/shots/hits/blocks/PIM/takeaways/giveaways, etc.)
 
+From MoneyPuck player game files I add advanced regular-season signals:
+- expected goals, shot quality, high-danger chances, and rebound chances
+- on-ice expected goals for/against and shot-attempt impact
+- situation splits for 5-on-5, power play, and penalty kill
+- shift starts, play-continuation metrics, penalties drawn, and faceoff context
+
+Because those MoneyPuck files start in 2008, the site focuses on seasons from 2008-09 forward.
+
 ### Step 1 — Normalize for ice time (so players are comparable)
 Players have different ice time, so I convert raw counts into per-60 rates:
 """)
@@ -304,10 +312,10 @@ st.markdown("---")
 # ----------------------------
 # What I'd do next (behind-the-scenes data)
 # ----------------------------
-st.header("What I'd do next with more advanced data")
+st.header("What I'd do next with private tracking data")
 
 st.markdown("""
-The public boxscore + usage data can tell you a lot, but NHL teams have access to richer behind-the-scenes streams.
+The public NHL + MoneyPuck data can tell you a lot, but NHL teams have access to even richer behind-the-scenes streams.
 Here are the most natural extensions of this project and exactly what data I’d use if I had access to it.
 
 ### 1) Full-resolution puck & player tracking

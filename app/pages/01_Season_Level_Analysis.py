@@ -123,7 +123,11 @@ def available_seasons() -> list[str]:
     seasons2 = set()
     for f in app_dir.glob("players_defense_*.parquet"):
         seasons2.add(f.stem.replace("players_defense_", ""))
-    seasons = sorted(list(seasons & seasons2), reverse=True)
+    seasons = [
+        s for s in (seasons & seasons2)
+        if s[:4].isdigit() and int(s[:4]) >= 2008
+    ]
+    seasons = sorted(seasons, reverse=True)
     return seasons
 
 def season_key_to_label(k: str) -> str:

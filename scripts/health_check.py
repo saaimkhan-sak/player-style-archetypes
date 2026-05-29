@@ -6,6 +6,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+MIN_ADVANCED_SEASON_START = 2008
 REQUIRED_MODULES = [
     "altair",
     "numpy",
@@ -18,6 +19,10 @@ REQUIRED_MODULES = [
 
 def season_label(k: str) -> str:
     return f"{k[:4]}-{k[4:]}" if len(k) == 8 and k.isdigit() else k
+
+
+def is_advanced_season(k: str) -> bool:
+    return len(k) == 8 and k[:4].isdigit() and int(k[:4]) >= MIN_ADVANCED_SEASON_START
 
 
 def check_modules() -> list[str]:
@@ -54,7 +59,7 @@ def check_data_inventory() -> list[str]:
 
     forwards = {p.stem.replace("players_forwards_", "") for p in data_app.glob("players_forwards_*.parquet")}
     defense = {p.stem.replace("players_defense_", "") for p in data_app.glob("players_defense_*.parquet")}
-    seasons = sorted(forwards & defense)
+    seasons = sorted(s for s in (forwards & defense) if is_advanced_season(s))
 
     if not seasons:
         errors.append("no complete seasons found in data/app")

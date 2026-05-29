@@ -32,7 +32,7 @@ def schedule_has_games(season: str) -> bool:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     ap = argparse.ArgumentParser(description="Build multi-season database WITHOUT hardcoded date cutoffs.")
-    ap.add_argument("--start_year", type=int, required=True, help="e.g. 2000 for 20002001")
+    ap.add_argument("--start_year", type=int, required=True, help="e.g. 2008 for 20082009")
     ap.add_argument("--end_year", type=int, required=True, help="e.g. 2025 for 20252026")
     ap.add_argument("--download_missing", action="store_true", help="Download missing games during reconciliation.")
     args = ap.parse_args(argv)
@@ -40,6 +40,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     root = Path(".")
     if not (root / "pipelines").exists():
         raise SystemExit("Run this from the project root (player-style-archetypes).")
+    if args.start_year < 2008:
+        raise SystemExit("This advanced-data build starts at 2008-2009 because MoneyPuck player data begins in 2008.")
 
     for y in range(args.start_year, args.end_year + 1):
         season = season_label(y)
@@ -66,20 +68,26 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
         sp = str(schedule_path(season))
 
-        # 1) Build season features from the authoritative schedule
+        # 1) Build MoneyPuck advanced player-season features when source rows exist
+        if y >= 2008:
+            run([sys.executable, "pipelines/03b_build_moneypuck_player_season_features.py", "--season_label", season])
+
+        # 2) Build season features from the authoritative schedule, merging MoneyPuck features if present
         run([sys.executable, "pipelines/03_build_player_season_features_boxscore.py", "--schedule_parquet", sp, "--season_label", season])
 
-        # 2) Directory + teams played (season-specific directory created by your updated 06)
+        # 3) Directory + teams played (season-specific directory created by your updated 06)
         run([sys.executable, "pipelines/06_build_player_directory.py", "--season_label", season])
 
-        # 3) Matrices + models + reports + app tables
+        # 4) Matrices + models + reports + app tables
         run([sys.executable, "pipelines/04_build_model_matrices.py", "--season_label", season])
         run([sys.executable, "pipelines/05_fit_nmf_gmm.py", "--season_label", season])
         run([sys.executable, "pipelines/07_make_archetype_cards.py", "--season_label", season])
         run([sys.executable, "pipelines/08_build_app_tables.py", "--season_label", season])
+        run([sys.executable, "pipelines/09_project_playoff_archetypes.py", "--season_label", season])
 
         print(f"\n✅ Finished season {season}")
 
+    run([sys.executable, "pipelines/10_build_line_combinations.py"])
     return 0
 
 

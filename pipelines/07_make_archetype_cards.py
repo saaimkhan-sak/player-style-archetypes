@@ -15,6 +15,22 @@ FEATURES = [
     "reg_pim_per60",
     "reg_pp_share", "reg_pk_share",
     "reg_fo_pct", "reg_fo_taken_per_game",
+    "mp_reg_5on5_I_F_xGoals_per60",
+    "mp_reg_5on5_I_F_xGoalsPerAttempt",
+    "mp_reg_5on5_I_F_highDangerShots_per60",
+    "mp_reg_5on5_I_F_highDangerShotShare",
+    "mp_reg_5on5_I_F_rebounds_per60",
+    "mp_reg_5on5_I_F_reboundxGoals_per60",
+    "mp_reg_5on5_I_F_playContinuedInZone_per60",
+    "mp_reg_5on5_I_F_playContinuedOutsideZone_per60",
+    "mp_reg_5on5_OnIce_xGoalsPercentage_calc",
+    "mp_reg_5on5_OnIce_F_xGoals_per60",
+    "mp_reg_5on5_OnIce_A_xGoals_per60",
+    "mp_reg_5on5_OnIce_A_shotAttempts_per60",
+    "mp_reg_5on5_shotsBlockedByPlayer_per60",
+    "mp_reg_5on5_penaltiesDrawn_per60",
+    "mp_reg_5on4_I_F_xGoals_per60",
+    "mp_reg_4on5_OnIce_A_xGoals_per60",
 ]
 
 

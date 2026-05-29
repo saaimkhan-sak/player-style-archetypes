@@ -45,6 +45,7 @@ except ImportError:
         return PROFILE_COLOR_MAP.get(canonical_profile_name(name), ("#E5E7EB", "#111827"))
 
 ARCHETYPE_LABEL_CACHE_KEY = "profile-colors-v2"
+MIN_ADVANCED_SEASON_START = 2008
 
 def season_key_to_label(k: str) -> str:
     k = str(k).strip()
@@ -56,7 +57,8 @@ def available_seasons() -> list[str]:
         return []
     fwd = {f.stem.replace("players_forwards_", "") for f in app_dir.glob("players_forwards_*.parquet")}
     dfd = {f.stem.replace("players_defense_", "") for f in app_dir.glob("players_defense_*.parquet")}
-    return sorted(list(fwd & dfd), reverse=True)
+    seasons = [s for s in (fwd & dfd) if s[:4].isdigit() and int(s[:4]) >= MIN_ADVANCED_SEASON_START]
+    return sorted(seasons, reverse=True)
 
 @st.cache_data
 def load_group(group: str, season: str) -> pd.DataFrame:
@@ -108,7 +110,7 @@ def archetype_math_explainer():
     st.expander("What is a 'Player Archetype' and How is it Calculated?", expanded=False).__enter__()
     st.markdown(
         """
-This page describes player “styles” (archetypes) learned from boxscore + usage features.
+This page describes player “styles” (archetypes) learned from NHL boxscore/usage data plus MoneyPuck advanced player metrics.
 Archetypes are learned per season, then translated into descriptive titles with consistent colors across seasons.
 """
     )

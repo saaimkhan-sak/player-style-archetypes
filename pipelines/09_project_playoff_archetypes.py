@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import warnings
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -30,9 +31,11 @@ def load_schema(season: str) -> dict:
 
 
 def regular_feature_to_playoff_feature(feature: str) -> str:
-    if not feature.startswith("reg_"):
-        raise ValueError(f"Expected regular-season feature name, got {feature!r}")
-    return "po_" + feature[len("reg_") :]
+    if feature.startswith("reg_"):
+        return "po_" + feature[len("reg_") :]
+    if feature.startswith("mp_reg_"):
+        return "mp_po_" + feature[len("mp_reg_") :]
+    raise ValueError(f"Expected regular-season feature name, got {feature!r}")
 
 
 def numeric_column(df: pd.DataFrame, col: str, default: float = 0.0) -> pd.Series:
@@ -52,6 +55,7 @@ def scaled_playoff_matrix(stats: pd.DataFrame, schema: dict, group: str) -> pd.D
         med = float(scaler["median"].get(reg_col, 0.0))
         iqr = float(scaler["iqr"].get(reg_col, 1.0)) or 1.0
         out[reg_col] = (values - med) / iqr
+        out[reg_col] = out[reg_col].replace([np.inf, -np.inf], np.nan).fillna(0.0).clip(-10.0, 10.0)
     return out
 
 
@@ -71,7 +75,15 @@ def project_latent(X_scaled: pd.DataFrame, nmf_artifact: dict, schema: dict, gro
         if not np.any(getattr(model, "components_", np.array([]))):
             parts.append(np.zeros((len(X_block), int(model.n_components)), dtype=float))
             continue
-        parts.append(model.transform(X_block))
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*matmul.*")
+            warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*divide by zero.*")
+            warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*overflow.*")
+            warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*invalid value.*")
+            projected = model.transform(X_block)
+        if not np.isfinite(projected).all():
+            raise RuntimeError(f"Playoff NMF projection produced NaN or infinite values for {group}.")
+        parts.append(projected)
 
     if not parts:
         raise RuntimeError(f"No playoff latent blocks produced for {group}.")
@@ -137,7 +149,8 @@ def build_group_projection(season: str, group: str, min_po_games: int) -> pd.Dat
 
 def available_feature_seasons() -> list[str]:
     paths = Path("data/features").glob("player_season_boxscore_*.parquet")
-    return sorted([p.stem.replace("player_season_boxscore_", "") for p in paths])
+    seasons = [p.stem.replace("player_season_boxscore_", "") for p in paths]
+    return sorted(s for s in seasons if s[:4].isdigit() and int(s[:4]) >= 2008)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

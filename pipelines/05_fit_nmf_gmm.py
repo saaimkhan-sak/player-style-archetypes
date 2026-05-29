@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import warnings
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -10,6 +12,8 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import NMF
 from sklearn.mixture import GaussianMixture
+
+os.environ.setdefault("LOKY_MAX_CPU_COUNT", "1")
 
 
 def load_schema(season_label: str) -> dict:
@@ -26,13 +30,22 @@ def ensure_nonnegative(X: np.ndarray) -> Tuple[np.ndarray, float]:
 
 
 def fit_nmf_block(X_block: np.ndarray, n_components: int, random_state: int) -> Tuple[np.ndarray, NMF]:
+    if not np.isfinite(X_block).all():
+        raise RuntimeError("NMF input contains NaN or infinite values after matrix preprocessing.")
+
     model = NMF(
         n_components=n_components,
-        init="nndsvda",
+        init="random",
         random_state=random_state,
         max_iter=2000,
     )
-    W = model.fit_transform(X_block)
+    with warnings.catch_warnings():
+        # Some Accelerate/OpenBLAS builds emit noisy matmul RuntimeWarnings
+        # while sklearn still converges on finite, bounded inputs.
+        warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*matmul.*")
+        W = model.fit_transform(X_block)
+    if not np.isfinite(W).all():
+        raise RuntimeError("NMF produced NaN or infinite latent values.")
     return W, model
 
 
@@ -42,6 +55,9 @@ def gmm_grid_search(
     cov_types: List[str],
     random_state: int
 ) -> Tuple[GaussianMixture, dict]:
+    if not np.isfinite(Z).all():
+        raise RuntimeError("GMM input contains NaN or infinite values.")
+
     best = None
     best_info = None
     for k in k_list:
@@ -54,7 +70,12 @@ def gmm_grid_search(
                 n_init=5,
                 max_iter=2000,
             )
-            gmm.fit(Z)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*matmul.*")
+                warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*divide by zero.*")
+                warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*overflow.*")
+                warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*invalid value.*")
+                gmm.fit(Z)
             bic = float(gmm.bic(Z))
             info = {"k": k, "covariance_type": cov, "bic": bic}
             if best is None or bic < best_info["bic"]:
@@ -112,8 +133,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p = argparse.ArgumentParser(description="Fit NMF-per-block then GMM (BIC) for forwards/defense.")
     p.add_argument("--season_label", required=True)
     p.add_argument("--random_state", type=int, default=42)
-    p.add_argument("--k_min", type=int, default=4)
-    p.add_argument("--k_max", type=int, default=14)
+    p.add_argument("--k_min", type=int, default=6)
+    p.add_argument("--k_max", type=int, default=12)
     p.add_argument("--cov_types", nargs="*", default=["full", "diag"])
     args = p.parse_args(argv)
 
@@ -123,9 +144,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # NMF components per block (tweak later)
     nmf_components = {
         "shooting_scoring": 3,
+        "chance_quality_netfront": 3,
+        "play_driving": 3,
+        "defensive_impact": 3,
         "physical_disruption": 3,
         "discipline": 1,
-        "special_teams_usage": 2,
+        "special_teams_usage": 3,
         "faceoffs": 2,
     }
 
@@ -149,6 +173,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         Z, nmf_models, latent_names = build_latent_matrix(
             X_feat, blocks=blocks, nmf_components=nmf_components, random_state=args.random_state
         )
+        if not np.isfinite(Z).all():
+            raise RuntimeError(f"Latent matrix for {group} contains NaN or infinite values.")
 
         gmm, best_info = gmm_grid_search(Z, k_list=k_list, cov_types=args.cov_types, random_state=args.random_state)
 

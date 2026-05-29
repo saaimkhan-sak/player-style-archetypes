@@ -219,6 +219,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ps = pd.merge(reg, po, on=["season","player_id"], how="outer").fillna(0)
     ps = ps.merge(pos_df, on=["season","player_id"], how="left")
 
+    mp_path = outdir / f"player_season_moneypuck_{args.season_label}.parquet"
+    if mp_path.exists():
+        mp = pd.read_parquet(mp_path)
+        mp["player_id"] = pd.to_numeric(mp["player_id"], errors="coerce").astype("Int64")
+        ps["player_id"] = pd.to_numeric(ps["player_id"], errors="coerce").astype("Int64")
+        ps = ps.merge(mp, on=["season","player_id"], how="left")
+
     ps_path = outdir / f"player_season_boxscore_{args.season_label}.parquet"
     ps.to_parquet(ps_path, index=False)
 
