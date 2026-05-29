@@ -153,8 +153,12 @@ def normalize_legacy_archetype_name(name: str) -> str:
     tables or user sessions.
     """
     replacements = {
-        "Low-Contact Scoring Profile": "Low-Contact Scorer",
-        "Shooting / Scoring Profile": "Shot-Volume Scorer",
+        "Low-Contact Scoring Profile": "Perimeter Skill Scorer",
+        "Low-Contact Scorer": "Perimeter Skill Scorer",
+        "Shooting / Scoring Profile": "Shot-Creation Scorer",
+        "Shot-Volume Scorer": "Shot-Creation Scorer",
+        "Volume Shooter": "Shot-Creation Scorer",
+        "Finisher": "Perimeter Skill Scorer",
         "Checking-Line Contact Profile": "Checking-Line Disruptor",
         "Puck-Pressure Scoring Profile": "Puck-Pressure Scorer",
     }
@@ -173,7 +177,7 @@ def group_archetype_name_summary(cluster: int, high_tokens: list, low_tokens: li
         defense_names = {
             "Agitating Heavy-Contact Forward": ("Physical Shutdown Defenseman", "Defense profile built around contact, crease-area resistance, and a higher-penalty edge."),
             "High-Volume Playmaking Scorer": ("Offensive Puck-Moving Defenseman", "Blue-line offense driver: creates through point shots, exits, and puck movement."),
-            "Low-Contact Scorer": ("Low-Event Puck-Moving Defenseman", "Puck-moving defense profile with offense showing up without a heavy-contact footprint."),
+            "Perimeter Skill Scorer": ("Low-Event Puck-Moving Defenseman", "Puck-moving defense profile with offense showing up without a heavy-contact footprint."),
             "Shot-Blocking Contact Specialist": ("Shot-Blocking Defensive Defenseman", "Defense-first profile: blocks shots, plays through contact, and absorbs hard minutes."),
             "Deployment / Role Specialist": ("Defensive Role Defenseman", "Role-driven defense profile whose statistical lean is moderate rather than extreme."),
             "Puck-Pressure Two-Way Creator": ("Puck-Pressure Transition Defenseman", "Transition defender: pressures puck carriers and turns recoveries into clean exits."),

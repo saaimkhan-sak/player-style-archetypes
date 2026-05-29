@@ -47,7 +47,10 @@ try:
 except ImportError:
     PROFILE_COLOR_MAP = {
         "High-Volume Playmaking Scorer": ("#2563EB", "#FFFFFF"),
-        "Low-Contact Scorer": ("#F97316", "#111827"),
+        "Perimeter Skill Scorer": ("#FED7AA", "#7C2D12"),
+        "Shot-Creation Scorer": ("#FDBA74", "#7C2D12"),
+        "Two-Way Skill Scorer": ("#BBF7D0", "#14532D"),
+        "High-Touch Risk/Reward Scorer": ("#F0ABFC", "#701A75"),
         "Shot-Blocking Contact Specialist": ("#0891B2", "#FFFFFF"),
         "Agitating Heavy-Contact Forward": ("#DC2626", "#FFFFFF"),
         "Puck-Pressure Two-Way Creator": ("#16A34A", "#FFFFFF"),
@@ -72,13 +75,14 @@ ARCHETYPE_LABEL_CACHE_KEY = "profile-colors-v2"
 
 def normalize_profile_name(name: str) -> str:
     replacements = {
-        "Low-Contact Scoring Profile": "Low-Contact Scorer",
-        "Shooting / Scoring Profile": "Low-Contact Scorer",
+        "Low-Contact Scoring Profile": "Perimeter Skill Scorer",
+        "Shooting / Scoring Profile": "Shot-Creation Scorer",
         "Shot-Creating Playmaker": "High-Volume Playmaking Scorer",
         "Setup Playmaker": "High-Volume Playmaking Scorer",
-        "Shot-Volume Scorer": "Low-Contact Scorer",
-        "Volume Shooter": "Low-Contact Scorer",
-        "Finisher": "Low-Contact Scorer",
+        "Low-Contact Scorer": "Perimeter Skill Scorer",
+        "Shot-Volume Scorer": "Shot-Creation Scorer",
+        "Volume Shooter": "Shot-Creation Scorer",
+        "Finisher": "Perimeter Skill Scorer",
         "Defense-First Shot Suppressor": "Shot-Blocking Contact Specialist",
         "Shot Suppressor": "Shot-Blocking Contact Specialist",
         "Puck Hunter": "Puck-Pressure Two-Way Creator",
@@ -102,7 +106,7 @@ def group_archetype_name_summary(cluster: int, high_tokens: list, low_tokens: li
         defense_names = {
             "Agitating Heavy-Contact Forward": ("Physical Shutdown Defenseman", "Defense profile built around contact, crease-area resistance, and a higher-penalty edge."),
             "High-Volume Playmaking Scorer": ("Offensive Puck-Moving Defenseman", "Blue-line offense driver: creates through point shots, exits, and puck movement."),
-            "Low-Contact Scorer": ("Low-Event Puck-Moving Defenseman", "Puck-moving defense profile with offense showing up without a heavy-contact footprint."),
+            "Perimeter Skill Scorer": ("Low-Event Puck-Moving Defenseman", "Puck-moving defense profile with offense showing up without a heavy-contact footprint."),
             "Shot-Blocking Contact Specialist": ("Shot-Blocking Defensive Defenseman", "Defense-first profile: blocks shots, plays through contact, and absorbs hard minutes."),
             "Deployment / Role Specialist": ("Defensive Role Defenseman", "Role-driven defense profile whose statistical lean is moderate rather than extreme."),
             "Puck-Pressure Two-Way Creator": ("Puck-Pressure Transition Defenseman", "Transition defender: pressures puck carriers and turns recoveries into clean exits."),
@@ -494,55 +498,6 @@ def _rgba(color: str, alpha: float) -> str:
     r, g, b = _hex_to_rgb(color)
     return f"rgba({r}, {g}, {b}, {alpha})"
 
-def render_percentage_circles(summary_df: pd.DataFrame, max_items: int = 6) -> str:
-    items = []
-    for r in summary_df.head(max_items).itertuples(index=False):
-        pct = float(getattr(r, "Share"))
-        color = getattr(r, "Color")
-        fg = getattr(r, "TextColor")
-        name = html.escape(str(getattr(r, "Archetype")))
-        players = int(getattr(r, "Players"))
-        avg_conf = float(getattr(r, "AvgConfidence"))
-        items.append(f"""
-        <div style="
-            min-width: 155px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 8px 12px;
-            border: 1px solid rgba(15,23,42,0.08);
-            border-radius: 8px;
-            background: linear-gradient(180deg, {_rgba(color, 0.22)}, rgba(255,255,255,0.92));
-        ">
-            <div style="
-                width: 104px;
-                height: 104px;
-                border-radius: 50%;
-                display: grid;
-                place-items: center;
-                background:
-                    radial-gradient(circle at center, #fff 0 56%, transparent 57%),
-                    conic-gradient({color} 0 {pct:.2f}%, rgba(148,163,184,0.22) {pct:.2f}% 100%);
-                box-shadow: inset 0 0 0 1px rgba(15,23,42,0.05);
-            ">
-                <div style="font-size: 1.35rem; font-weight: 850; color: {fg};">{pct:.0f}%</div>
-            </div>
-            <div style="font-weight: 800; text-align: center; line-height: 1.15; color: #111827;">{name}</div>
-            <div style="font-size: 0.82rem; color: #475569; text-align: center;">{players} players · {avg_conf:.0f}% avg confidence</div>
-        </div>
-        """)
-    return f"""
-    <div style="
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
-        gap: 12px;
-        margin: 8px 0 18px;
-    ">
-        {''.join(items)}
-    </div>
-    """
-
 def render_snapshot_metric(label: str, value: str, detail: str, color: str = "#E5E7EB") -> str:
     return f"""
     <div style="
@@ -558,6 +513,46 @@ def render_snapshot_metric(label: str, value: str, detail: str, color: str = "#E
         <div style="font-size: 0.88rem; color: #475569; margin-top: 6px; line-height: 1.25;">{html.escape(detail)}</div>
     </div>
     """
+
+def percentage_circle_chart(summary_df: pd.DataFrame, max_items: int = 6) -> alt.Chart:
+    chart_data = summary_df.head(max_items).copy()
+    chart_data["ArchetypeLabel"] = chart_data["Archetype"].apply(lambda x: wrap_label(x, width=18))
+    chart_data["Remainder"] = (100.0 - chart_data["Share"]).clip(lower=0.0)
+    long = chart_data.melt(
+        id_vars=["Archetype", "ArchetypeLabel", "Share", "Players", "AvgConfidence", "Color"],
+        value_vars=["Share", "Remainder"],
+        var_name="Segment",
+        value_name="Value",
+    )
+    long["SegmentColor"] = np.where(long["Segment"].eq("Share"), long["Color"], "#E5E7EB")
+
+    arcs = alt.Chart(long).mark_arc(innerRadius=34, outerRadius=50, stroke="#FFFFFF", strokeWidth=1).encode(
+        theta=alt.Theta("Value:Q", stack=True),
+        color=alt.Color("SegmentColor:N", scale=None, legend=None),
+        tooltip=[
+            alt.Tooltip("Archetype:N", title="Archetype"),
+            alt.Tooltip("Share:Q", title="Player share", format=".1f"),
+            alt.Tooltip("Players:Q", title="Players"),
+            alt.Tooltip("AvgConfidence:Q", title="Avg confidence", format=".1f"),
+        ],
+    )
+
+    labels = alt.Chart(long).transform_filter(
+        alt.datum.Segment == "Share"
+    ).mark_text(fontSize=18, fontWeight="bold", color="#111827").encode(
+        text=alt.Text("Share:Q", format=".0f"),
+    )
+    return (
+        alt.layer(arcs, labels).properties(height=150)
+        .facet(
+            column=alt.Column(
+                "ArchetypeLabel:N",
+                title=None,
+                header=alt.Header(labelOrient="bottom", labelPadding=8, labelFontWeight="bold"),
+            )
+        )
+        .resolve_scale(color="independent")
+    )
 
 def wrap_label(s: str, width: int = 16) -> str:
     words = str(s).split()
@@ -903,7 +898,7 @@ with tabs[0]:
         st.markdown(render_snapshot_metric("Mixed profiles", f"{mixed_count}", "Players below 80% top-profile confidence", "#FDE68A"), unsafe_allow_html=True)
 
     st.markdown("### Top archetype shares")
-    st.markdown(render_percentage_circles(mix, max_items=6), unsafe_allow_html=True)
+    st.altair_chart(percentage_circle_chart(mix, max_items=6), use_container_width=True)
 
     chart_data = mix.copy()
     chart_data["ArchetypeLabel"] = chart_data["Archetype"].apply(lambda x: wrap_label(x, width=22))

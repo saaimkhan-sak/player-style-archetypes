@@ -49,8 +49,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     df["reg_games"] = pd.to_numeric(df.get("reg_games", 0), errors="coerce").fillna(0).astype(int)
     df["reg_toi_s"] = pd.to_numeric(df.get("reg_toi_s", 0), errors="coerce").fillna(0.0)
 
-    # sample filters (tweak later)
-    df = df[(df["reg_games"] >= 5) & (df["reg_toi_s"] >= 60*60)].copy()
+    # Keep the modeling population stable enough that short call-ups do not
+    # define or distort season-level archetypes.
+    min_reg_games = 15
+    min_reg_toi_s = 60 * 60
+    df = df[(df["reg_games"] >= min_reg_games) & (df["reg_toi_s"] >= min_reg_toi_s)].copy()
 
     # Feature blocks from REG per60 + usage shares, enriched with MoneyPuck
     # advanced features when the 03b aggregation has been merged in.
@@ -145,7 +148,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "blocks": blocks,
             "all_features": all_cols,
             "scaler": scaler,
-            "filters": {"min_reg_games": 5, "min_reg_toi_s": 3600},
+            "filters": {"min_reg_games": min_reg_games, "min_reg_toi_s": min_reg_toi_s},
             "rows": len(out),
             "path": str(out_path),
         }

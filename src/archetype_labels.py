@@ -9,29 +9,34 @@ ARCHETYPE_LABEL_VERSION = "role-names-v2"
 
 PROFILE_COLOR_MAP: dict[str, tuple[str, str]] = {
     "High-Volume Playmaking Scorer": ("#BFDBFE", "#1E3A8A"),
-    "Low-Contact Scorer": ("#FED7AA", "#7C2D12"),
+    "Perimeter Skill Scorer": ("#FED7AA", "#7C2D12"),
+    "Shot-Creation Scorer": ("#FBCFE8", "#831843"),
+    "Two-Way Skill Scorer": ("#DCFCE7", "#14532D"),
+    "High-Touch Risk/Reward Scorer": ("#FAE8FF", "#701A75"),
     "Shot-Blocking Contact Specialist": ("#A5F3FC", "#164E63"),
     "Agitating Heavy-Contact Forward": ("#FECACA", "#7F1D1D"),
-    "Puck-Pressure Two-Way Creator": ("#BBF7D0", "#14532D"),
+    "Puck-Pressure Two-Way Creator": ("#CFFAFE", "#155E75"),
     "Interior Net-Front Finisher": ("#99F6E4", "#134E4A"),
     "Rush / Transition Chance Creator": ("#DDD6FE", "#4C1D95"),
+    "Possession-Carrying Forward": ("#E0E7FF", "#3730A3"),
     "Cycle Pressure Play-Driver": ("#A7F3D0", "#064E3B"),
     "Two-Way Shot-Share Driver": ("#BAE6FD", "#0C4A6E"),
+    "Suppression Workload Forward": ("#F1F5F9", "#334155"),
     "Shutdown Suppression Center": ("#C7D2FE", "#312E81"),
     "Deployment / Role Specialist": ("#E2E8F0", "#334155"),
     "PP-Leaning Offensive Role": ("#FDE68A", "#78350F"),
     "PK-Leaning Defensive Role": ("#C4B5FD", "#312E81"),
-    "High-Touch Risk/Reward Playmaker": ("#F0ABFC", "#701A75"),
+    "High-Touch Risk/Reward Playmaker": ("#E9D5FF", "#581C87"),
     "Checking-Line Disruptor": ("#FECDD3", "#881337"),
     "Physical Shutdown Defenseman": ("#FCA5A5", "#7F1D1D"),
     "Shot-Blocking Defensive Defenseman": ("#67E8F9", "#164E63"),
     "Offensive Puck-Moving Defenseman": ("#93C5FD", "#1E3A8A"),
-    "Low-Event Puck-Moving Defenseman": ("#FDBA74", "#7C2D12"),
+    "Low-Event Puck-Moving Defenseman": ("#FEF3C7", "#78350F"),
     "Point-Usage Power-Play Defenseman": ("#FCD34D", "#78350F"),
     "Penalty-Kill Defensive Defenseman": ("#A5B4FC", "#312E81"),
     "Transition Risk/Reward Defenseman": ("#E879F9", "#701A75"),
     "Defensive Role Defenseman": ("#CBD5E1", "#334155"),
-    "Puck-Pressure Transition Defenseman": ("#86EFAC", "#14532D"),
+    "Puck-Pressure Transition Defenseman": ("#D9F99D", "#365314"),
     "Crease-Clearing Suppression Defenseman": ("#5EEAD4", "#134E4A"),
     "Play-Driving Puck-Moving Defenseman": ("#7DD3FC", "#0C4A6E"),
     "High-Event Physical Defenseman": ("#FDA4AF", "#881337"),
@@ -44,9 +49,10 @@ def canonical_profile_name(name: str) -> str:
     replacements = {
         "Shot-Creating Playmaker": "High-Volume Playmaking Scorer",
         "Setup Playmaker": "High-Volume Playmaking Scorer",
-        "Shot-Volume Scorer": "Low-Contact Scorer",
-        "Volume Shooter": "Low-Contact Scorer",
-        "Finisher": "Low-Contact Scorer",
+        "Low-Contact Scorer": "Perimeter Skill Scorer",
+        "Shot-Volume Scorer": "Shot-Creation Scorer",
+        "Volume Shooter": "Shot-Creation Scorer",
+        "Finisher": "Perimeter Skill Scorer",
         "Defense-First Shot Suppressor": "Shot-Blocking Contact Specialist",
         "Shot Suppressor": "Shot-Blocking Contact Specialist",
         "Puck Hunter": "Puck-Pressure Two-Way Creator",
@@ -57,8 +63,8 @@ def canonical_profile_name(name: str) -> str:
         "Power-Play Specialist": "PP-Leaning Offensive Role",
         "Penalty-Kill Specialist": "PK-Leaning Defensive Role",
         "Role-Center Specialist": "Deployment / Role Specialist",
-        "Low-Contact Scoring Profile": "Low-Contact Scorer",
-        "Shooting / Scoring Profile": "Low-Contact Scorer",
+        "Low-Contact Scoring Profile": "Perimeter Skill Scorer",
+        "Shooting / Scoring Profile": "Shot-Creation Scorer",
     }
     text = str(name)
     if text in PROFILE_COLOR_MAP:
@@ -205,6 +211,10 @@ def _fallback_role_name(cluster: int, high_tokens: list[TraitToken], low_feature
         return "Role-Center Specialist", "Shows up through deployment details like draws, matchups, and role minutes."
 
     if categories:
+        if categories[0] == "Suppression":
+            return "Suppression Workload Forward", "Defensive-workload profile: the clearest signal is time spent absorbing shots and expected chances against."
+        if categories[0] == "Puck-Carrying":
+            return "Possession-Carrying Forward", "Puck-carrying profile: keeps plays moving through carries and continued possessions more than net-front finishing."
         high_text = ", ".join(readable_trait_label(feature).lower() for feature, _ in high_tokens[:2])
         low_text = ", ".join(readable_trait_label(feature).lower() for feature in list(low_features)[:2])
         detail = f"Leans most toward {high_text}"
@@ -308,6 +318,8 @@ def build_archetype_name_summary(
 
     if high_danger_hi and rebound_hi:
         return "Interior Net-Front Finisher", "Interior scoring profile: creates high-danger chances and rebound-based offense around the net."
+    if giveaways_hi and offense_hi:
+        return "High-Touch Risk/Reward Scorer", "Shot-creation profile with extra puck touches and some turnover risk."
     if outside_zone_hi and offense_hi:
         return "Rush / Transition Chance Creator", "Transition-leaning creator: pushes plays forward and turns movement through the neutral zone into offense."
     if in_zone_hi and xg_share_hi:
@@ -336,10 +348,10 @@ def build_archetype_name_summary(
         return "Shot-Blocking Contact Specialist", "Low-offense profile built around blocked shots and defensive minutes."
     if hits_hi and not offense_hi:
         return "Checking-Line Disruptor", "Physical depth role: contact and disruption matter more than scoring."
-    if scoring_hi and not hits_hi:
-        return "Low-Contact Scorer", "Skill-leaning scorer: creates offense without much physical play."
     if takeaways_hi and scoring_hi:
-        return "Puck-Pressure Two-Way Creator", "Creates offense while pressuring puck carriers."
+        return "Two-Way Skill Scorer", "Blends scoring with puck-pressure and recovery value."
+    if scoring_hi and not hits_hi:
+        return "Perimeter Skill Scorer", "Skill-leaning scorer whose value comes more from shots and points than physical involvement."
     if giveaways_hi and playmaking_hi:
         return "High-Touch Risk/Reward Playmaker", "High-event puck profile: creates plays while carrying turnover risk."
 

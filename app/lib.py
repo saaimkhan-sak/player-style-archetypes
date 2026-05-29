@@ -24,7 +24,10 @@ except ImportError:
     ARCHETYPE_LABEL_VERSION = "role-names-v2"
     PROFILE_COLOR_MAP = {
         "High-Volume Playmaking Scorer": ("#2563EB", "#FFFFFF"),
-        "Low-Contact Scorer": ("#F97316", "#111827"),
+        "Perimeter Skill Scorer": ("#FED7AA", "#7C2D12"),
+        "Shot-Creation Scorer": ("#FDBA74", "#7C2D12"),
+        "Two-Way Skill Scorer": ("#BBF7D0", "#14532D"),
+        "High-Touch Risk/Reward Scorer": ("#F0ABFC", "#701A75"),
         "Shot-Blocking Contact Specialist": ("#0891B2", "#FFFFFF"),
         "Agitating Heavy-Contact Forward": ("#DC2626", "#FFFFFF"),
         "Puck-Pressure Two-Way Creator": ("#16A34A", "#FFFFFF"),

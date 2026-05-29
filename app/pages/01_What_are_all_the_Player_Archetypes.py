@@ -94,8 +94,12 @@ def prettify_traits_lines(s: str, max_items: int = 4) -> str:
 
 def normalize_legacy_archetype_name(name: str) -> str:
     replacements = {
-        "Low-Contact Scoring Profile": "Low-Contact Scorer",
-        "Shooting / Scoring Profile": "Shot-Volume Scorer",
+        "Low-Contact Scoring Profile": "Perimeter Skill Scorer",
+        "Low-Contact Scorer": "Perimeter Skill Scorer",
+        "Shooting / Scoring Profile": "Shot-Creation Scorer",
+        "Shot-Volume Scorer": "Shot-Creation Scorer",
+        "Volume Shooter": "Shot-Creation Scorer",
+        "Finisher": "Perimeter Skill Scorer",
         "Checking-Line Contact Profile": "Checking-Line Disruptor",
         "Puck-Pressure Scoring Profile": "Puck-Pressure Scorer",
     }

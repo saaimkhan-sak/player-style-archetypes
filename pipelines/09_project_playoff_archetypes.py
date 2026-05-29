@@ -51,7 +51,12 @@ def scaled_playoff_matrix(stats: pd.DataFrame, schema: dict, group: str) -> pd.D
     out = pd.DataFrame(index=stats.index)
     for reg_col in all_features:
         po_col = regular_feature_to_playoff_feature(reg_col)
-        values = numeric_column(stats, po_col)
+        if po_col in stats.columns:
+            values = numeric_column(stats, po_col)
+        elif reg_col in stats.columns:
+            values = numeric_column(stats, reg_col)
+        else:
+            values = pd.Series(float(scaler["median"].get(reg_col, 0.0)), index=stats.index)
         med = float(scaler["median"].get(reg_col, 0.0))
         iqr = float(scaler["iqr"].get(reg_col, 1.0)) or 1.0
         out[reg_col] = (values - med) / iqr
