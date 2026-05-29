@@ -40,7 +40,7 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.archetype_labels import build_archetype_name_summary, parse_trait_string
+from src.archetype_labels import build_archetype_name_summary, parse_trait_string, readable_trait_label
 try:
     from src.archetype_labels import PROFILE_COLOR_MAP
 except ImportError:
@@ -192,14 +192,14 @@ ARCH_BADGE_JS = """
 function(params) {
   const v = params.value || "";
   const map = __PROFILE_COLOR_MAP__;
-  const c = map[v] || ["#E5E7EB", "#111827"];
+    const c = map[v] || ["#E5E7EB", "#111827"];
   return {
     backgroundColor: c[0],
     color: c[1],
-    border: "1px solid rgba(0,0,0,0.10)",
+    border: "1px solid rgba(0,0,0,0.08)",
     borderRadius: "999px",
     padding: "3px 10px",
-    fontWeight: "750",
+    fontWeight: "700",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -366,7 +366,10 @@ def make_badge_grid(df, height=560, pin_cols=("Player","Teams"), player_width_of
     if archetype_col in df.columns:
         archetype_opts = {
             "cellStyle": JsCode(ARCH_BADGE_JS),
-            "width": max(230, col_width(df, archetype_col, 190, 340)),
+            "width": max(340, col_width(df, archetype_col, 260, 430)),
+            "minWidth": 320,
+            "wrapText": True,
+            "autoHeight": True,
         }
         if archetype_tooltip_col in df.columns:
             archetype_opts["tooltipValueGetter"] = JsCode(
@@ -405,26 +408,10 @@ function(params) {{
 # -------------------------
 # Legend helpers
 # -------------------------
-TRAIT_LABELS = {
-    "reg_points_per60": "Points / 60",
-    "reg_goals_per60": "Goals / 60",
-    "reg_assists_per60": "Assists / 60",
-    "reg_shots_per60": "Shots / 60",
-    "reg_hits_per60": "Hits / 60",
-    "reg_blocked_shots_per60": "Blocks / 60",
-    "reg_takeaways_per60": "Takeaways / 60",
-    "reg_giveaways_per60": "Giveaways / 60",
-    "reg_pim_per60": "PIMs / 60",
-    "reg_pp_share": "Power-play usage share",
-    "reg_pk_share": "Penalty-kill usage share",
-    "reg_fo_pct": "Faceoff %",
-    "reg_fo_taken_per_game": "Faceoffs / game",
-}
-
 def format_traits_multiline(tokens, max_items=5):
     lines = []
     for feat, z in tokens[:max_items]:
-        label = TRAIT_LABELS.get(feat, feat.replace("reg_", "").replace("_", " ").title())
+        label = readable_trait_label(feat)
         arrow = "↑" if z >= 0 else "↓"
         lines.append(f"{arrow} {label} ({z:+.1f}σ)")
     return "\n".join(lines)
@@ -432,7 +419,7 @@ def format_traits_multiline(tokens, max_items=5):
 def format_traits_inline(tokens, max_items=5):
     pieces = []
     for feat, z in tokens[:max_items]:
-        label = TRAIT_LABELS.get(feat, feat.replace("reg_", "").replace("_", " ").title())
+        label = readable_trait_label(feat)
         arrow = "higher" if z >= 0 else "lower"
         pieces.append(f"{label} ({arrow}, {z:+.1f}σ)")
     return "; ".join(pieces)
@@ -480,8 +467,7 @@ def make_legend_grid(df: pd.DataFrame):
     gb.configure_default_column(sortable=False, filter=False, resizable=True)
     gb.configure_grid_options(domLayout="autoHeight", suppressSizeToFit=True, alwaysShowHorizontalScroll=True)
 
-    # Summary fixed at 250px (per request)
-    gb.configure_column("Archetype", width=280, pinned="left", cellStyle=JsCode(ARCH_BADGE_JS))
+    gb.configure_column("Archetype", width=380, minWidth=340, pinned="left", wrapText=True, autoHeight=True, cellStyle=JsCode(ARCH_BADGE_JS))
     gb.configure_column("Summary", width=420, wrapText=True, autoHeight=True, cellStyle=PRELINE_CENTER)
     gb.configure_column("Traits that tend to be higher", width=360, wrapText=True, autoHeight=True, cellStyle=PRELINE_CENTER)
     gb.configure_column("Traits that tend to be lower", width=360, wrapText=True, autoHeight=True, cellStyle=PRELINE_CENTER)
@@ -763,7 +749,19 @@ if traits is not None:
             "Traits that tend to be lower": format_traits_multiline(low_tokens, max_items=4),
             "Example players": format_examples_multiline(getattr(r, "prototype_players", ""), max_players=7),
         })
-    make_legend_grid(pd.DataFrame(legend_rows).sort_values("Archetype"))
+    legend_df = pd.DataFrame(legend_rows)
+    if not legend_df.empty:
+        legend_df = (
+            legend_df.groupby("Archetype", as_index=False)
+            .agg({
+                "Summary": "first",
+                "Traits that tend to be higher": "first",
+                "Traits that tend to be lower": "first",
+                "Example players": "first",
+            })
+            .sort_values("Archetype")
+        )
+    make_legend_grid(legend_df)
 
 tabs = st.tabs(["Player Explorer", "Team Roster Fit", "Need Finder"])
 

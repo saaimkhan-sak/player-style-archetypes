@@ -23,6 +23,7 @@ from lib import (
     load_all_seasons_group,
     parse_trait_string,
 )
+from src.archetype_labels import readable_trait_label
 
 REPORTS_DIR = Path("reports")
 ARCHETYPE_COLOR_DOMAIN = list(PROFILE_COLOR_MAP.keys())
@@ -35,10 +36,10 @@ function(params) {
   return {
     backgroundColor: c[0],
     color: c[1],
-    border: "1px solid rgba(0,0,0,0.10)",
+    border: "1px solid rgba(0,0,0,0.08)",
     borderRadius: "999px",
     padding: "3px 10px",
-    fontWeight: "750",
+    fontWeight: "700",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -83,7 +84,7 @@ def prettify_traits_lines(s: str, max_items: int = 4) -> str:
     lines = []
     for feat, z in tokens[:max_items]:
         arrow = "↑" if z >= 0 else "↓"
-        lines.append(f"{arrow} {feat} ({z:+.1f}σ)")
+        lines.append(f"{arrow} {readable_trait_label(feat)} ({z:+.1f}σ)")
     return "\n".join(lines)
 
 def archetype_description_from_traits(name: str, top_traits: str, low_traits: str) -> str:
@@ -134,7 +135,16 @@ def archetype_description_from_traits(name: str, top_traits: str, low_traits: st
     if "pp-leaning" in n.lower() or "reg_pp_share" in top:
         return "Power-play leaning profile: production is driven by scoring-role deployment and PP usage."
 
-    return "Balanced contributor: has a recognizable statistical lean, but not one extreme enough to dominate the whole role."
+    top_tokens = parse_trait_string(top_traits)
+    low_tokens = parse_trait_string(low_traits)
+    top_labels = [readable_trait_label(feat).lower() for feat, _ in top_tokens[:2]]
+    low_labels = [readable_trait_label(feat).lower() for feat, _ in low_tokens[:2]]
+    if top_labels:
+        desc = f"Blended profile whose strongest signals are {', '.join(top_labels)}"
+        if low_labels:
+            desc += f", with less emphasis on {', '.join(low_labels)}"
+        return desc + "."
+    return "Blended role profile defined more by usage and secondary contributions than by one extreme scoring or defensive marker."
 
 
 def normalize_legacy_archetype_name(name: str) -> str:
@@ -283,7 +293,7 @@ def show_multiline_table(df: pd.DataFrame, height: int = 420):
         gb.configure_column(c, cellStyle=PRELINE_CELL)
     for c in ("Archetype name", "Top archetype (season-specific)"):
         if c in df.columns:
-            gb.configure_column(c, width=300, cellStyle=ARCHETYPE_CELL_JS)
+            gb.configure_column(c, width=380, minWidth=340, wrapText=True, autoHeight=True, cellStyle=ARCHETYPE_CELL_JS)
 
     AgGrid(
         df,
@@ -462,6 +472,16 @@ def build_glossary(group: str, all_df: pd.DataFrame, mapping: dict[tuple[str,int
     out = pd.DataFrame(rows).sort_values("Archetype name")
     if not out.empty:
         out["Archetype name"] = out["Archetype name"].map(normalize_legacy_archetype_name)
+        out = (
+            out.groupby("Archetype name", as_index=False)
+            .agg({
+                "Description": "first",
+                "High traits": "first",
+                "Low traits": "first",
+                "Exemplars": "first",
+            })
+            .sort_values("Archetype name")
+        )
     return out
 
 traits_f = traits_registry("forwards", map_f)
@@ -544,6 +564,9 @@ def top_label(row) -> str:
     return nm
 
 hist["Top archetype (season-specific)"] = hist.apply(top_label, axis=1)
+career_color_domain = list(dict.fromkeys(hist["Top archetype (season-specific)"].astype(str).tolist()))
+career_color_range = [PROFILE_COLOR_MAP.get(name, ("#E5E7EB", "#111827"))[0] for name in career_color_domain]
+career_legend = alt.Legend(title="Top archetype", labelLimit=0, orient="right", symbolLimit=0)
 
 # Summary metrics
 c1, c2, c2chip, c3, c3chip = st.columns([1.1, 0.55, 0.95, 0.55, 0.95])
@@ -605,8 +628,8 @@ points = base.mark_circle(size=90).encode(
     y=alt.Y("Confidence (%):Q", title="Top-archetype confidence (%)", scale=alt.Scale(domain=[0, 100])),
     color=alt.Color(
         "Top archetype (season-specific):N",
-        title="Top archetype",
-        scale=alt.Scale(domain=ARCHETYPE_COLOR_DOMAIN, range=ARCHETYPE_COLOR_RANGE),
+        scale=alt.Scale(domain=career_color_domain, range=career_color_range),
+        legend=career_legend,
     ),
     tooltip=[
         alt.Tooltip("Season:O", title="Season"),
@@ -624,8 +647,8 @@ change_pts = alt.Chart(hist[hist["changed"]]).mark_point(size=160).encode(
     y="Confidence (%):Q",
     color=alt.Color(
         "Top archetype (season-specific):N",
-        title="Top archetype",
-        scale=alt.Scale(domain=ARCHETYPE_COLOR_DOMAIN, range=ARCHETYPE_COLOR_RANGE),
+        scale=alt.Scale(domain=career_color_domain, range=career_color_range),
+        legend=career_legend,
     ),
     tooltip=[
         alt.Tooltip("Season:O", title="Season"),

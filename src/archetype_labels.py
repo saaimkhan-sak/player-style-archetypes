@@ -8,33 +8,33 @@ TraitToken = tuple[str, float]
 ARCHETYPE_LABEL_VERSION = "role-names-v2"
 
 PROFILE_COLOR_MAP: dict[str, tuple[str, str]] = {
-    "High-Volume Playmaking Scorer": ("#2563EB", "#FFFFFF"),
-    "Low-Contact Scorer": ("#F97316", "#111827"),
-    "Shot-Blocking Contact Specialist": ("#0891B2", "#FFFFFF"),
-    "Agitating Heavy-Contact Forward": ("#DC2626", "#FFFFFF"),
-    "Puck-Pressure Two-Way Creator": ("#16A34A", "#FFFFFF"),
-    "Interior Net-Front Finisher": ("#0D9488", "#FFFFFF"),
-    "Rush / Transition Chance Creator": ("#7C3AED", "#FFFFFF"),
-    "Cycle Pressure Play-Driver": ("#059669", "#FFFFFF"),
-    "Two-Way Shot-Share Driver": ("#0284C7", "#FFFFFF"),
-    "Shutdown Suppression Center": ("#1D4ED8", "#FFFFFF"),
-    "Deployment / Role Specialist": ("#64748B", "#FFFFFF"),
-    "PP-Leaning Offensive Role": ("#D97706", "#111827"),
-    "PK-Leaning Defensive Role": ("#4F46E5", "#FFFFFF"),
-    "High-Touch Risk/Reward Playmaker": ("#9333EA", "#FFFFFF"),
-    "Checking-Line Disruptor": ("#BE123C", "#FFFFFF"),
-    "Physical Shutdown Defenseman": ("#DC2626", "#FFFFFF"),
-    "Shot-Blocking Defensive Defenseman": ("#0891B2", "#FFFFFF"),
-    "Offensive Puck-Moving Defenseman": ("#2563EB", "#FFFFFF"),
-    "Low-Event Puck-Moving Defenseman": ("#F97316", "#111827"),
-    "Point-Usage Power-Play Defenseman": ("#D97706", "#111827"),
-    "Penalty-Kill Defensive Defenseman": ("#4F46E5", "#FFFFFF"),
-    "Transition Risk/Reward Defenseman": ("#9333EA", "#FFFFFF"),
-    "Defensive Role Defenseman": ("#64748B", "#FFFFFF"),
-    "Puck-Pressure Transition Defenseman": ("#16A34A", "#FFFFFF"),
-    "Crease-Clearing Suppression Defenseman": ("#0F766E", "#FFFFFF"),
-    "Play-Driving Puck-Moving Defenseman": ("#0284C7", "#FFFFFF"),
-    "High-Event Physical Defenseman": ("#BE123C", "#FFFFFF"),
+    "High-Volume Playmaking Scorer": ("#BFDBFE", "#1E3A8A"),
+    "Low-Contact Scorer": ("#FED7AA", "#7C2D12"),
+    "Shot-Blocking Contact Specialist": ("#A5F3FC", "#164E63"),
+    "Agitating Heavy-Contact Forward": ("#FECACA", "#7F1D1D"),
+    "Puck-Pressure Two-Way Creator": ("#BBF7D0", "#14532D"),
+    "Interior Net-Front Finisher": ("#99F6E4", "#134E4A"),
+    "Rush / Transition Chance Creator": ("#DDD6FE", "#4C1D95"),
+    "Cycle Pressure Play-Driver": ("#A7F3D0", "#064E3B"),
+    "Two-Way Shot-Share Driver": ("#BAE6FD", "#0C4A6E"),
+    "Shutdown Suppression Center": ("#C7D2FE", "#312E81"),
+    "Deployment / Role Specialist": ("#E2E8F0", "#334155"),
+    "PP-Leaning Offensive Role": ("#FDE68A", "#78350F"),
+    "PK-Leaning Defensive Role": ("#C4B5FD", "#312E81"),
+    "High-Touch Risk/Reward Playmaker": ("#F0ABFC", "#701A75"),
+    "Checking-Line Disruptor": ("#FECDD3", "#881337"),
+    "Physical Shutdown Defenseman": ("#FCA5A5", "#7F1D1D"),
+    "Shot-Blocking Defensive Defenseman": ("#67E8F9", "#164E63"),
+    "Offensive Puck-Moving Defenseman": ("#93C5FD", "#1E3A8A"),
+    "Low-Event Puck-Moving Defenseman": ("#FDBA74", "#7C2D12"),
+    "Point-Usage Power-Play Defenseman": ("#FCD34D", "#78350F"),
+    "Penalty-Kill Defensive Defenseman": ("#A5B4FC", "#312E81"),
+    "Transition Risk/Reward Defenseman": ("#E879F9", "#701A75"),
+    "Defensive Role Defenseman": ("#CBD5E1", "#334155"),
+    "Puck-Pressure Transition Defenseman": ("#86EFAC", "#14532D"),
+    "Crease-Clearing Suppression Defenseman": ("#5EEAD4", "#134E4A"),
+    "Play-Driving Puck-Moving Defenseman": ("#7DD3FC", "#0C4A6E"),
+    "High-Event Physical Defenseman": ("#FDA4AF", "#881337"),
 }
 
 PROFILE_ORDER = list(PROFILE_COLOR_MAP.keys())
@@ -80,6 +80,49 @@ def parse_trait_string(value: str) -> list[TraitToken]:
         if match:
             out.append((match.group(1), float(match.group(2))))
     return out
+
+
+TRAIT_LABELS: dict[str, str] = {
+    "reg_points_per60": "Points per 60",
+    "reg_goals_per60": "Goals per 60",
+    "reg_assists_per60": "Assists per 60",
+    "reg_shots_per60": "Shots on goal per 60",
+    "reg_hits_per60": "Hits per 60",
+    "reg_blocked_shots_per60": "Blocked shots per 60",
+    "reg_takeaways_per60": "Takeaways per 60",
+    "reg_giveaways_per60": "Giveaways per 60",
+    "reg_pim_per60": "Penalty minutes per 60",
+    "reg_pp_share": "Power-play usage",
+    "reg_pk_share": "Penalty-kill usage",
+    "reg_fo_pct": "Faceoff win rate",
+    "reg_fo_taken_per_game": "Faceoffs per game",
+    "mp_reg_5on5_I_F_highDangerShots_per60": "High-danger shots per 60",
+    "mp_reg_5on5_I_F_highDangerShotShare": "Share of shots from high-danger areas",
+    "mp_reg_5on5_I_F_xGoals_per60": "Individual expected goals per 60",
+    "mp_reg_5on5_I_F_xGoalsPerAttempt": "Expected goals per shot attempt",
+    "mp_reg_5on5_I_F_rebounds_per60": "Rebound chances per 60",
+    "mp_reg_5on5_I_F_reboundxGoals_per60": "Expected goals from rebounds per 60",
+    "mp_reg_5on5_I_F_playContinuedInZone_per60": "Offensive-zone possessions extended per 60",
+    "mp_reg_5on5_I_F_playContinuedOutsideZone_per60": "Rush possessions extended per 60",
+    "mp_reg_5on5_OnIce_xGoalsPercentage_calc": "On-ice expected-goal share",
+    "mp_reg_5on5_OnIce_F_xGoals_per60": "Team expected goals while on ice per 60",
+    "mp_reg_5on5_OnIce_A_xGoals_per60": "Expected goals against while on ice per 60",
+    "mp_reg_5on5_OnIce_A_shotAttempts_per60": "Shot attempts against while on ice per 60",
+    "mp_reg_4on5_OnIce_A_xGoals_per60": "Penalty-kill expected goals against per 60",
+    "mp_reg_5on5_shotsBlockedByPlayer_per60": "Shot blocks per 60",
+    "mp_reg_5on5_penaltiesDrawn_per60": "Penalties drawn per 60",
+    "mp_reg_5on4_I_F_xGoals_per60": "Power-play expected goals per 60",
+}
+
+
+def readable_trait_label(feature: str) -> str:
+    if feature in TRAIT_LABELS:
+        return TRAIT_LABELS[feature]
+    text = re.sub(r"^(mp_)?reg_", "", str(feature))
+    text = text.replace("5on5_", "").replace("5on4_", "power_play_").replace("4on5_", "penalty_kill_")
+    text = text.replace("OnIce_", "on_ice_").replace("I_F_", "individual_")
+    text = text.replace("_per60", "_per_60").replace("_calc", "")
+    return text.replace("_", " ").title()
 
 
 def _has(features: set[str], names: Iterable[str]) -> bool:
@@ -162,8 +205,14 @@ def _fallback_role_name(cluster: int, high_tokens: list[TraitToken], low_feature
         return "Role-Center Specialist", "Shows up through deployment details like draws, matchups, and role minutes."
 
     if categories:
-        return f"Balanced {categories[0]} Contributor", "Has a real statistical signature, but it is more moderate than the extreme archetypes."
-    return f"Balanced Role Contributor {cluster}", "Does not lean heavily into one boxscore trait, so the cluster reads as a balanced role."
+        high_text = ", ".join(readable_trait_label(feature).lower() for feature, _ in high_tokens[:2])
+        low_text = ", ".join(readable_trait_label(feature).lower() for feature in list(low_features)[:2])
+        detail = f"Leans most toward {high_text}"
+        if low_text:
+            detail += f", with less emphasis on {low_text}"
+        return f"Balanced {categories[0]} Contributor", f"{detail}."
+    top_text = ", ".join(readable_trait_label(feature).lower() for feature, _ in high_tokens[:2])
+    return f"Balanced Role Contributor {cluster}", f"Blended role profile with its clearest signals in {top_text or 'usage and secondary production'}."
 
 
 def _build_defense_name_summary(cluster: int, high_features: set[str], low_features: set[str], high_tokens: list[TraitToken]) -> tuple[str, str]:
@@ -214,8 +263,14 @@ def _build_defense_name_summary(cluster: int, high_features: set[str], low_featu
 
     categories = _ordered_categories(high_tokens)
     if categories:
-        return "Defensive Role Defenseman", "Role-driven defense profile whose statistical lean is moderate rather than extreme."
-    return f"Defensive Role Defenseman {cluster}", "Balanced defense profile without one dominant statistical trait."
+        high_text = ", ".join(readable_trait_label(feature).lower() for feature, _ in high_tokens[:2])
+        low_text = ", ".join(readable_trait_label(feature).lower() for feature in list(low_features)[:2])
+        detail = f"Role-driven defense profile that leans toward {high_text}"
+        if low_text:
+            detail += f" while showing less {low_text}"
+        return "Defensive Role Defenseman", f"{detail}."
+    top_text = ", ".join(readable_trait_label(feature).lower() for feature, _ in high_tokens[:2])
+    return f"Defensive Role Defenseman {cluster}", f"Blended defense profile with its clearest signals in {top_text or 'usage and suppression metrics'}."
 
 
 def build_archetype_name_summary(
