@@ -484,6 +484,81 @@ def make_legend_grid(df: pd.DataFrame):
         allow_unsafe_jscode=True
     )
 
+def _hex_to_rgb(color: str) -> tuple[int, int, int]:
+    color = str(color).strip().lstrip("#")
+    if len(color) != 6:
+        return (229, 231, 235)
+    return tuple(int(color[i:i + 2], 16) for i in (0, 2, 4))
+
+def _rgba(color: str, alpha: float) -> str:
+    r, g, b = _hex_to_rgb(color)
+    return f"rgba({r}, {g}, {b}, {alpha})"
+
+def render_percentage_circles(summary_df: pd.DataFrame, max_items: int = 6) -> str:
+    items = []
+    for r in summary_df.head(max_items).itertuples(index=False):
+        pct = float(getattr(r, "Share"))
+        color = getattr(r, "Color")
+        fg = getattr(r, "TextColor")
+        name = html.escape(str(getattr(r, "Archetype")))
+        players = int(getattr(r, "Players"))
+        avg_conf = float(getattr(r, "AvgConfidence"))
+        items.append(f"""
+        <div style="
+            min-width: 155px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 8px 12px;
+            border: 1px solid rgba(15,23,42,0.08);
+            border-radius: 8px;
+            background: linear-gradient(180deg, {_rgba(color, 0.22)}, rgba(255,255,255,0.92));
+        ">
+            <div style="
+                width: 104px;
+                height: 104px;
+                border-radius: 50%;
+                display: grid;
+                place-items: center;
+                background:
+                    radial-gradient(circle at center, #fff 0 56%, transparent 57%),
+                    conic-gradient({color} 0 {pct:.2f}%, rgba(148,163,184,0.22) {pct:.2f}% 100%);
+                box-shadow: inset 0 0 0 1px rgba(15,23,42,0.05);
+            ">
+                <div style="font-size: 1.35rem; font-weight: 850; color: {fg};">{pct:.0f}%</div>
+            </div>
+            <div style="font-weight: 800; text-align: center; line-height: 1.15; color: #111827;">{name}</div>
+            <div style="font-size: 0.82rem; color: #475569; text-align: center;">{players} players · {avg_conf:.0f}% avg confidence</div>
+        </div>
+        """)
+    return f"""
+    <div style="
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+        gap: 12px;
+        margin: 8px 0 18px;
+    ">
+        {''.join(items)}
+    </div>
+    """
+
+def render_snapshot_metric(label: str, value: str, detail: str, color: str = "#E5E7EB") -> str:
+    return f"""
+    <div style="
+        border: 1px solid rgba(15,23,42,0.08);
+        border-left: 5px solid {color};
+        border-radius: 8px;
+        padding: 13px 14px;
+        background: linear-gradient(180deg, {_rgba(color, 0.16)}, rgba(255,255,255,0.94));
+        min-height: 104px;
+    ">
+        <div style="font-size: 0.8rem; color: #64748B; font-weight: 750; text-transform: uppercase;">{html.escape(label)}</div>
+        <div style="font-size: 1.65rem; color: #111827; font-weight: 850; line-height: 1.05; margin-top: 7px;">{html.escape(value)}</div>
+        <div style="font-size: 0.88rem; color: #475569; margin-top: 6px; line-height: 1.25;">{html.escape(detail)}</div>
+    </div>
+    """
+
 def wrap_label(s: str, width: int = 16) -> str:
     words = str(s).split()
     lines, cur = [], []
@@ -764,12 +839,127 @@ if traits is not None:
         )
     make_legend_grid(legend_df)
 
-tabs = st.tabs(["Player Explorer", "Team Roster Fit", "Need Finder"])
+tabs = st.tabs(["Archetype Snapshot", "Player Explorer", "Team Roster Fit", "Need Finder"])
+
+# -------------------------
+# Archetype Snapshot
+# -------------------------
+with tabs[0]:
+    st.subheader("Archetype Snapshot")
+
+    snap = df.copy()
+    snap["Archetype"] = snap["top_cluster"].apply(lambda x: archetype_name_map.get(safe_int(x), f"Archetype {safe_int(x)}"))
+    snap["ConfidencePct"] = pd.to_numeric(snap["confidence"], errors="coerce").fillna(0.0) * 100.0
+    snap["REG TOI"] = (
+        pd.to_numeric(snap.get("reg_avg_toi_min", 0), errors="coerce").fillna(0.0)
+        * pd.to_numeric(snap.get("reg_games", 0), errors="coerce").fillna(0.0)
+    )
+
+    total_players = max(len(snap), 1)
+    total_toi = float(snap["REG TOI"].sum())
+    mix = (
+        snap.groupby("Archetype", as_index=False)
+        .agg(
+            Players=("player_id", "nunique"),
+            AvgConfidence=("ConfidencePct", "mean"),
+            MedianConfidence=("ConfidencePct", "median"),
+            TotalTOI=("REG TOI", "sum"),
+            AvgPoints=("reg_points", "mean"),
+            AvgGames=("reg_games", "mean"),
+        )
+    )
+    mix["Share"] = mix["Players"] / total_players * 100.0
+    mix["TOI Share"] = np.where(total_toi > 0, mix["TotalTOI"] / total_toi * 100.0, 0.0)
+    mix["Color"] = mix["Archetype"].apply(lambda x: PROFILE_COLOR_MAP.get(x, ("#E5E7EB", "#111827"))[0])
+    mix["TextColor"] = mix["Archetype"].apply(lambda x: PROFILE_COLOR_MAP.get(x, ("#E5E7EB", "#111827"))[1])
+    mix = mix.sort_values(["Share", "AvgConfidence"], ascending=[False, False]).reset_index(drop=True)
+
+    dominant = mix.iloc[0] if not mix.empty else None
+    top3_share = float(mix.head(3)["Share"].sum()) if not mix.empty else 0.0
+    entropy = 0.0
+    if not mix.empty:
+        shares = (mix["Share"] / 100.0).replace(0, np.nan).dropna()
+        if len(shares) > 1:
+            entropy = float(-(shares * np.log(shares)).sum() / np.log(len(shares)))
+    balance_label = "Balanced spread"
+    if top3_share >= 75:
+        balance_label = "Highly concentrated"
+    elif top3_share >= 58:
+        balance_label = "Moderately concentrated"
+
+    avg_conf_pct = float(snap["ConfidencePct"].mean()) if len(snap) else 0.0
+    mixed_count = int((snap["ConfidencePct"] < 80).sum())
+    dominant_color = str(dominant["Color"]) if dominant is not None else "#E5E7EB"
+    dominant_name = str(dominant["Archetype"]) if dominant is not None else "None"
+
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.markdown(render_snapshot_metric("Dominant archetype", dominant_name, f"{dominant['Share']:.1f}% of {group}" if dominant is not None else "No player data", dominant_color), unsafe_allow_html=True)
+    with m2:
+        st.markdown(render_snapshot_metric("Top-three concentration", f"{top3_share:.1f}%", balance_label, "#BAE6FD"), unsafe_allow_html=True)
+    with m3:
+        st.markdown(render_snapshot_metric("Average confidence", f"{avg_conf_pct:.1f}%", "How cleanly players fit their top profile", "#BBF7D0"), unsafe_allow_html=True)
+    with m4:
+        st.markdown(render_snapshot_metric("Mixed profiles", f"{mixed_count}", "Players below 80% top-profile confidence", "#FDE68A"), unsafe_allow_html=True)
+
+    st.markdown("### Top archetype shares")
+    st.markdown(render_percentage_circles(mix, max_items=6), unsafe_allow_html=True)
+
+    chart_data = mix.copy()
+    chart_data["ArchetypeLabel"] = chart_data["Archetype"].apply(lambda x: wrap_label(x, width=22))
+
+    share_chart = (
+        alt.Chart(chart_data)
+        .mark_bar(cornerRadiusTopRight=5, cornerRadiusBottomRight=5, opacity=0.82)
+        .encode(
+            x=alt.X("Share:Q", title="Players (%)"),
+            y=alt.Y("ArchetypeLabel:N", title=None, sort="-x"),
+            color=alt.Color("Archetype:N", scale=alt.Scale(domain=ARCHETYPE_COLOR_DOMAIN, range=ARCHETYPE_COLOR_RANGE), legend=None),
+            tooltip=[
+                alt.Tooltip("Archetype:N", title="Archetype"),
+                alt.Tooltip("Players:Q", title="Players"),
+                alt.Tooltip("Share:Q", title="Player share", format=".1f"),
+                alt.Tooltip("TOI Share:Q", title="TOI share", format=".1f"),
+                alt.Tooltip("AvgConfidence:Q", title="Avg confidence", format=".1f"),
+            ],
+        )
+        .properties(height=max(280, 34 * len(chart_data)))
+    )
+    st.altair_chart(share_chart, use_container_width=True)
+
+    c_left, c_right = st.columns([1.05, 0.95])
+    with c_left:
+        st.markdown("### High-level trends")
+        trend_rows = []
+        if dominant is not None:
+            trend_rows.append(f"**{dominant_name}** is the largest profile in this selected season/group.")
+        if len(mix) >= 2:
+            runner = mix.iloc[1]
+            gap = float(mix.iloc[0]["Share"] - runner["Share"])
+            trend_rows.append(f"The gap between the top two archetypes is **{gap:.1f} percentage points**, so the group is **{balance_label.lower()}**.")
+        trend_rows.append(f"The top three archetypes cover **{top3_share:.1f}%** of players.")
+        trend_rows.append(f"The distribution balance score is **{entropy:.2f}** on a 0-1 scale, where 1 means a more even archetype spread.")
+        trend_rows.append(f"Average top-archetype confidence is **{avg_conf_pct:.1f}%**, with **{mixed_count}** mixed-profile players under 80%.")
+        st.markdown("\n".join(f"- {row}" for row in trend_rows))
+
+    with c_right:
+        st.markdown("### Archetype table")
+        table_df = mix[["Archetype", "Players", "Share", "TOI Share", "AvgConfidence", "AvgPoints", "AvgGames"]].copy()
+        table_df = table_df.rename(columns={
+            "Share": "Player %",
+            "TOI Share": "TOI %",
+            "AvgConfidence": "Avg confidence %",
+            "AvgPoints": "Avg points",
+            "AvgGames": "Avg games",
+        })
+        for c in ["Player %", "TOI %", "Avg confidence %", "Avg points", "Avg games"]:
+            table_df[c] = table_df[c].round(1)
+        st.dataframe(table_df, use_container_width=True, hide_index=True)
 
 # -------------------------
 # Player Explorer
 # -------------------------
-with tabs[0]:
+with tabs[1]:
     st.subheader("Player Explorer")
     st.markdown("""
 **What you’re looking at**
@@ -899,7 +1089,7 @@ with tabs[0]:
 # -------------------------
 # Team Roster Fit
 # -------------------------
-with tabs[1]:
+with tabs[2]:
     st.subheader("Team Roster Construction")
     st.markdown("""
 **What you’re looking at**
@@ -1200,7 +1390,7 @@ with tabs[1]:
 # -------------------------
 # Need Finder
 # -------------------------
-with tabs[2]:
+with tabs[3]:
     st.subheader("Need Finder (find players who match a target archetype)")
     st.markdown("""
 **What you’re looking at**
