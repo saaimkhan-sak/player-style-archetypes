@@ -36,6 +36,12 @@ section[data-testid="stSidebar"] [data-testid="stPageLink"] a div {
   overflow: visible !important;
   text-overflow: clip !important;
 }
+.profile-table-wrap {overflow-x:auto;}
+.profile-table {width:100%; min-width:1500px; border-collapse:collapse; border:1px solid #E5E7EB; border-radius:8px; overflow:hidden;}
+.profile-table th,.profile-table td {padding:9px 10px; border-bottom:1px solid #E5E7EB; text-align:left; vertical-align:middle; white-space:nowrap;}
+.profile-table th {background:#F9FAFB; color:#6B7280; font-weight:750;}
+.profile-table .arch-col {min-width:245px;}
+.profile-pill {display:inline-block; padding:4px 10px; border-radius:999px; font-weight:750; white-space:normal; line-height:1.2;}
 </style>""",
     unsafe_allow_html=True,
 )
@@ -239,6 +245,34 @@ def compact_table(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def profile_pill(name: object) -> str:
+    text = "" if pd.isna(name) else str(name)
+    bg, fg = PROFILE_COLOR_MAP.get(text, ("#E5E7EB", "#111827"))
+    return f'<span class="profile-pill" style="background:{bg};color:{fg};">{text}</span>'
+
+
+def render_profile_changes_table(df: pd.DataFrame) -> str:
+    table = compact_table(df).sort_values("Shift score", ascending=False).head(30)
+    cols = list(table.columns)
+    header = "".join(
+        f'<th class="arch-col">{c}</th>' if c in {"REG archetype", "Projected PO archetype"} else f"<th>{c}</th>"
+        for c in cols
+    )
+    rows = []
+    for r in table.to_dict("records"):
+        cells = []
+        for c in cols:
+            val = r[c]
+            if c in {"REG archetype", "Projected PO archetype"}:
+                cells.append(f'<td class="arch-col">{profile_pill(val)}</td>')
+            elif isinstance(val, float):
+                cells.append(f"<td>{val:.3g}</td>")
+            else:
+                cells.append(f"<td>{val}</td>")
+        rows.append(f"<tr>{''.join(cells)}</tr>")
+    return f'<div class="profile-table-wrap"><table class="profile-table"><thead><tr>{header}</tr></thead><tbody>{"".join(rows)}</tbody></table></div>'
+
+
 data = load_playoff_shift_data()
 if data.empty:
     st.warning("No app data found.")
@@ -295,7 +329,7 @@ with tab_season:
                 "archetype_label:N",
                 title="REG archetype",
                 scale=alt.Scale(domain=ARCHETYPE_COLOR_DOMAIN, range=ARCHETYPE_COLOR_RANGE),
-                legend=alt.Legend(labelLimit=420, symbolLimit=0, orient="right"),
+                legend=alt.Legend(labelLimit=420, orient="right"),
             ),
             shape=alt.Shape("model_shift_band:N", title="Model shift band"),
             size=alt.Size("po_games:Q", title="PO GP", scale=alt.Scale(range=[40, 240])),
@@ -312,18 +346,14 @@ with tab_season:
                 alt.Tooltip("playoff_shift_score:Q", title="Shift score", format=".2f"),
             ],
         )
-        .properties(width=690, height=420)
+        .properties(width=820, height=420)
     )
     zero_x = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(color="#9CA3AF").encode(x="x:Q")
     zero_y = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(color="#9CA3AF").encode(y="y:Q")
     st.altair_chart(scatter + zero_x + zero_y, use_container_width=False)
 
     st.markdown("#### Biggest Playoff Profile Changes")
-    st.dataframe(
-        compact_table(season_df).sort_values("Shift score", ascending=False).head(30),
-        use_container_width=True,
-        hide_index=True,
-    )
+    st.markdown(render_profile_changes_table(season_df), unsafe_allow_html=True)
 
 with tab_archetypes:
     st.subheader("Regular-Season Archetypes Under Playoff Pressure")
