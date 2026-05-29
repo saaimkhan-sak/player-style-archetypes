@@ -295,6 +295,7 @@ with tab_season:
                 "archetype_label:N",
                 title="REG archetype",
                 scale=alt.Scale(domain=ARCHETYPE_COLOR_DOMAIN, range=ARCHETYPE_COLOR_RANGE),
+                legend=alt.Legend(labelLimit=420, symbolLimit=0, orient="right"),
             ),
             shape=alt.Shape("model_shift_band:N", title="Model shift band"),
             size=alt.Size("po_games:Q", title="PO GP", scale=alt.Scale(range=[40, 240])),
@@ -311,11 +312,11 @@ with tab_season:
                 alt.Tooltip("playoff_shift_score:Q", title="Shift score", format=".2f"),
             ],
         )
-        .properties(height=420)
+        .properties(width=690, height=420)
     )
     zero_x = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(color="#9CA3AF").encode(x="x:Q")
     zero_y = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(color="#9CA3AF").encode(y="y:Q")
-    st.altair_chart(scatter + zero_x + zero_y, use_container_width=True)
+    st.altair_chart(scatter + zero_x + zero_y, use_container_width=False)
 
     st.markdown("#### Biggest Playoff Profile Changes")
     st.dataframe(
