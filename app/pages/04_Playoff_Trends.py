@@ -400,29 +400,79 @@ with tab_player:
         c3.metric("Career PO GP", f"{int(hist['po_games'].sum()):,}")
         c4.metric("Career P/GP change", f"{hist['P/GP change'].mean():+.2f}")
 
-        long = hist.melt(
-            id_vars=["Season", "season"],
-            value_vars=["REG P/GP", "PO P/GP", "reg_avg_toi_min", "po_avg_toi_min"],
-            var_name="Metric",
-            value_name="Value",
-        )
-        long["Metric"] = long["Metric"].replace(
-            {
-                "reg_avg_toi_min": "REG ATOI",
-                "po_avg_toi_min": "PO ATOI",
-            }
-        )
-        chart = (
-            alt.Chart(long)
-            .mark_line(point=True)
-            .encode(
-                x=alt.X("Season:O", sort=[season_key_to_label(s) for s in sorted(hist["season"].unique())]),
-                y=alt.Y("Value:Q", title="Value"),
-                color=alt.Color("Metric:N"),
-                tooltip=["Season", "Metric", alt.Tooltip("Value:Q", format=".2f")],
+        season_sort = [season_key_to_label(s) for s in sorted(hist["season"].unique())]
+        profile = hist[[
+            "Season", "REG P/GP", "PO P/GP", "reg_avg_toi_min", "po_avg_toi_min",
+            "P/GP change", "TOI change", "playoff_shift_score", "archetype_label",
+            "playoff_archetype_label", "po_games",
+        ]].copy()
+        profile["REG ATOI"] = profile["reg_avg_toi_min"]
+        profile["PO ATOI"] = profile["po_avg_toi_min"]
+        profile["Profile"] = profile["archetype_label"] + " -> " + profile["playoff_archetype_label"].fillna("not projected")
+
+        def paired_delta_chart(reg_col: str, po_col: str, title: str, fmt: str) -> alt.Chart:
+            long = profile.melt(
+                id_vars=["Season", "Profile", "po_games"],
+                value_vars=[reg_col, po_col],
+                var_name="Split",
+                value_name="Value",
             )
-            .properties(height=340)
+            split_labels = {reg_col: "Regular Season", po_col: "Playoffs"}
+            long["Split"] = long["Split"].map(split_labels)
+            lines = alt.Chart(long).mark_line(strokeWidth=3, opacity=0.55).encode(
+                x=alt.X("Value:Q", title=title),
+                y=alt.Y("Season:O", sort=season_sort, title=None),
+                detail="Season:N",
+                color=alt.Color("Split:N", scale=alt.Scale(range=["#94A3B8", "#EF4444"])),
+            )
+            points = alt.Chart(long).mark_circle(size=110).encode(
+                x="Value:Q",
+                y=alt.Y("Season:O", sort=season_sort, title=None),
+                color=alt.Color("Split:N", title=None, scale=alt.Scale(range=["#94A3B8", "#EF4444"])),
+                tooltip=["Season", "Split", alt.Tooltip("Value:Q", format=fmt), "Profile", alt.Tooltip("po_games:Q", title="PO GP")],
+            )
+            return (lines + points).properties(height=max(190, 42 * len(profile)), title=title)
+
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.altair_chart(paired_delta_chart("REG P/GP", "PO P/GP", "Scoring Rate: Regular Season vs Playoffs", ".2f"), use_container_width=True)
+        with col_b:
+            st.altair_chart(paired_delta_chart("REG ATOI", "PO ATOI", "Usage: Regular Season vs Playoffs", ".1f"), use_container_width=True)
+
+        profile_long = profile.melt(
+            id_vars=["Season", "playoff_shift_score", "P/GP change", "TOI change", "po_games"],
+            value_vars=["archetype_label", "playoff_archetype_label"],
+            var_name="Split",
+            value_name="Archetype",
         )
-        st.altair_chart(chart, use_container_width=True)
+        profile_long["Split"] = profile_long["Split"].replace({"archetype_label": "Regular Season", "playoff_archetype_label": "Playoffs"})
+        transition = (
+            alt.Chart(profile_long)
+            .mark_rect(cornerRadius=4)
+            .encode(
+                x=alt.X("Split:N", title=None, sort=["Regular Season", "Playoffs"]),
+                y=alt.Y("Season:O", sort=season_sort, title=None),
+                color=alt.Color("Archetype:N", scale=alt.Scale(domain=ARCHETYPE_COLOR_DOMAIN, range=ARCHETYPE_COLOR_RANGE), legend=None),
+                tooltip=["Season", "Split", "Archetype", alt.Tooltip("playoff_shift_score:Q", title="Shift score", format=".2f")],
+            )
+            .properties(height=max(180, 38 * len(profile)), title="Archetype Translation")
+        )
+        shift = (
+            alt.Chart(profile)
+            .mark_bar(cornerRadiusEnd=4)
+            .encode(
+                x=alt.X("playoff_shift_score:Q", title="Shift score"),
+                y=alt.Y("Season:O", sort=season_sort, title=None),
+                color=alt.Color("P/GP change:Q", title="P/GP change", scale=alt.Scale(scheme="redblue", domainMid=0)),
+                tooltip=[
+                    "Season",
+                    alt.Tooltip("playoff_shift_score:Q", title="Shift score", format=".2f"),
+                    alt.Tooltip("P/GP change:Q", format="+.2f"),
+                    alt.Tooltip("TOI change:Q", format="+.1f"),
+                ],
+            )
+            .properties(height=max(180, 38 * len(profile)), title="How Much the Playoff Profile Moved")
+        )
+        st.altair_chart(alt.hconcat(transition, shift, spacing=28), use_container_width=True)
 
         st.dataframe(compact_table(hist), use_container_width=True, hide_index=True)
