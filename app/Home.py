@@ -112,7 +112,7 @@ To answer the question above, I had to find a way to tackle the following:
 Everything here is generated from **public NHL Gamecenter data** combined with **MoneyPuck player-level advanced metrics**. The advanced-data era begins in **2008-09**, which is the earliest season covered by the MoneyPuck files in this project.
 """)
 
-st.info("Use the left navigation to explore **Season Level Trends**, **Player Evolution**, and **Playoff Style Shifts**.")
+st.info("Use the left navigation to explore **What are all the Player Archetypes?**, **What does each season reveal?**, **How does a player's archetype evolve?**, and **How do archetypes change in the playoffs?**")
 
 st.markdown("---")
 
@@ -270,9 +270,9 @@ st.latex(r"\text{Mixedness} = 1 - \max_k(p_{ik})")
 st.markdown("---")
 
 # ----------------------------
-# Related research (bulleted citations)
+# References
 # ----------------------------
-st.header("Related research (closest matches)")
+st.header("References")
 
 st.markdown("""
 This is a list of peer-reviewed papers, conference papers, and academic theses that I learned and took inspiration from while working on this project:

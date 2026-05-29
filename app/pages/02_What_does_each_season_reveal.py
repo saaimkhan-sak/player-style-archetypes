@@ -11,7 +11,7 @@ import html
 
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
 
-st.set_page_config(page_title="Season-Level Analysis", layout="wide")
+st.set_page_config(page_title="What does each season reveal?", layout="wide")
 
 st.markdown(
     """
@@ -596,7 +596,7 @@ def load_archetype_name_map_for_season(
 # -------------------------
 # Page
 # -------------------------
-st.title("Season by Season Breakdown")
+st.title("What does each season reveal?")
 
 
 season_keys = available_seasons()  # e.g. ["20242025","20232024",...], newest first

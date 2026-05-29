@@ -50,8 +50,8 @@ function(params) {
 """.replace("__PROFILE_COLOR_MAP__", json.dumps(PROFILE_COLOR_MAP))
 )
 
-st.set_page_config(page_title="Player Archetype Evolution", layout="wide")
-st.title("Player Archetype Evolution")
+st.set_page_config(page_title="How does a player's archetype evolve?", layout="wide")
+st.title("How does a player's archetype evolve?")
 
 # ----------------------------
 # Helpers
@@ -332,181 +332,12 @@ I define **Mixedness** as:
 """)
 
 # ----------------------------
-# GLOBAL Archetype Glossary (before group selector)
-# ----------------------------
-st.markdown("## Archetype Glossary")
-
-st.markdown("""
-To make it simple, I aggregated all the archetypes the model generated across all the seasons analyzed and placed them in the below table.
-
-""")
-
-# Load multi-season data for both groups
-all_f = load_all_seasons_group("forwards")
-all_d = load_all_seasons_group("defense")
-all_combined = pd.concat([all_f, all_d], ignore_index=True)
-
-map_f = build_season_cluster_to_name("forwards")
-map_d = build_season_cluster_to_name("defense")
-
-def traits_registry(group: str, mapping: dict[tuple[str,int], str]) -> dict[str, dict[str, str]]:
-    """
-    Returns: archetype_name -> {"high": "...", "low": "..."} aggregated from all seasons.
-    We keep the most common (mode) high/low trait strings across seasons for that archetype name.
-    """
-    reg = {}
-    counts = {}
-
-    for sk in available_seasons():
-        t = load_traits_csv(group, sk)
-        if t.empty:
-            continue
-        for _, tr in t.iterrows():
-            kk = int(tr["cluster"])
-            name = normalize_legacy_archetype_name(mapping.get((sk, kk)))
-            if not name:
-                continue
-
-            hi = str(tr.get("top_traits", "")).strip()
-            lo = str(tr.get("low_traits", "")).strip()
-            if not hi and not lo:
-                continue
-
-            if name not in counts:
-                counts[name] = {"hi": {}, "lo": {}}
-            counts[name]["hi"][hi] = counts[name]["hi"].get(hi, 0) + 1
-            counts[name]["lo"][lo] = counts[name]["lo"].get(lo, 0) + 1
-
-    for name, c in counts.items():
-        hi = max(c["hi"].items(), key=lambda x: x[1])[0] if c["hi"] else ""
-        lo = max(c["lo"].items(), key=lambda x: x[1])[0] if c["lo"] else ""
-        reg[name] = {
-            "high": prettify_traits_lines(hi, max_items=4),
-            "low": prettify_traits_lines(lo, max_items=3),
-            "desc": archetype_description_from_traits(name, hi, lo),
-        }
-    return reg
-
-def build_glossary(group: str, all_df: pd.DataFrame, mapping: dict[tuple[str,int], str], traits_map: dict[str, dict[str,str]]) -> pd.DataFrame:
-    if all_df.empty:
-        return pd.DataFrame()
-
-    # Determine max K for that group dataset
-    pcols = [c for c in all_df.columns if isinstance(c, str) and c.startswith("p") and c[1:].isdigit()]
-    if not pcols:
-        return pd.DataFrame()
-
-    # Build long rows: player-season membership for every k
-    parts = []
-    for pc in pcols:
-        k = int(pc[1:])
-        tmp = all_df[["season","player_id","full_name","position", pc]].copy()
-        tmp = tmp.rename(columns={pc: "prob"})
-        tmp["k"] = k
-        tmp["archetype_name"] = tmp.apply(
-            lambda r: normalize_legacy_archetype_name(mapping.get((r["season"], int(r["k"])), None)),
-            axis=1,
-        )
-        tmp = tmp.dropna(subset=["archetype_name"])
-        parts.append(tmp)
-
-    long = pd.concat(parts, ignore_index=True)
-    long["era"] = long["season"].apply(era5)
-    long = long[long["era"].isin(ERA_ORDER)].copy()
-
-    # filter: avoid tiny samples if reg_games exists
-    if "reg_games" in all_df.columns:
-        rg = all_df[["season","player_id","reg_games"]].copy()
-        long = long.merge(rg, on=["season","player_id"], how="left")
-        long = long[long["reg_games"].fillna(0) >= 15].copy()
-
-    # For each archetype_name, pick 1 exemplar per era (no duplicates)
-    rows = []
-    for name, sub in long.groupby("archetype_name"):
-        # --- exemplars: 5 most recent, 100% confidence (i.e., prob == 1.0), no season text ---
-        sub = sub.copy()
-        sub["start_year"] = sub["season"].astype(str).str[:4].astype(int)
-
-        # Only keep rows where the player is a "pure" member of this archetype for that season
-        # Use >= 0.999 to be robust to float storage
-        pure = sub[sub["prob"] >= 0.999].copy()
-
-        # Sort by most recent season, then highest prob
-        pure = pure.sort_values(["start_year", "prob"], ascending=[False, False])
-
-        # Pick unique players (no duplicates) up to 5
-        used = set()
-        exemplars = []
-        for _, r in pure.iterrows():
-            pid = int(r["player_id"])
-            if pid in used:
-                continue
-            used.add(pid)
-            exemplars.append(str(r["full_name"]))
-            if len(exemplars) == 5:
-                break
-
-        # If fewer than 5 pure members exist, optionally fall back to next-most-confident recent players
-        # (comment this block out if you want STRICTLY 100% only)
-        if len(exemplars) < 5:
-            fallback = sub.sort_values(["start_year", "prob"], ascending=[False, False])
-            for _, r in fallback.iterrows():
-                pid = int(r["player_id"])
-                if pid in used:
-                    continue
-                used.add(pid)
-                exemplars.append(str(r["full_name"]))
-                if len(exemplars) == 5:
-                    break
-
-        exemplar_lines = exemplars  # already most recent first
-
-        rows.append({
-            "Archetype name": name,
-            "Description": traits_map.get(name, {}).get("desc", ""),
-            "High traits": traits_map.get(name, {}).get("high", ""),
-            "Low traits": traits_map.get(name, {}).get("low", ""),
-            "Exemplars": "\n".join(exemplar_lines),
-        })
-
-    out = pd.DataFrame(rows).sort_values("Archetype name")
-    if not out.empty:
-        out["Archetype name"] = out["Archetype name"].map(normalize_legacy_archetype_name)
-        out = (
-            out.groupby("Archetype name", as_index=False)
-            .agg({
-                "Description": "first",
-                "High traits": "first",
-                "Low traits": "first",
-                "Exemplars": "first",
-            })
-            .sort_values("Archetype name")
-        )
-    return out
-
-traits_f = traits_registry("forwards", map_f)
-traits_d = traits_registry("defense", map_d)
-
-st.markdown("")
-glossary_group = st.radio("Glossary group", ["forwards", "defense"], horizontal=True)
-glossary = build_glossary(
-    glossary_group,
-    all_f if glossary_group == "forwards" else all_d,
-    map_f if glossary_group == "forwards" else map_d,
-    traits_f if glossary_group == "forwards" else traits_d,
-)
-if glossary.empty:
-    st.info("No glossary available yet.")
-else:
-    show_multiline_table(glossary, height=650)  # or st.dataframe if you prefer
-
-
-
-
-# ----------------------------
 # Player evolution controls
 # ----------------------------
-st.markdown("## Player Evolution")
+all_f = load_all_seasons_group("forwards")
+all_d = load_all_seasons_group("defense")
+map_f = build_season_cluster_to_name("forwards")
+map_d = build_season_cluster_to_name("defense")
 
 group = st.selectbox("Group", ["forwards", "defense"], index=0)
 

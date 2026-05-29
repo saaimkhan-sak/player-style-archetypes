@@ -22,8 +22,8 @@ from lib import (  # noqa: E402
 )
 
 
-st.set_page_config(page_title="Playoff Style Shifts", layout="wide")
-st.title("Playoff Style Shifts")
+st.set_page_config(page_title="How do archetypes change in the playoffs?", layout="wide")
+st.title("How do archetypes change in the playoffs?")
 ARCHETYPE_COLOR_DOMAIN = list(PROFILE_COLOR_MAP.keys())
 ARCHETYPE_COLOR_RANGE = [PROFILE_COLOR_MAP[name][0] for name in ARCHETYPE_COLOR_DOMAIN]
 
