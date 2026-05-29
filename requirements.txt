@@ -2,6 +2,7 @@ altair==5.5.0
 numpy==2.2.6
 pandas==2.2.3
 pyarrow==20.0.0
+pytest==9.0.3
 requests==2.32.3
 streamlit==1.41.1
 streamlit-aggrid==1.1.8.post1
