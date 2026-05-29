@@ -997,8 +997,6 @@ with tabs[1]:
         top_pct = weighted_share(top_half, top_k) * 100
         bottom_pct = weighted_share(bottom_half, top_k) * 100
         spread_gap = abs(top_pct - bottom_pct)
-        identity_note = "star-loaded" if top_pct - bottom_pct >= 15 else "depth-loaded" if bottom_pct - top_pct >= 15 else "balanced through the roster"
-
         def ring(label: str, pct: float, sub: str) -> str:
             pct = max(0, min(100, float(pct)))
             return f"""
@@ -1045,10 +1043,9 @@ with tabs[1]:
             unsafe_allow_html=True,
         )
 
-        c1, c2, c3 = st.columns(3)
+        c1, c2 = st.columns([2.4, 1])
         c1.metric("Dominant profile", dominant)
-        c2.metric("Construction read", identity_note)
-        c3.metric("Top/bottom gap", f"{spread_gap:.0f} pts")
+        c2.metric("Top/bottom gap", f"{spread_gap:.0f} pts")
 
         st.markdown(f"### {team} {slot_label.lower()} construction")
         source_msg = "MoneyPuck 5v5 line/pairing minutes" if unit_cards else "regular-season player TOI fallback"
