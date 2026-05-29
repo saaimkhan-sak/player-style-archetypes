@@ -23,6 +23,15 @@ from lib import (
 REPORTS_DIR = Path("reports")
 
 st.set_page_config(page_title="NHL Player Style Archetypes", layout="wide")
+st.markdown(
+    """<style>
+section[data-testid="stSidebar"] [data-testid="stPageLink"] a {
+  white-space: normal !important;
+  line-height: 1.2 !important;
+}
+</style>""",
+    unsafe_allow_html=True,
+)
 
 @st.cache_data(ttl=3600)
 def load_traits_csv(group: str, season_key: str) -> pd.DataFrame:
@@ -112,7 +121,7 @@ To answer the question above, I had to find a way to tackle the following:
 Everything here is generated from **public NHL Gamecenter data** combined with **MoneyPuck player-level advanced metrics**. The advanced-data era begins in **2008-09**, which is the earliest season covered by the MoneyPuck files in this project.
 """)
 
-st.info("Use the left navigation to explore **What are all the Player Archetypes?**, **What does each season reveal?**, **How does a player's archetype evolve?**, and **How do archetypes change in the playoffs?**")
+st.info("Use the left navigation to explore **What Are All the Player Styles According to the Model?**, **What Are the Season Level Trends in Play Style?**, **How Does a Player's Play Style Evolve Over Their Career?**, and **How Does Play Style Change in the Playoffs?**")
 
 st.markdown("---")
 

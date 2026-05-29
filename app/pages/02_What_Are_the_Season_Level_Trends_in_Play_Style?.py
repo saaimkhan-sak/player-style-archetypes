@@ -7,11 +7,12 @@ from pathlib import Path
 import datetime
 import json
 import html
+import subprocess
 
 
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
 
-st.set_page_config(page_title="What does each season reveal?", layout="wide")
+st.set_page_config(page_title="What Are the Season Level Trends in Play Style?", layout="wide")
 
 st.markdown(
     """
@@ -22,6 +23,10 @@ st.markdown(
   line-height: 1.35 !important;
   padding: 12px 14px !important;
   border-radius: 8px !important;
+}
+section[data-testid="stSidebar"] [data-testid="stPageLink"] a {
+  white-space: normal !important;
+  line-height: 1.2 !important;
 }
 </style>
 """,
@@ -514,45 +519,37 @@ def render_snapshot_metric(label: str, value: str, detail: str, color: str = "#E
     </div>
     """
 
-def percentage_circle_chart(summary_df: pd.DataFrame, max_items: int = 6) -> alt.Chart:
+def percentage_circle_chart(summary_df: pd.DataFrame, max_items: int = 8) -> alt.Chart:
     chart_data = summary_df.head(max_items).copy()
-    chart_data["ArchetypeLabel"] = chart_data["Archetype"].apply(lambda x: wrap_label(x, width=18))
-    chart_data["Remainder"] = (100.0 - chart_data["Share"]).clip(lower=0.0)
-    long = chart_data.melt(
-        id_vars=["Archetype", "ArchetypeLabel", "Share", "Players", "AvgConfidence", "Color"],
-        value_vars=["Share", "Remainder"],
-        var_name="Segment",
-        value_name="Value",
-    )
-    long["SegmentColor"] = np.where(long["Segment"].eq("Share"), long["Color"], "#E5E7EB")
-
-    arcs = alt.Chart(long).mark_arc(innerRadius=34, outerRadius=50, stroke="#FFFFFF", strokeWidth=1).encode(
-        theta=alt.Theta("Value:Q", stack=True),
-        color=alt.Color("SegmentColor:N", scale=None, legend=None),
-        tooltip=[
-            alt.Tooltip("Archetype:N", title="Archetype"),
-            alt.Tooltip("Share:Q", title="Player share", format=".1f"),
-            alt.Tooltip("Players:Q", title="Players"),
-            alt.Tooltip("AvgConfidence:Q", title="Avg confidence", format=".1f"),
-        ],
-    )
-
-    labels = alt.Chart(long).transform_filter(
-        alt.datum.Segment == "Share"
-    ).mark_text(fontSize=18, fontWeight="bold", color="#111827").encode(
-        text=alt.Text("Share:Q", format=".0f"),
-    )
-    return (
-        alt.layer(arcs, labels).properties(height=150)
-        .facet(
-            column=alt.Column(
-                "ArchetypeLabel:N",
-                title=None,
-                header=alt.Header(labelOrient="bottom", labelPadding=8, labelFontWeight="bold"),
-            )
+    charts = []
+    for _, row in chart_data.iterrows():
+        share = float(row["Share"])
+        data = pd.DataFrame(
+            {
+                "Segment": ["Share", "Remainder"],
+                "Value": [share, max(0.0, 100.0 - share)],
+                "Color": [row["Color"], "#E5E7EB"],
+                "Archetype": [row["Archetype"], row["Archetype"]],
+                "Players": [row["Players"], row["Players"]],
+                "AvgConfidence": [row["AvgConfidence"], row["AvgConfidence"]],
+            }
         )
-        .resolve_scale(color="independent")
-    )
+        arc = alt.Chart(data).mark_arc(innerRadius=34, outerRadius=50, stroke="#FFFFFF", strokeWidth=1).encode(
+            theta=alt.Theta("Value:Q", stack=True),
+            color=alt.Color("Color:N", scale=None, legend=None),
+            tooltip=[
+                alt.Tooltip("Archetype:N", title="Archetype"),
+                alt.Tooltip("Players:Q", title="Players"),
+                alt.Tooltip("AvgConfidence:Q", title="Avg confidence", format=".1f"),
+            ],
+        )
+        label = alt.Chart(pd.DataFrame({"Share": [share]})).mark_text(
+            fontSize=18, fontWeight="bold", color="#111827"
+        ).encode(text=alt.Text("Share:Q", format=".0f"))
+        title = alt.TitleParams(wrap_label(row["Archetype"], width=20), fontSize=11, dy=8, anchor="middle")
+        charts.append((arc + label).properties(width=128, height=128, title=title))
+    rows = [alt.hconcat(*charts[i:i + 4], spacing=8) for i in range(0, len(charts), 4)]
+    return alt.vconcat(*rows, spacing=4).configure_view(stroke=None)
 
 def wrap_label(s: str, width: int = 16) -> str:
     words = str(s).split()
@@ -666,7 +663,7 @@ def load_archetype_name_map_for_season(
 # -------------------------
 # Page
 # -------------------------
-st.title("What does each season reveal?")
+st.title("What Are the Season Level Trends in Play Style?")
 
 
 season_keys = available_seasons()  # e.g. ["20242025","20232024",...], newest first
@@ -689,12 +686,7 @@ from zoneinfo import ZoneInfo
 ET_TZ = ZoneInfo("America/New_York")
 
 def get_last_updated_ts(season_key: str) -> datetime | None:
-    """
-    Returns the most recent modification time (as UTC-aware datetime)
-    among the files the app serves for this season.
-    """
     repo_root = Path(__file__).resolve().parents[2]  # app/pages -> app -> repo root
-
     candidates = [
         repo_root / f"data/app/players_forwards_{season_key}.parquet",
         repo_root / f"data/app/players_defense_{season_key}.parquet",
@@ -702,12 +694,24 @@ def get_last_updated_ts(season_key: str) -> datetime | None:
         repo_root / f"reports/archetype_traits_defense_{season_key}.csv",
         repo_root / f"data/processed/schedule_{season_key}.parquet",
     ]
-
+    rel_paths = [str(p.relative_to(repo_root)) for p in candidates if p.exists()]
+    if rel_paths:
+        try:
+            result = subprocess.run(
+                ["git", "log", "-1", "--format=%cI", "--", *rel_paths],
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=2,
+            )
+            stamp = result.stdout.strip().splitlines()[0] if result.stdout.strip() else ""
+            if stamp:
+                return datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+        except Exception:
+            pass
     mtimes = [p.stat().st_mtime for p in candidates if p.exists()]
-    if not mtimes:
-        return None
-
-    return datetime.fromtimestamp(max(mtimes), tz=timezone.utc)
+    return datetime.fromtimestamp(max(mtimes), tz=timezone.utc) if mtimes else None
 
 def fmt_updated_et(ts: datetime | None) -> str:
     if ts is None:
@@ -716,7 +720,7 @@ def fmt_updated_et(ts: datetime | None) -> str:
 
 season_key = str(season).replace("-", "")  # works for "20252026" and "2025-2026"
 last_updated_ts = get_last_updated_ts(season_key)
-st.sidebar.caption(f"Last updated: {fmt_updated_et(last_updated_ts)}")
+st.sidebar.caption(f"Data refreshed: {fmt_updated_et(last_updated_ts)}")
 
 
 df = load_group(group, season)
@@ -898,7 +902,7 @@ with tabs[0]:
         st.markdown(render_snapshot_metric("Mixed profiles", f"{mixed_count}", "Players below 80% top-profile confidence", "#FDE68A"), unsafe_allow_html=True)
 
     st.markdown("### Top archetype shares")
-    st.altair_chart(percentage_circle_chart(mix, max_items=6), use_container_width=True)
+    st.altair_chart(percentage_circle_chart(mix, max_items=8), use_container_width=False)
 
     chart_data = mix.copy()
     chart_data["ArchetypeLabel"] = chart_data["Archetype"].apply(lambda x: wrap_label(x, width=22))

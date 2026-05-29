@@ -61,8 +61,17 @@ function(params) {
 )
 
 
-st.set_page_config(page_title="What are all the Player Archetypes?", layout="wide")
-st.title("What are all the Player Archetypes?")
+st.set_page_config(page_title="What Are All the Player Styles According to the Model?", layout="wide")
+st.markdown(
+    """<style>
+section[data-testid="stSidebar"] [data-testid="stPageLink"] a {
+  white-space: normal !important;
+  line-height: 1.2 !important;
+}
+</style>""",
+    unsafe_allow_html=True,
+)
+st.title("What Are All the Player Styles According to the Model?")
 
 
 def season_start_year(season_key: str) -> int:

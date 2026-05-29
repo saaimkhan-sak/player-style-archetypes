@@ -50,8 +50,17 @@ function(params) {
 """.replace("__PROFILE_COLOR_MAP__", json.dumps(PROFILE_COLOR_MAP))
 )
 
-st.set_page_config(page_title="How does a player's archetype evolve?", layout="wide")
-st.title("How does a player's archetype evolve?")
+st.set_page_config(page_title="How Does a Player's Play Style Evolve Over Their Career?", layout="wide")
+st.markdown(
+    """<style>
+section[data-testid="stSidebar"] [data-testid="stPageLink"] a {
+  white-space: normal !important;
+  line-height: 1.2 !important;
+}
+</style>""",
+    unsafe_allow_html=True,
+)
+st.title("How Does a Player's Play Style Evolve Over Their Career?")
 
 # ----------------------------
 # Helpers
