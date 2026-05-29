@@ -456,7 +456,7 @@ with tab_player:
             split_labels = {reg_col: "Regular Season", po_col: "Playoffs"}
             long["Split"] = long["Split"].map(split_labels)
             lines = alt.Chart(long).mark_line(strokeWidth=3, opacity=0.55).encode(
-                x=alt.X("Value:Q", title=title, titlePadding=14),
+                x=alt.X("Value:Q", title=title, axis=alt.Axis(titlePadding=14)),
                 y=alt.Y("Season:O", sort=season_sort, title=None),
                 detail="Season:N",
                 color=alt.Color("Split:N", scale=alt.Scale(range=["#94A3B8", "#EF4444"])),
@@ -470,7 +470,6 @@ with tab_player:
             return (lines + points).properties(
                 height=max(220, 46 * len(profile)),
                 title=title,
-                padding={"left": 5, "right": 5, "top": 8, "bottom": 36},
             )
 
         col_a, col_b = st.columns(2)
