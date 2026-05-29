@@ -249,6 +249,11 @@ st.markdown(
 This page compares a player's regular-season profile with their playoff profile. The archetype shown is still the regular-season model assignment; the shift score measures how much their tracked playoff production, shot volume, ice time, penalty rate, and plus-minus move relative to regular season.
 """
 )
+st.info(
+    """
+**Shift score, in plain English:** this is a "how different did this player look in the playoffs?" score. It compares playoff scoring rate, shot rate, ice time, penalty rate, and plus-minus rate against that same player's regular-season baseline, then combines those changes into one number. A **larger score** means the playoff version of the player looked more different from his regular-season version; a **smaller score** means his role and results stayed steadier. Directional stats still matter: a **positive change** in a column like P/GP or TOI means it went up in the playoffs, while a **negative change** means it went down.
+"""
+)
 if data["model_shift_score"].notna().any():
     st.caption("For seasons with projection files, the playoff archetype is calculated by running playoff feature vectors through that season's regular-season NMF/GMM model.")
 
@@ -420,7 +425,7 @@ with tab_player:
             split_labels = {reg_col: "Regular Season", po_col: "Playoffs"}
             long["Split"] = long["Split"].map(split_labels)
             lines = alt.Chart(long).mark_line(strokeWidth=3, opacity=0.55).encode(
-                x=alt.X("Value:Q", title=title),
+                x=alt.X("Value:Q", title=title, titlePadding=14),
                 y=alt.Y("Season:O", sort=season_sort, title=None),
                 detail="Season:N",
                 color=alt.Color("Split:N", scale=alt.Scale(range=["#94A3B8", "#EF4444"])),
@@ -431,7 +436,11 @@ with tab_player:
                 color=alt.Color("Split:N", title=None, scale=alt.Scale(range=["#94A3B8", "#EF4444"])),
                 tooltip=["Season", "Split", alt.Tooltip("Value:Q", format=fmt), "Profile", alt.Tooltip("po_games:Q", title="PO GP")],
             )
-            return (lines + points).properties(height=max(190, 42 * len(profile)), title=title)
+            return (lines + points).properties(
+                height=max(220, 46 * len(profile)),
+                title=title,
+                padding={"left": 5, "right": 5, "top": 8, "bottom": 36},
+            )
 
         col_a, col_b = st.columns(2)
         with col_a:
