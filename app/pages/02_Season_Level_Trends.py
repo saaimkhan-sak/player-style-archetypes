@@ -1271,10 +1271,21 @@ with tabs[2]:
             for _, r in sub.iterrows():
                 arch = r["Archetype"]
                 bg, fg = PROFILE_COLOR_MAP.get(arch, ("#E5E7EB", "#111827"))
+                conf_val = float(r["Confidence (%)"])
+                if conf_val >= 90:
+                    conf_bg, conf_fg = "#DCFCE7", "#166534"
+                elif conf_val >= 80:
+                    conf_bg, conf_fg = "#FEF9C3", "#854D0E"
+                else:
+                    conf_bg, conf_fg = "#FEE2E2", "#991B1B"
+                conf_chip = f'<span style="display:inline-flex;padding:1px 6px;border-radius:999px;font-size:11px;font-weight:800;background:{conf_bg};color:{conf_fg};margin-left:5px;">{conf_val:.1f}%</span>'
+                g = int(r.get("reg_goals", 0))
+                a = int(r.get("reg_assists", 0))
+                p = int(r.get("reg_points", 0))
                 unit_html.append(
                     f"""<div class="player-row">
-  <div class="player-name">{html.escape(str(r["full_name"]))}</div>
-  <div class="player-meta">{html.escape(str(r["position"]))} · {int(r.get("reg_games", 0))} GP · {min_to_mmss(r.get("reg_avg_toi_min", 0))} ATOI · {r["Confidence (%)"]:.1f}%</div>
+  <div class="player-name">{html.escape(str(r["full_name"]))}{conf_chip}</div>
+  <div class="player-meta">{html.escape(str(r["position"]))} · {int(r.get("reg_games", 0))} GP · {min_to_mmss(r.get("reg_avg_toi_min", 0))} ATOI · {g}G, {a}A, {p}P</div>
   <span class="profile-chip" style="background:{bg};color:{fg};">{html.escape(arch)}</span>
 </div>"""
                 )
@@ -1315,7 +1326,8 @@ with tabs[2]:
         st.markdown(f'<table class="mix-table">{header}{"".join(rows_html)}</table>', unsafe_allow_html=True)
 
         st.markdown("### Depth chart table")
-        show_roster = roster[["Unit", "Depth", "full_name", "position", "Archetype", "Confidence (%)", "reg_games", "reg_avg_toi_min", "reg_points", "reg_goals", "reg_assists"]].rename(columns={
+        show_roster = roster[["Unit", "Depth", "full_name", "position", "Archetype", "Confidence (%)", "reg_games", "reg_avg_toi_min", "reg_points", "reg_goals", "reg_assists"]].copy()
+        show_roster = show_roster.rename(columns={
             "Unit": slot_label,
             "full_name": "Player",
             "position": "Pos",
@@ -1326,12 +1338,19 @@ with tabs[2]:
             "reg_assists": "REG A",
         })
         show_roster["REG ATOI"] = show_roster["REG ATOI"].apply(min_to_mmss)
-        show_roster["Confidence cue"] = pd.cut(
-            show_roster["Confidence (%)"],
-            bins=[-1, 80, 92, 101],
-            labels=["mixed", "solid", "clean fit"],
-        ).astype(str)
-        st.dataframe(show_roster, use_container_width=True, hide_index=True)
+        show_roster["Confidence"] = show_roster["Confidence (%)"].apply(lambda x: f"{x:.1f}%")
+        show_roster = show_roster.drop(columns=["Confidence (%)"])
+        make_badge_grid(
+            show_roster,
+            height=420,
+            pin_cols=("Player",),
+            conf_mode="fixed",
+            conf_q33=80.0,
+            conf_q67=90.0,
+            player_min_px=160,
+            player_max_px=280,
+            key_suffix=f"depth_{team}_{season}_{group}",
+        )
 
         st.divider()
         st.markdown("### League-context roster gaps")
@@ -1398,7 +1417,15 @@ with tabs[2]:
             show = me[[
                 "Archetype","Team share (%)","League avg (%)","Z-score","Strong coverage (%)","Reliance on top 2 (%)","Note"
             ]].reset_index(drop=True)
-            st.dataframe(show.reset_index(drop=True), use_container_width=True, hide_index=True)
+            make_badge_grid(
+                show,
+                height=max(300, 42 * len(show) + 60),
+                pin_cols=("Archetype",),
+                confidence_col="__none__",
+                player_min_px=260,
+                player_max_px=400,
+                key_suffix=f"gaps_{team}_{season}_{group}",
+            )
 
 # -------------------------
 # Need Finder

@@ -216,11 +216,45 @@ def profile_pill(name: object) -> str:
     return f'<span class="profile-pill" style="background:{bg};color:{fg};">{text}</span>'
 
 
-def render_profile_changes_table(df: pd.DataFrame) -> str:
-    table = compact_table(df).head(30)
+_SHIFT_BAND_COLORS = {
+    "Held steady":    ("#DCFCE7", "#166534"),
+    "Moderate shift": ("#FEF9C3", "#854D0E"),
+    "Major shift":    ("#FEE2E2", "#991B1B"),
+    "Not projected":  ("#F1F5F9", "#64748B"),
+}
+
+
+def shift_band_pill(band: object) -> str:
+    text = "Not projected" if (band is None or (isinstance(band, float) and pd.isna(band))) else str(band)
+    bg, fg = _SHIFT_BAND_COLORS.get(text, ("#F1F5F9", "#64748B"))
+    return f'<span class="profile-pill" style="background:{bg};color:{fg};font-size:0.82em;">{text}</span>'
+
+
+def model_score_pill(score: object) -> str:
+    try:
+        v = float(score)
+    except (TypeError, ValueError):
+        return '<span class="profile-pill" style="background:#F1F5F9;color:#64748B;font-size:0.82em;">—</span>'
+    if pd.isna(v):
+        return '<span class="profile-pill" style="background:#F1F5F9;color:#64748B;font-size:0.82em;">—</span>'
+    if v >= 0.75:
+        bg, fg = "#FEE2E2", "#991B1B"
+    elif v >= 0.25:
+        bg, fg = "#FEF9C3", "#854D0E"
+    else:
+        bg, fg = "#DCFCE7", "#166534"
+    return f'<span class="profile-pill" style="background:{bg};color:{fg};font-size:0.82em;">{v:.3f}</span>'
+
+
+_ARCH_COLS = {"REG archetype", "Projected PO archetype"}
+_BAND_COLS = {"Model shift band", "Stat shift band"}
+_SCORE_COLS = {"Model shift ↑"}
+
+
+def _render_table_html(table: pd.DataFrame) -> str:
     cols = list(table.columns)
     header = "".join(
-        f'<th class="arch-col">{c}</th>' if c in {"REG archetype", "Projected PO archetype"} else f"<th>{c}</th>"
+        f'<th class="arch-col">{c}</th>' if c in _ARCH_COLS else f"<th>{c}</th>"
         for c in cols
     )
     rows = []
@@ -228,14 +262,22 @@ def render_profile_changes_table(df: pd.DataFrame) -> str:
         cells = []
         for c in cols:
             val = r[c]
-            if c in {"REG archetype", "Projected PO archetype"}:
+            if c in _ARCH_COLS:
                 cells.append(f'<td class="arch-col">{profile_pill(val)}</td>')
+            elif c in _BAND_COLS:
+                cells.append(f"<td>{shift_band_pill(val)}</td>")
+            elif c in _SCORE_COLS:
+                cells.append(f"<td>{model_score_pill(val)}</td>")
             elif isinstance(val, float):
                 cells.append(f"<td>{val:.3g}</td>")
             else:
                 cells.append(f"<td>{val}</td>")
         rows.append(f"<tr>{''.join(cells)}</tr>")
     return f'<div class="profile-table-wrap"><table class="profile-table"><thead><tr>{header}</tr></thead><tbody>{"".join(rows)}</tbody></table></div>'
+
+
+def render_profile_changes_table(df: pd.DataFrame) -> str:
+    return _render_table_html(compact_table(df).head(30))
 
 
 # ── Data load ──────────────────────────────────────────────────────────────────
@@ -246,7 +288,7 @@ if data.empty:
 
 # ── Intro & explainer ──────────────────────────────────────────────────────────
 st.markdown("""
-Every hockey fan knows the playoffs feel different — tighter systems, better goaltending, and higher stakes.
+We all know that the playoffs feel different — tighter systems, better goaltending, and higher stakes.
 But how much does a player's *actual style* change when the intensity ramps up?
 This page answers that question using the same archetype model that classifies regular-season play, now applied to playoff data.
 """)
@@ -254,7 +296,7 @@ This page answers that question using the same archetype model that classifies r
 with st.expander("📊 How is the model shift score calculated? (click to expand)", expanded=False):
     st.markdown("""
 ### The short version
-We take each player's playoff statistics, run them through the exact same machine-learning model used to assign regular-season archetypes, and measure how far the player's playoff "style fingerprint" is from their regular-season one. A bigger number = a bigger identity shift.
+I take each player's playoff statistics, run them through the exact same machine-learning model used to assign regular-season archetypes, and measure how far the player's playoff "style fingerprint" is from their regular-season one. A bigger number = a bigger identity shift.
 
 ---
 
@@ -262,7 +304,7 @@ We take each player's playoff statistics, run them through the exact same machin
 
 **Regular season:** The archetype model was trained on [MoneyPuck](https://moneypuck.com) player-level advanced metrics — a well-regarded public data source that tracks things like expected goals (xGoals), shot quality, and on-ice possession at the individual player level, game by game.
 
-**Playoffs:** MoneyPuck publishes playoff statistics on the same site, but only as a season summary (not game by game). We saved the playoff statistics pages for all 18 seasons from 2008-09 through 2025-26 and extracted the data directly from each page's HTML. To capture special-teams context, we collected four separate views for each season:
+**Playoffs:** MoneyPuck publishes playoff statistics on the same site, but only as a season summary (not game by game). I saved the playoff statistics pages for all 18 seasons from 2008-09 through 2025-26 and extracted the data directly from each page's HTML. To capture special-teams context, I collected four separate views for each season:
 - **All situations combined**
 - **5-on-5 (even strength)** — the most important slice, where most of the game is played
 - **5-on-4 (power play)** — when a team has the man advantage
@@ -272,7 +314,7 @@ We take each player's playoff statistics, run them through the exact same machin
 
 ### Step 2 — What we calculated from the playoff data
 
-For each player and each situation, we computed the same types of rate statistics the regular-season model uses:
+For each player and each situation, I computed the same types of rate statistics the regular-season model uses:
 
 | Metric | What it measures | Why it matters |
 |--------|-----------------|----------------|
@@ -296,7 +338,7 @@ For situations where MoneyPuck's summary view doesn't publish a metric (specific
 
 ### Step 3 — Running it through the model
 
-With those playoff rate statistics in hand, we do two things:
+With those playoff rate statistics in hand, I do two things:
 
 **NMF compression:** Non-negative Matrix Factorization squashes all those metrics into a compact "style fingerprint" — a short list of numbers that describe *how* a player plays rather than *how much* they produce. Think of it as distilling a player's full stat line into a few key style dimensions.
 
@@ -304,7 +346,7 @@ With those playoff rate statistics in hand, we do two things:
 - Regular season: 72% Playmaking Scorer, 18% Two-Way Creator, 10% Other
 - Playoffs: 41% Playmaking Scorer, 44% Two-Way Creator, 15% Other
 
-The regular-season model was not re-trained on playoff data — the same fitted model is used to project each player into archetype space based on their playoff numbers.
+The regular-season model was not re-trained on playoff data — I use the same fitted model to project each player into archetype space based on their playoff numbers.
 
 ---
 
@@ -429,11 +471,9 @@ with tab_season:
 with tab_archetypes:
     st.subheader("Regular-Season Archetypes Under Playoff Pressure")
     st.markdown(
-        "The heatmap below shows, for each regular-season archetype and each season, "
-        "the **median model shift score** across all players in that archetype who made the playoffs. "
-        "Red = that archetype's players tended to look noticeably different in the playoffs; "
-        "green = their playoff fingerprint stayed close to their regular-season one. "
-        "Hover over a cell for the archetype change rate and scoring rate context."
+        "For each regular-season archetype and season, the chart shows how much that group's "
+        "play style shifted in the playoffs — and how many players actually got re-classified "
+        "into a different archetype. Hover over any circle for full detail."
     )
     arch = (
         base.groupby(["season", "Season", "archetype_label"], as_index=False)
@@ -448,43 +488,59 @@ with tab_archetypes:
     )
     arch = arch[arch["players"] >= 3].copy()
 
-    heat = (
+    season_sort = [season_key_to_label(s) for s in sorted(base["season"].unique())]
+    arch["change_rate_pct"] = (arch["archetype_change_rate"] * 100).round(1)
+
+    # Background grid so empty cells are visible
+    bg = (
         alt.Chart(arch)
-        .mark_rect()
+        .mark_rect(color="#F9FAFB", stroke="#E5E7EB", strokeWidth=0.5)
         .encode(
-            x=alt.X("Season:O", title="Season", sort=[season_key_to_label(s) for s in sorted(base["season"].unique())]),
-            y=alt.Y(
-                "archetype_label:N",
-                title="REG archetype",
-                sort="-x",
-                axis=alt.Axis(labelLimit=320, titlePadding=18, labelPadding=8),
-            ),
+            x=alt.X("Season:O", title="Season", sort=season_sort),
+            y=alt.Y("archetype_label:N", title="REG archetype", sort="-x",
+                    axis=alt.Axis(labelLimit=320, titlePadding=18, labelPadding=8)),
+        )
+    )
+    # Circles: color = model shift severity, size = archetype change rate
+    dots = (
+        alt.Chart(arch)
+        .mark_circle(stroke="#FFFFFF", strokeWidth=1)
+        .encode(
+            x=alt.X("Season:O", title="Season", sort=season_sort),
+            y=alt.Y("archetype_label:N", title="REG archetype", sort="-x",
+                    axis=alt.Axis(labelLimit=320, titlePadding=18, labelPadding=8)),
             color=alt.Color(
                 "median_model_shift:Q",
                 title="Median model shift",
-                scale=alt.Scale(scheme="redyellowgreen", reverse=True, domain=[0, 1.0]),
+                scale=alt.Scale(scheme="orangered", domain=[0, 1.0]),
+                legend=alt.Legend(gradientLength=120),
             ),
-            opacity=alt.Opacity(
-                "archetype_change_rate:Q",
-                title="Archetype change rate",
-                scale=alt.Scale(range=[0.35, 1.0]),
-                legend=alt.Legend(format=".0%"),
+            size=alt.Size(
+                "change_rate_pct:Q",
+                title="Archetype change rate (%)",
+                scale=alt.Scale(range=[30, 700]),
+                legend=alt.Legend(values=[0, 25, 50, 75, 100]),
             ),
             tooltip=[
                 alt.Tooltip("Season:O"),
                 alt.Tooltip("archetype_label:N", title="REG archetype"),
                 alt.Tooltip("players:Q", title="Players"),
                 alt.Tooltip("median_model_shift:Q", title="Median model shift", format=".3f"),
-                alt.Tooltip("archetype_change_rate:Q", title="Archetype change rate", format=".0%"),
+                alt.Tooltip("change_rate_pct:Q", title="Archetype change rate (%)", format=".0f"),
                 alt.Tooltip("median_stat_shift:Q", title="Median stat shift", format=".2f"),
                 alt.Tooltip("median_pgp_change:Q", title="Median P/GP change", format="+.2f"),
                 alt.Tooltip("median_toi_change:Q", title="Median TOI change (min)", format="+.1f"),
             ],
         )
-        .properties(
-            height=max(360, 28 * arch["archetype_label"].nunique()),
-            padding={"right": 20, "top": 10, "bottom": 10},
-        )
+    )
+    heat = (bg + dots).properties(
+        height=max(380, 30 * arch["archetype_label"].nunique()),
+        padding={"right": 20, "top": 10, "bottom": 10},
+    )
+    st.markdown(
+        "**How to read this:** Each circle is one archetype × season cell. "
+        "🔴 **Color** (light→dark orange-red) = median model shift score — darker means players looked more different in the playoffs. "
+        "⚫ **Size** = archetype change rate — bigger dot means a higher share of players got classified into a *different* archetype in the playoffs vs regular season."
     )
     st.altair_chart(heat, use_container_width=True)
 
@@ -632,4 +688,4 @@ with tab_player:
         )
         st.altair_chart(alt.hconcat(transition, shift, spacing=28), use_container_width=True)
 
-        st.dataframe(compact_table(hist), use_container_width=True, hide_index=True)
+        st.markdown(_render_table_html(compact_table(hist)), unsafe_allow_html=True)
