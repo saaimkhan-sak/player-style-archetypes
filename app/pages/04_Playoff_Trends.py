@@ -534,7 +534,7 @@ with tab_archetypes:
         )
     )
     heat = (bg + dots).properties(
-        height=max(380, 30 * arch["archetype_label"].nunique()),
+        height=max(420, 48 * arch["archetype_label"].nunique()),
         padding={"right": 20, "top": 10, "bottom": 10},
     )
     st.markdown(
