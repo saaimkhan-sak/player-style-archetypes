@@ -373,13 +373,22 @@ latest = (all_df.sort_values("season")
               .tail(1)
               .copy())
 
-latest["Most recent season played"] = latest["season"].apply(season_key_to_label)
+career_ranges = (
+    all_df.groupby("player_id", as_index=False)
+    .agg(first_season=("season", "min"), last_season=("season", "max"))
+)
+latest = latest.merge(career_ranges, on="player_id", how="left")
+latest["Career span"] = (
+    latest["first_season"].apply(season_key_to_label)
+    + " - "
+    + latest["last_season"].apply(season_key_to_label)
+)
 
 # No team in dropdown label (per request)
 latest["display"] = (
     latest["full_name"].astype(str)
     + " — " + latest["position"].fillna("UNK").astype(str)
-    + " — " + latest["Most recent season played"].astype(str)
+    + " — " + latest["Career span"].astype(str)
 )
 
 st.markdown("### Select a player")
