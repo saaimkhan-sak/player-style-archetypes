@@ -393,7 +393,7 @@ with tab_archetypes:
                 alt.Tooltip("median_toi_change:Q", title="Median TOI change", format="+.1f"),
             ],
         )
-        .properties(height=max(360, 28 * arch["archetype_label"].nunique()), padding={"left": 210, "right": 20, "top": 10, "bottom": 10})
+        .properties(height=max(360, 28 * arch["archetype_label"].nunique()), padding={"right": 20, "top": 10, "bottom": 10})
     )
     st.altair_chart(heat, use_container_width=True)
 
@@ -475,6 +475,7 @@ with tab_player:
             return (lines + points).properties(
                 height=max(220, 46 * len(profile)),
                 title=title,
+                padding={"bottom": 36},
             )
 
         col_a, col_b = st.columns(2)
