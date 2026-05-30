@@ -375,7 +375,12 @@ with tab_archetypes:
         .mark_rect()
         .encode(
             x=alt.X("Season:O", title="Season", sort=[season_key_to_label(s) for s in sorted(base["season"].unique())]),
-            y=alt.Y("archetype_label:N", title="REG archetype", sort="-x"),
+            y=alt.Y(
+                "archetype_label:N",
+                title="REG archetype",
+                sort="-x",
+                axis=alt.Axis(labelLimit=320, titlePadding=18, labelPadding=8),
+            ),
             color=alt.Color("median_model_shift:Q", title="Median model shift", scale=alt.Scale(scheme="redyellowgreen", reverse=True)),
             tooltip=[
                 alt.Tooltip("Season:O"),
@@ -388,7 +393,7 @@ with tab_archetypes:
                 alt.Tooltip("median_toi_change:Q", title="Median TOI change", format="+.1f"),
             ],
         )
-        .properties(height=max(360, 28 * arch["archetype_label"].nunique()))
+        .properties(height=max(360, 28 * arch["archetype_label"].nunique()), padding={"left": 210, "right": 20, "top": 10, "bottom": 10})
     )
     st.altair_chart(heat, use_container_width=True)
 
