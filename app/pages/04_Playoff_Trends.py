@@ -296,7 +296,7 @@ This page answers that question using the same archetype model that classifies r
 with st.expander("📊 How is the model shift score calculated? (click to expand)", expanded=False):
     st.markdown("""
 ### The short version
-I take each player's playoff statistics, run them through the exact same machine-learning model used to assign regular-season archetypes, and measure how far the player's playoff "style fingerprint" is from their regular-season one. A bigger number = a bigger identity shift.
+I took each player's playoff statistics, ran them through the exact same machine-learning model used to assign regular-season archetypes, and measured how far the player's playoff "style fingerprint" is from their regular-season one. A bigger number = a bigger identity shift.
 
 ---
 
@@ -312,7 +312,7 @@ I take each player's playoff statistics, run them through the exact same machine
 
 ---
 
-### Step 2 — What we calculated from the playoff data
+### Step 2 — What I calculated from the playoff data
 
 For each player and each situation, I computed the same types of rate statistics the regular-season model uses:
 
@@ -332,13 +332,13 @@ For each player and each situation, I computed the same types of rate statistics
 | **Power play xGoals (5v4)** | Expected goals on the power play | Identifies PP specialists |
 | **Penalty kill opponent xGoals (4v5)** | Expected goals allowed while shorthanded | Identifies PK specialists |
 
-For situations where MoneyPuck's summary view doesn't publish a metric (specifically: play-continuation rates and after-shift xGoals in non-5v5 situations), we substitute the league-average value from the regular-season model — meaning those signals are neutral rather than actively misleading.
+For situations where MoneyPuck's summary view doesn't publish a metric (specifically: play-continuation rates and after-shift xGoals in non-5v5 situations), I substituted the league-average value from the regular-season model — meaning those signals are neutral rather than actively misleading.
 
 ---
 
 ### Step 3 — Running it through the model
 
-With those playoff rate statistics in hand, I do two things:
+With those playoff rate statistics in hand, I did two things:
 
 **NMF compression:** Non-negative Matrix Factorization squashes all those metrics into a compact "style fingerprint" — a short list of numbers that describe *how* a player plays rather than *how much* they produce. Think of it as distilling a player's full stat line into a few key style dimensions.
 
@@ -346,7 +346,7 @@ With those playoff rate statistics in hand, I do two things:
 - Regular season: 72% Playmaking Scorer, 18% Two-Way Creator, 10% Other
 - Playoffs: 41% Playmaking Scorer, 44% Two-Way Creator, 15% Other
 
-The regular-season model was not re-trained on playoff data — I use the same fitted model to project each player into archetype space based on their playoff numbers.
+The regular-season model was not re-trained on playoff data — I used the same fitted model to project each player into archetype space based on their playoff numbers.
 
 ---
 
