@@ -44,6 +44,15 @@ def numeric_column(df: pd.DataFrame, col: str, default: float = 0.0) -> pd.Serie
     return pd.to_numeric(df[col], errors="coerce").fillna(default)
 
 
+def playoff_games_column(stats: pd.DataFrame) -> pd.Series:
+    if "po_games" in stats.columns:
+        return numeric_column(stats, "po_games")
+    for col in ("mp_po_all_mp_po_all_games", "mp_po_5on5_mp_po_5on5_games"):
+        if col in stats.columns:
+            return numeric_column(stats, col)
+    return pd.Series(0.0, index=stats.index)
+
+
 def scaled_playoff_matrix(stats: pd.DataFrame, schema: dict, group: str) -> pd.DataFrame:
     all_features = schema[group]["all_features"]
     scaler = schema[group]["scaler"]
@@ -103,7 +112,7 @@ def build_group_projection(season: str, group: str, min_po_games: int) -> pd.Dat
     schema = load_schema(season)
     stats = pd.read_parquet(stats_path)
     stats["position"] = stats["position"].map(norm_pos)
-    stats["po_games"] = numeric_column(stats, "po_games").astype(int)
+    stats["po_games"] = playoff_games_column(stats).astype(int)
 
     positions = FORWARD_POS if group == "forwards" else DEFENSE_POS
     stats = stats[(stats["position"].isin(positions)) & (stats["po_games"] >= min_po_games)].copy()

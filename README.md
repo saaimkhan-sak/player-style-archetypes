@@ -57,6 +57,18 @@ python pipelines/99_build_all_seasons.py --start_year 2008 --end_year 2025 --dow
 
 The advanced-data build starts at 2008-09 because that is the first season covered by the MoneyPuck player files currently used by the project. The all-season runner uses the active Python interpreter, so run it from the activated virtual environment.
 
+## Daily Refresh
+
+GitHub Actions runs `.github/workflows/refresh-data.yml` every day at 9am America/New_York time. The workflow:
+
+1. Downloads the latest current-season MoneyPuck skater and line game-by-game files.
+2. Reconciles the NHL schedule and downloads completed game boxscores/play-by-play.
+3. Rebuilds the current season models, app tables, reports, playoff projections, and line combinations.
+4. Runs the health check and smoke tests.
+5. Commits `data/app`, `reports`, and `models` back to `main` only when generated artifacts changed.
+
+You can also start it manually from the GitHub Actions tab and optionally pass a season label such as `20252026`.
+
 ## Deployment Notes
 
 For Streamlit Cloud, use `app/Home.py` as the app entrypoint. The repo intentionally tracks app-facing data in `data/app` and reports in `reports`, while larger intermediate files stay local.

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
+from typing import Optional, Sequence
 
 import pandas as pd
 
@@ -30,7 +32,11 @@ def season_key(start_year: int) -> str:
     return f"{start_year}{start_year + 1}"
 
 
-def main() -> int:
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    parser = argparse.ArgumentParser(description="Build app table for MoneyPuck line and pairing combinations.")
+    parser.add_argument("--season_label", help="If set, replace only this season in the existing app table.")
+    args = parser.parse_args(argv)
+
     parts = []
     for path in RAW_FILES:
         if not path.exists():
@@ -44,6 +50,10 @@ def main() -> int:
             chunk["season"] = pd.to_numeric(chunk["season"], errors="coerce").astype("Int64")
             chunk = chunk.dropna(subset=["season", "playerTeam", "position", "name", "lineId"])
             chunk["season_key"] = chunk["season"].astype(int).map(season_key)
+            if args.season_label:
+                chunk = chunk[chunk["season_key"] == args.season_label].copy()
+                if chunk.empty:
+                    continue
             parts.append(
                 chunk.groupby(["season_key", "playerTeam", "position", "name", "lineId"], as_index=False)
                 .agg(
@@ -74,6 +84,11 @@ def main() -> int:
 
     out_path = Path("data/app/line_combinations.parquet")
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    if args.season_label and out_path.exists():
+        existing = pd.read_parquet(out_path)
+        existing = existing[existing["season_key"].astype(str) != args.season_label].copy()
+        out = pd.concat([existing, out], ignore_index=True)
+        out = out.sort_values(["season_key", "playerTeam", "position", "toi_min"], ascending=[False, True, True, False])
     out.to_parquet(out_path, index=False)
     print(f"Saved {len(out):,} line/pairing rows -> {out_path}")
     return 0

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -155,6 +156,15 @@ def write_parquets(df_full: pd.DataFrame, season_label: str) -> Tuple[Path, Path
     have = local_game_ids(season_label)
     expected = set(df_full["game_id"].astype(int).tolist()) if not df_full.empty else set()
     missing = sorted(list(expected - have))
+
+    if "game_date" in df_full.columns:
+        today = date.today().isoformat()
+        future_ids = set(
+            df_full.loc[df_full["game_date"].fillna("9999-99-99").astype(str) > today, "game_id"]
+            .astype(int)
+            .tolist()
+        )
+        missing = [game_id for game_id in missing if game_id not in future_ids]
 
     df_missing = df_full[df_full["game_id"].isin(missing)].copy()
     miss_path = outdir / f"schedule_{season_label}_missing.parquet"

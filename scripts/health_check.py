@@ -39,9 +39,10 @@ def check_app_files() -> list[str]:
     expected = [
         ROOT / "app" / "Home.py",
         ROOT / "app" / "lib.py",
-        ROOT / "app" / "pages" / "01_Season_Level_Analysis.py",
-        ROOT / "app" / "pages" / "02_Player_Evolution.py",
-        ROOT / "app" / "pages" / "03_Playoff_Style_Shifts.py",
+        ROOT / "app" / "pages" / "01_Play_Style_Glossary.py",
+        ROOT / "app" / "pages" / "02_Season_Level_Trends.py",
+        ROOT / "app" / "pages" / "03_Career_Trends.py",
+        ROOT / "app" / "pages" / "04_Playoff_Trends.py",
     ]
     missing = [p.relative_to(ROOT).as_posix() for p in expected if not p.exists()]
     if missing:

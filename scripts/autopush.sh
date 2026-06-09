@@ -15,6 +15,7 @@ TRACK_PATHS=(
   "requirements.txt"
   "data/app"
   "reports"
+  "models"
 )
 
 
@@ -42,4 +43,3 @@ git commit -m "Auto-update generated artifacts (${TS})"
 git push origin main
 
 echo "Pushed updates."
-

@@ -4,14 +4,20 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_DIR"
 
-# Activate venv
-source "$REPO_DIR/.venv/bin/activate"
+if [[ -z "${PYTHON_BIN:-}" ]]; then
+  if [[ -x "$REPO_DIR/.venv/bin/python" ]]; then
+    PYTHON_BIN="$REPO_DIR/.venv/bin/python"
+  else
+    PYTHON_BIN="python3"
+  fi
+fi
+SEASON_ARG=()
+if [[ "${1:-}" != "" ]]; then
+  SEASON_ARG=(--season_label "$1")
+fi
 
-# 1) Build/update the app tables you serve in Streamlit
-python pipelines/08_build_app_tables.py --season_label 20252026
+# Build/update the latest season app artifacts from fresh NHL + MoneyPuck data.
+"$PYTHON_BIN" scripts/refresh_latest_data.py "${SEASON_ARG[@]}"
 
-# (Optional) run other pipeline steps here if you want:
-# python pipelines/XX_something.py ...
-
-# 2) Auto-commit + push updates (make sure TRACK_PATHS includes data/app)
+# Auto-commit + push updates (make sure TRACK_PATHS includes generated artifacts)
 ./scripts/autopush.sh
