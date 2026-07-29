@@ -2706,10 +2706,9 @@ function careerPlayerStatistics(rows) {
       aria-labelledby="career-card-summary-title"
     >
       <header>
-        <div>
-          <p class="career-card-eyebrow">Career statistics summary</p>
-          <h2 id="career-card-summary-title">Career totals in dataset</h2>
-        </div>
+        <p class="career-card-eyebrow" id="career-card-summary-title">
+          Career totals in dataset
+        </p>
       </header>
       <div class="career-card-stat-groups">
         <section class="career-card-stat-group" aria-labelledby="career-card-reg-title">

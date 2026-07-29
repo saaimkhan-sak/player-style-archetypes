@@ -167,7 +167,7 @@ if (
   !appSource.includes("<label for=\"career-matches\">Matches</label>") ||
   !appSource.includes("Selected: ${escapeHTML(selected?.display || \"No player\")}") ||
   !appSource.includes("function careerPlayerStatistics(rows)") ||
-  !appSource.includes("Career statistics summary") ||
+  appSource.includes("Career statistics summary") ||
   !appSource.includes("Career totals in dataset") ||
   appSource.includes("Model-eligible seasons") ||
   !appSource.includes("Most frequent style") ||
