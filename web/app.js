@@ -1,4 +1,5 @@
 const DATA_ROOT = "/data";
+const CORE_DATA_VERSION = "20260729-glossary-examples-v2";
 
 const appState = {
   core: null,
@@ -13,6 +14,7 @@ const appState = {
   careerGroup: "forwards",
   careerQuery: "",
   careerPlayerId: null,
+  careerPlayerName: null,
   playoffs: null,
   playoffSeason: null,
   playoffGroup: "forwards",
@@ -928,6 +930,25 @@ function glossaryRows() {
   return appState.core.glossary[appState.glossaryGroup];
 }
 
+function glossaryExampleLink(example) {
+  const isRecord = example && typeof example === "object";
+  const name = String(isRecord ? example.name || "" : example || "").trim();
+  if (!name) return "";
+  const playerId = Number(isRecord ? example.id : 0);
+  const destination =
+    Number.isInteger(playerId) && playerId > 0
+      ? `#career?player=${playerId}&amp;group=${escapeHTML(appState.glossaryGroup)}`
+      : `#career?name=${encodeURIComponent(name)}&amp;group=${escapeHTML(appState.glossaryGroup)}`;
+  return `
+    <a
+      href="${destination}"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Open ${escapeHTML(name)}’s profile in a new tab"
+    >${escapeHTML(name)}</a>
+  `;
+}
+
 function updateGlossaryList() {
   const rows = glossaryRows();
   const list = document.querySelector("#glossary-list");
@@ -970,16 +991,8 @@ function updateGlossaryList() {
                 <div class="example-links">
                   ${
                     row.examples
-                      .map(
-                        (example) => `
-                          <a
-                            href="#career?player=${Number(example.id)}&amp;group=${escapeHTML(appState.glossaryGroup)}"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label="Open ${escapeHTML(example.name)}’s profile in a new tab"
-                          >${escapeHTML(example.name)}</a>
-                        `,
-                      )
+                      .map(glossaryExampleLink)
+                      .filter(Boolean)
                       .join("") || "<span>No recent examples</span>"
                   }
                 </div>
@@ -1522,6 +1535,14 @@ async function renderCareer() {
   }
   if (appState.route !== "career") return;
   const players = careerPlayers(appState.careers, appState.careerGroup);
+  if (appState.careerPlayerName) {
+    const requestedName = appState.careerPlayerName.trim().toLowerCase();
+    const requestedPlayer = players.find(
+      (player) => player.name.trim().toLowerCase() === requestedName,
+    );
+    if (requestedPlayer) appState.careerPlayerId = requestedPlayer.id;
+    appState.careerPlayerName = null;
+  }
   if (!appState.careerPlayerId || !players.some((player) => player.id === appState.careerPlayerId)) {
     appState.careerPlayerId = players[0]?.id;
   }
@@ -1572,6 +1593,7 @@ async function renderCareer() {
   bindGroupControl("career-group", (group) => {
     appState.careerGroup = group;
     appState.careerPlayerId = null;
+    appState.careerPlayerName = null;
     appState.careerQuery = "";
     renderCareer();
   });
@@ -1914,11 +1936,15 @@ async function renderRoute() {
   if (appState.route === "career") {
     const requestedGroup = routeParams.get("group");
     const requestedPlayer = Number(routeParams.get("player"));
+    const requestedName = routeParams.get("name");
     if (requestedGroup === "forwards" || requestedGroup === "defense") {
       appState.careerGroup = requestedGroup;
     }
     if (Number.isInteger(requestedPlayer) && requestedPlayer > 0) {
       appState.careerPlayerId = requestedPlayer;
+      appState.careerPlayerName = null;
+    } else if (requestedName) {
+      appState.careerPlayerName = requestedName;
     }
   }
   document.querySelectorAll("[data-route]").forEach((link) => {
@@ -1945,7 +1971,9 @@ async function renderRoute() {
 
 async function init() {
   try {
-    appState.core = await getJSON(`${DATA_ROOT}/core.json`);
+    appState.core = await getJSON(
+      `${DATA_ROOT}/core.json?v=${CORE_DATA_VERSION}`,
+    );
     appState.season = appState.core.meta.seasons[0].key;
     const oldest = appState.core.meta.seasons.at(-1).label;
     const latest = appState.core.meta.seasons[0].label;
