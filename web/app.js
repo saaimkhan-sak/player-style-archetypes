@@ -1,5 +1,5 @@
 const DATA_ROOT = "/data";
-const DATA_VERSION = "20260729-playoff-trends-v1";
+const DATA_VERSION = "20260729-playoff-career-v2";
 const NEED_GAME_VALUES = [
   0, 5, 10, 15, 20, 25, 30, 35, 40,
   45, 50, 55, 60, 65, 70, 75, 80, 82,
@@ -3501,9 +3501,13 @@ function playoffScorePill(value) {
   `;
 }
 
-function playoffShiftTable(rows, limit = 30) {
+function playoffShiftTable(rows, limit = 30, order = "shift") {
   const sorted = [...rows]
-    .sort((left, right) => Number(right.distance) - Number(left.distance))
+    .sort((left, right) =>
+      order === "season"
+        ? left.season.localeCompare(right.season)
+        : Number(right.distance) - Number(left.distance),
+    )
     .slice(0, limit);
   return `
     <div class="playoff-table-wrap" tabindex="0" aria-label="Playoff profile changes table; scroll horizontally for all columns">
@@ -3849,19 +3853,155 @@ function playoffArchetypesView(base) {
 }
 
 function playoffEligiblePlayers(base) {
-  const latest = new Map();
+  const grouped = new Map();
   [...base]
     .sort((left, right) => left.season.localeCompare(right.season))
-    .forEach((row) => latest.set(row.id, row));
-  return [...latest.values()]
+    .forEach((row) => {
+      if (!grouped.has(row.id)) {
+        grouped.set(row.id, {
+          id: row.id,
+          name: row.name,
+          position: row.position,
+          team: row.team,
+          firstSeason: row.season,
+          lastSeason: row.season,
+          latestSeason: row.season,
+          seasons: 0,
+        });
+      }
+      const player = grouped.get(row.id);
+      player.seasons += 1;
+      if (row.season < player.firstSeason) player.firstSeason = row.season;
+      if (row.season > player.lastSeason) player.lastSeason = row.season;
+      if (row.season >= player.latestSeason) {
+        player.latestSeason = row.season;
+        player.position = row.position;
+        player.team = row.team;
+      }
+    });
+  return [...grouped.values()]
     .map((row) => ({
-      id: row.id,
-      name: row.name,
-      position: row.position,
-      team: row.team,
-      season: row.season,
+      ...row,
+      display: `${row.name} — ${row.position || "UNK"} — ${playoffSeasonLabel(row.firstSeason)} to ${playoffSeasonLabel(row.lastSeason)}`,
     }))
-    .sort((left, right) => left.name.localeCompare(right.name));
+    .sort(
+      (left, right) =>
+        right.latestSeason.localeCompare(left.latestSeason) ||
+        left.name.localeCompare(right.name),
+    );
+}
+
+function playoffCareerStatistics(history) {
+  if (!history.length) return "";
+  const playoffStyleCounts = new Map();
+  const playoffStyleRecency = new Map();
+  history.forEach((row, index) => {
+    playoffStyleCounts.set(
+      row.playoffProfile,
+      (playoffStyleCounts.get(row.playoffProfile) || 0) + 1,
+    );
+    playoffStyleRecency.set(row.playoffProfile, index);
+  });
+  const mostFrequentPlayoffStyle =
+    [...playoffStyleCounts.keys()].sort(
+      (left, right) =>
+        playoffStyleCounts.get(right) - playoffStyleCounts.get(left) ||
+        playoffStyleRecency.get(right) - playoffStyleRecency.get(left),
+    )[0] || "—";
+  const total = (field) =>
+    history.reduce((sum, row) => sum + Number(row[field] || 0), 0);
+  const average = (field) => mean(history.map((row) => Number(row[field] || 0)));
+  const classificationChanges = history.filter((row) => row.changed).length;
+
+  return `
+    <section
+      class="career-card-summary playoff-career-card-summary"
+      aria-labelledby="playoff-career-card-summary-title"
+    >
+      <header>
+        <p class="career-card-eyebrow" id="playoff-career-card-summary-title">
+          Career totals in dataset
+        </p>
+      </header>
+      <div class="career-card-stat-groups">
+        <section class="career-card-stat-group" aria-labelledby="playoff-career-reg-title">
+          <h3 id="playoff-career-reg-title">Regular season sample</h3>
+          <dl class="career-card-stat-grid">
+            ${careerCardStat("Seasons", number(history.length))}
+            ${careerCardStat("GP", number(total("regGames")))}
+            ${careerCardStat("P/GP", number(average("regPpg"), 2))}
+            ${careerCardStat("ATOI", minuteClock(average("regToi")))}
+          </dl>
+        </section>
+        <section class="career-card-stat-group" aria-labelledby="playoff-career-po-title">
+          <h3 id="playoff-career-po-title">Playoffs</h3>
+          <dl class="career-card-stat-grid">
+            ${careerCardStat("Seasons", number(history.length))}
+            ${careerCardStat("GP", number(total("playoffGames")))}
+            ${careerCardStat("P/GP", number(average("playoffPpg"), 2))}
+            ${careerCardStat("ATOI", minuteClock(average("playoffToi")))}
+          </dl>
+        </section>
+      </div>
+      <div class="career-card-style">
+        <div class="career-card-primary-style">
+          <span>Most frequent playoff style</span>
+          ${profileChip(mostFrequentPlayoffStyle)}
+        </div>
+        <div class="career-card-change-count">
+          <span>REG → PO changes</span>
+          <strong>${number(classificationChanges)}</strong>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function playoffCareerSummary(history) {
+  const medianModelShift = median(history.map((row) => row.distance));
+  const averagePpgChange = mean(history.map((row) => row.ppgChange));
+  return `
+    <section
+      class="career-summary-grid playoff-career-summary-grid"
+      aria-label="Player career playoff summary"
+    >
+      <article class="career-summary-card">
+        <span>Playoff seasons</span>
+        <strong>${number(history.length)}</strong>
+      </article>
+      <article class="career-summary-card">
+        <span>Median model shift</span>
+        <div>
+          <strong>${number(medianModelShift, 2)}</strong>
+          ${playoffBandPill(
+            medianModelShift > 0.75
+              ? "Major shift"
+              : medianModelShift > 0.25
+                ? "Moderate shift"
+                : "Held steady",
+          )}
+        </div>
+      </article>
+      <article class="career-summary-card">
+        <span>Career PO GP</span>
+        <strong>${number(
+          history.reduce(
+            (sum, row) => sum + Number(row.playoffGames || 0),
+            0,
+          ),
+        )}</strong>
+      </article>
+      <article class="career-summary-card">
+        <span>Career P/GP change</span>
+        <div>
+          <strong>${signedNumber(averagePpgChange, 2)}</strong>
+          <em class="playoff-direction ${averagePpgChange >= 0 ? "is-up" : "is-down"}">
+            ${averagePpgChange >= 0 ? "Higher in playoffs" : "Lower in playoffs"}
+          </em>
+        </div>
+      </article>
+    </section>
+  `;
 }
 
 function playoffDeltaChart(history, regField, playoffField, title, digits) {
@@ -3951,6 +4091,147 @@ function playoffCareerTranslation(history) {
   `;
 }
 
+function playoffCareerTrajectory(history) {
+  return `
+    <section
+      class="career-timeline-panel playoff-career-trajectory"
+      aria-labelledby="playoff-career-trajectory-title"
+    >
+      <header class="career-timeline-head">
+        <h2 id="playoff-career-trajectory-title">Regular Season → Playoffs</h2>
+        <ul>
+          <li>Each row connects the player's regular-season result to their playoff result in the same year.</li>
+          <li>Longer connectors show a larger change in scoring rate or average ice time.</li>
+        </ul>
+      </header>
+      <div class="playoff-career-trajectory-body">
+        <div class="playoff-delta-grid">
+          ${playoffDeltaChart(
+            history,
+            "regPpg",
+            "playoffPpg",
+            "Scoring Rate: Regular Season vs Playoffs",
+            2,
+          )}
+          ${playoffDeltaChart(
+            history,
+            "regToi",
+            "playoffToi",
+            "Ice Time: Regular Season vs Playoffs (min)",
+            1,
+          )}
+        </div>
+        ${playoffCareerTranslation(history)}
+      </div>
+    </section>
+  `;
+}
+
+function playoffCareerSeasonCard(row, index, total) {
+  const isLatest = index === total - 1;
+  return `
+    <li class="career-season-item">
+      <details
+        class="career-season-card playoff-career-season-card"
+        id="playoff-career-season-${escapeHTML(row.season)}"
+        style="--profile:${profileColor(row.playoffProfile)}"
+        ${isLatest ? "open" : ""}
+      >
+        <summary>
+          <span class="career-season-node" aria-hidden="true"></span>
+          <span class="career-season-summary">
+            <span class="career-season-identity">
+              <span class="career-season-title-row">
+                <span class="career-field-label">Season</span>
+                <strong>${escapeHTML(playoffSeasonLabel(row.season))}</strong>
+                ${row.changed ? '<span class="career-change-label">REG → PO change</span>' : ""}
+              </span>
+              <span class="career-team-line">
+                <span class="career-field-label">Team(s)</span>
+                ${careerTeamMarks(row.team, row.season)}
+                <span>${escapeHTML(row.team || "—")}</span>
+                <span aria-hidden="true">·</span>
+                <span class="career-field-label">Pos</span>
+                <span>${escapeHTML(row.position || "UNK")}</span>
+              </span>
+            </span>
+            <span class="career-season-profile playoff-season-profile">
+              <span>Regular season → playoffs</span>
+              <span class="playoff-profile-transition">
+                ${profileChip(row.regProfile)}
+                <i aria-hidden="true">→</i>
+                ${profileChip(row.playoffProfile)}
+              </span>
+            </span>
+            <span class="career-season-measures">
+              <span>
+                <small>Model shift</small>
+                <strong>${number(row.distance, 3)}</strong>
+              </span>
+              <span>
+                <small>Stat shift</small>
+                <strong>${number(row.statShift, 2)}</strong>
+              </span>
+            </span>
+            <span class="career-season-disclosure" aria-hidden="true"></span>
+          </span>
+        </summary>
+        <div class="career-season-detail playoff-career-season-detail">
+          <section>
+            <h3>Regular season</h3>
+            <dl class="career-stat-grid">
+              ${careerStat("REG GP", number(row.regGames))}
+              ${careerStat("REG P/GP", number(row.regPpg, 3))}
+              ${careerStat("REG ATOI", minuteClock(row.regToi))}
+              ${careerStat("Style", row.regProfile)}
+            </dl>
+          </section>
+          <section>
+            <h3>Playoffs</h3>
+            <dl class="career-stat-grid">
+              ${careerStat("PO GP", number(row.playoffGames))}
+              ${careerStat("PO P/GP", number(row.playoffPpg, 3))}
+              ${careerStat("PO ATOI", minuteClock(row.playoffToi))}
+              ${careerStat("Style", row.playoffProfile)}
+            </dl>
+          </section>
+          <section>
+            <h3>What changed</h3>
+            <dl class="career-stat-grid">
+              ${careerStat("P/GP", signedNumber(row.ppgChange, 2))}
+              ${careerStat("ATOI", `${signedNumber(row.toiChange, 1)} min`)}
+              ${careerStat("Shot rate", signedNumber(row.shotRateChange, 2))}
+              ${careerStat("PIM rate", signedNumber(row.pimRateChange, 2))}
+              ${careerStat("+/− rate", signedNumber(row.plusMinusRateChange, 2))}
+              ${careerStat("Model shift", number(row.distance, 3))}
+              ${careerStat("Stat shift", number(row.statShift, 2))}
+              ${careerStat("Shift band", row.shiftBand || "—")}
+            </dl>
+          </section>
+        </div>
+      </details>
+    </li>
+  `;
+}
+
+function playoffCareerSeasonList(history) {
+  return `
+    <section
+      class="career-season-section playoff-career-season-section"
+      aria-labelledby="playoff-career-season-title"
+    >
+      <h2 id="playoff-career-season-title">Playoff Translation by Season</h2>
+      <ol class="career-season-list">
+        ${history
+          .map((row, index) =>
+            playoffCareerSeasonCard(row, index, history.length),
+          )
+          .join("")}
+      </ol>
+    </section>
+  `;
+}
+
 function playoffPlayerView(base) {
   const players = playoffEligiblePlayers(base);
   if (
@@ -3980,11 +4261,19 @@ function playoffPlayerView(base) {
     <section class="playoff-section-head">
       <p class="eyebrow">Player Career</p>
       <h2>Player Career Playoff Pattern</h2>
+      <p>
+        Follow how one player's regular-season identity translated under
+        playoff pressure, season by season.
+      </p>
     </section>
-    <div class="playoff-player-picker">
-      <div class="playoff-player-controls">
+    <section
+      class="career-picker playoff-player-picker"
+      aria-labelledby="playoff-player-picker-title"
+    >
+      <div class="career-picker-controls playoff-player-controls">
+        <h2 id="playoff-player-picker-title">Select a player</h2>
         <div class="field">
-          <label for="playoff-player-search">Search player</label>
+          <label for="playoff-player-search">Search player name</label>
           <input
             class="search-input"
             id="playoff-player-search"
@@ -3995,7 +4284,7 @@ function playoffPlayerView(base) {
           />
         </div>
         <div class="field">
-          <label for="playoff-player-matches">Player</label>
+          <label for="playoff-player-matches">Matches</label>
           <select id="playoff-player-matches" size="6">
             ${players
               .map(
@@ -4003,7 +4292,7 @@ function playoffPlayerView(base) {
                   <option
                     value="${player.id}"
                     ${player.id === appState.playoffPlayerId ? "selected" : ""}
-                  >${escapeHTML(`${player.name} - ${player.position}`)}</option>
+                  >${escapeHTML(player.display)}</option>
                 `,
               )
               .join("")}
@@ -4011,40 +4300,36 @@ function playoffPlayerView(base) {
         </div>
         <p class="playoff-player-match-status" aria-live="polite"></p>
         <p class="playoff-player-no-matches" hidden>No matching playoff players under the current filters.</p>
+        <p class="career-selected-caption">
+          Selected: ${escapeHTML(selected?.display || "No player")}
+        </p>
       </div>
-      <div class="detail-panel playoff-selected-player">
+      <div
+        class="detail-panel career-selected-player playoff-selected-player"
+        tabindex="-1"
+        aria-label="${escapeHTML(`Selected player: ${selected?.name || "No player"}`)}"
+      >
         ${playerIdentity(
           selectedWithTeam,
-          latest?.season,
+          latest?.season || selected?.latestSeason,
           "Selected player",
-          `${history.length} playoff season${history.length === 1 ? "" : "s"} in the dataset`,
+          `${selectedWithTeam.position || "UNK"}
+${playoffSeasonLabel(selected?.firstSeason)} to ${playoffSeasonLabel(selected?.lastSeason)}`,
         )}
+        ${playoffCareerStatistics(history)}
       </div>
-    </div>
-    <section class="metric-grid playoff-metric-grid">
-      ${metric("Playoff seasons", number(history.length))}
-      ${metric("Median model shift", number(median(history.map((row) => row.distance)), 2))}
-      ${metric("Career PO GP", number(history.reduce((sum, row) => sum + Number(row.playoffGames || 0), 0)))}
-      ${metric("Career P/GP change", signedNumber(mean(history.map((row) => row.ppgChange)), 2))}
     </section>
-    <div class="playoff-delta-grid">
-      ${playoffDeltaChart(
-        history,
-        "regPpg",
-        "playoffPpg",
-        "Scoring Rate: Regular Season vs Playoffs",
-        2,
-      )}
-      ${playoffDeltaChart(
-        history,
-        "regToi",
-        "playoffToi",
-        "Ice Time: Regular Season vs Playoffs (min)",
-        1,
-      )}
-    </div>
-    ${playoffCareerTranslation(history)}
-    ${playoffShiftTable(history, history.length)}
+    ${playoffCareerSummary(history)}
+    ${playoffCareerTrajectory(history)}
+    ${playoffCareerSeasonList(history)}
+    <section
+      class="playoff-career-table-section"
+      aria-labelledby="playoff-career-table-title"
+    >
+      <h2 id="playoff-career-table-title">Complete Career Comparison</h2>
+      <p>Every regular-season and playoff value used in the career view.</p>
+    </section>
+    ${playoffShiftTable(history, history.length, "season")}
   `;
 }
 
@@ -4206,7 +4491,7 @@ function bindPlayoffPlayerSearch(base) {
           <option
             value="${player.id}"
             ${player.id === appState.playoffPlayerId ? "selected" : ""}
-          >${escapeHTML(`${player.name} - ${player.position}`)}</option>
+          >${escapeHTML(player.display)}</option>
         `,
       )
       .join("");
@@ -4222,7 +4507,11 @@ function bindPlayoffPlayerSearch(base) {
     if (!playerId) return;
     appState.playoffPlayerId = playerId;
     appState.playoffQuery = "";
-    renderPlayoffs();
+    renderPlayoffs().then(() => {
+      document
+        .querySelector(".playoff-selected-player")
+        ?.focus({ preventScroll: true });
+    });
   });
   draw();
 }

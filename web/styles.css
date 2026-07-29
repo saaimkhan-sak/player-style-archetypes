@@ -3346,9 +3346,9 @@ h3 {
 
 .playoff-player-picker {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(330px, 0.85fr);
   gap: 24px;
-  margin-bottom: 28px;
+  margin-bottom: 38px;
 }
 
 .playoff-player-controls {
@@ -3358,18 +3358,29 @@ h3 {
   background: rgba(255, 253, 249, 0.86);
 }
 
+.playoff-player-controls h2 {
+  margin-bottom: 22px;
+}
+
 .playoff-player-controls .field + .field {
   margin-top: 18px;
 }
 
+.playoff-player-controls .search-input,
 .playoff-player-controls select {
   width: 100%;
+  min-height: 46px;
+}
+
+.playoff-player-controls select {
   min-height: 190px;
   padding: 6px;
 }
 
 .playoff-player-controls option {
   padding: 9px 8px;
+  border-radius: 7px;
+  white-space: normal;
 }
 
 .playoff-player-match-status {
@@ -3388,10 +3399,63 @@ h3 {
 }
 
 .playoff-selected-player {
+  display: flex;
   min-width: 0;
+  flex-direction: column;
 }
 
 .playoff-selected-player .player-identity {
+  margin-bottom: 0;
+}
+
+.playoff-selected-player .detail-meta {
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.playoff-career-summary-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.playoff-career-summary-grid .playoff-band {
+  width: fit-content;
+}
+
+.playoff-direction {
+  display: inline-flex;
+  min-height: 29px;
+  align-items: center;
+  padding: 4px 11px;
+  border: 1px solid rgba(7, 24, 33, 0.08);
+  border-radius: 999px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.playoff-direction.is-up {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.playoff-direction.is-down {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.playoff-career-trajectory {
+  margin-bottom: 54px;
+}
+
+.playoff-career-trajectory-body {
+  display: grid;
+  gap: 24px;
+  padding: clamp(20px, 3vw, 28px);
+}
+
+.playoff-career-trajectory .playoff-delta-grid,
+.playoff-career-trajectory .playoff-career-comparison {
   margin-bottom: 0;
 }
 
@@ -3581,6 +3645,59 @@ h3 {
   text-align: right;
 }
 
+.playoff-career-season-section {
+  margin-bottom: 48px;
+}
+
+.playoff-season-profile {
+  gap: 10px;
+}
+
+.playoff-profile-transition {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.playoff-profile-transition > i {
+  color: var(--muted);
+  font-size: 17px;
+  font-style: normal;
+}
+
+.playoff-profile-transition .profile-chip {
+  width: 100%;
+}
+
+.playoff-career-season-detail {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.playoff-career-season-detail .career-stat-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.playoff-career-season-detail .career-stat-grid dd {
+  overflow-wrap: anywhere;
+}
+
+.playoff-career-table-section {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.playoff-career-table-section h2,
+.playoff-career-table-section p {
+  margin: 0;
+}
+
+.playoff-career-table-section p {
+  color: var(--muted);
+  font-size: 14px;
+}
+
 @media (max-width: 1050px) {
   .playoff-page-head {
     grid-template-columns: 1fr;
@@ -3596,6 +3713,10 @@ h3 {
   .playoff-player-picker,
   .playoff-career-comparison {
     grid-template-columns: 1fr;
+  }
+
+  .playoff-career-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .playoff-how-to-read {
@@ -3622,6 +3743,10 @@ h3 {
     right: 18px;
     left: 62px;
   }
+
+  .playoff-career-season-detail {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 560px) {
@@ -3637,6 +3762,22 @@ h3 {
 
   .playoff-primary-signal {
     padding: 20px 18px;
+  }
+
+  .playoff-player-controls {
+    padding: 22px 18px;
+  }
+
+  .playoff-player-controls select {
+    min-height: 176px;
+  }
+
+  .playoff-career-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .playoff-career-trajectory-body {
+    padding: 16px;
   }
 
   .playoff-filter-panel {

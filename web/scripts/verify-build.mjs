@@ -321,13 +321,23 @@ const playoffContent = [
   "Regular-Season Archetypes Under Playoff Pressure",
   "How to read this:",
   "Player Career Playoff Pattern",
+  "Follow how one player's regular-season identity translated under playoff pressure",
+  "Select a player",
+  "Search player name",
+  "Career totals in dataset",
+  "Most frequent playoff style",
+  "REG → PO changes",
   "Playoff seasons",
   "Career PO GP",
   "Career P/GP change",
+  "Regular Season → Playoffs",
   "Scoring Rate: Regular Season vs Playoffs",
   "Ice Time: Regular Season vs Playoffs (min)",
   "Archetype Translation",
   "How Much the Playoff Profile Moved",
+  "Playoff Translation by Season",
+  "What changed",
+  "Complete Career Comparison",
 ];
 const playoffTableLabels = [
   "REG archetype",
@@ -355,14 +365,24 @@ if (
   !appSource.includes("function playoffScatter(rows)") ||
   !appSource.includes("function playoffArchetypeMatrix(rows)") ||
   !appSource.includes("function playoffDeltaChart(") ||
+  !appSource.includes("function playoffCareerStatistics(history)") ||
+  !appSource.includes("function playoffCareerSummary(history)") ||
+  !appSource.includes("function playoffCareerTrajectory(history)") ||
   !appSource.includes("function playoffCareerTranslation(history)") ||
+  !appSource.includes("function playoffCareerSeasonCard(") ||
+  !appSource.includes("function playoffCareerSeasonList(history)") ||
+  !appSource.includes('playoffShiftTable(history, history.length, "season")') ||
   !appSource.includes("rows.filter((row) => row.changed).length") ||
   !appSource.includes(".filter((row) => row.players >= 3)") ||
   !stylesSource.includes(".playoff-page-head") ||
   !stylesSource.includes(".playoff-scatter-point") ||
   !stylesSource.includes(".playoff-matrix") ||
   !stylesSource.includes(".playoff-delta-card") ||
-  !stylesSource.includes(".playoff-translation-card")
+  !stylesSource.includes(".playoff-translation-card") ||
+  !stylesSource.includes(".playoff-career-summary-grid") ||
+  !stylesSource.includes(".playoff-career-trajectory") ||
+  !stylesSource.includes(".playoff-profile-transition") ||
+  !stylesSource.includes(".playoff-career-season-detail")
 ) {
   throw new Error(
     "Playoff Trends is missing Streamlit content, navigation, or the responsive comparison views.",
