@@ -1341,6 +1341,43 @@ def player_record(
     }
 
 
+def career_record(
+    row: pd.Series,
+    record: dict[str, Any],
+    season: str,
+    group: str,
+) -> dict[str, Any]:
+    confidence = float(row.get("confidence", 0) or 0)
+    return {
+        "season": season,
+        "group": group,
+        "id": record["id"],
+        "name": record["name"],
+        "team": record["team"],
+        "position": record["position"],
+        "profile": record["profile"],
+        "confidence": record["confidence"],
+        "confidencePct": clean(confidence * 100, 1),
+        "mixedness": clean(1.0 - confidence, 3),
+        "games": record["games"],
+        "regAtoi": record["regAtoi"],
+        "points": record["points"],
+        "goals": record["goals"],
+        "assists": record["assists"],
+        "shots": record["shots"],
+        "plusMinus": record["plusMinus"],
+        "pim": record["pim"],
+        "playoffGames": record["playoffGames"],
+        "playoffAtoi": record["playoffAtoi"],
+        "playoffPoints": record["playoffPoints"],
+        "playoffGoals": record["playoffGoals"],
+        "playoffAssists": record["playoffAssists"],
+        "playoffShots": record["playoffShots"],
+        "playoffPlusMinus": record["playoffPlusMinus"],
+        "playoffPim": record["playoffPim"],
+    }
+
+
 def surname_key(name: Any) -> str:
     parts = str(name or "").replace(".", "").replace("'", "").split()
     return parts[-1].lower() if parts else ""
@@ -1898,30 +1935,18 @@ def main() -> None:
             all_frames[group].append(frame)
             unique_ids.update(int(value) for value in frame["player_id"])
             names = maps[group][season]
-            players = [
-                player_record(row, names)
-                for _, row in frame.sort_values(
-                    ["reg_points", "confidence"],
-                    ascending=False,
-                ).iterrows()
-            ]
-            player_season_count += len(players)
-            career_records.extend(
-                {
-                    "season": season,
-                    "group": group,
-                    "id": record["id"],
-                    "name": record["name"],
-                    "team": record["team"],
-                    "position": record["position"],
-                    "games": record["games"],
-                    "points": record["points"],
-                    "toi": record["toi"],
-                    "profile": record["profile"],
-                    "confidence": record["confidence"],
-                }
-                for record in players
+            ordered_frame = frame.sort_values(
+                ["reg_points", "confidence"],
+                ascending=False,
             )
+            players: list[dict[str, Any]] = []
+            for _, row in ordered_frame.iterrows():
+                record = player_record(row, names)
+                players.append(record)
+                career_records.append(
+                    career_record(row, record, season, group)
+                )
+            player_season_count += len(players)
             profile_counts = Counter(record["profile"] for record in players)
             season_payload[season][group] = {
                 "players": players,

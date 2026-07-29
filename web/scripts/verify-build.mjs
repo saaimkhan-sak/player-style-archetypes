@@ -11,12 +11,14 @@ const required = [
 
 await Promise.all(required.map((path) => access(path)));
 
-const [coreSource, appSource, stylesSource] = await Promise.all([
+const [coreSource, appSource, stylesSource, careersSource] = await Promise.all([
   readFile("data/core.json", "utf8"),
   readFile("app.js", "utf8"),
   readFile("styles.css", "utf8"),
+  readFile("data/careers.json", "utf8"),
 ]);
 const data = JSON.parse(coreSource);
+const careers = JSON.parse(careersSource);
 if (!data.meta?.seasons?.length || !data.glossary) {
   throw new Error("The generated site data is incomplete.");
 }
@@ -120,6 +122,165 @@ if (
   );
 }
 
+const careerLabels = [
+  "Season",
+  "Team(s)",
+  "Pos",
+  "Top archetype (season-specific)",
+  "Confidence (%)",
+  "Mixedness",
+  "REG GP",
+  "REG ATOI",
+  "REG P",
+  "REG G",
+  "REG A",
+  "REG SOG",
+  "REG +/-",
+  "REG PIM",
+  "PO GP",
+  "PO ATOI",
+  "PO P",
+  "PO G",
+  "PO A",
+  "PO SOG",
+  "PO +/-",
+  "PO PIM",
+];
+if (
+  !appSource.includes(
+    "How Does a Player's Play Style Evolve Over Their Career?",
+  ) ||
+  !appSource.includes(
+    "Understanding the Evolution of a Player's Archetype",
+  ) ||
+  !appSource.includes("What Does the Evolution Really Mean?") ||
+  !appSource.includes("What is Mixedness?") ||
+  !appSource.includes("Stable top archetype + high confidence") ||
+  !appSource.includes("Mixedness &gt;= <strong>0.40</strong>") ||
+  !appSource.includes("<span class=\"field-label\">Group</span>") ||
+  !appSource.includes("<h2 id=\"career-picker-title\">Select a player</h2>") ||
+  !appSource.includes("<label for=\"career-search\">Search player name</label>") ||
+  !appSource.includes("<label for=\"career-matches\">Matches</label>") ||
+  !appSource.includes("Selected: ${escapeHTML(selected?.display || \"No player\")}") ||
+  !appSource.includes("Seasons in dataset") ||
+  !appSource.includes("Avg confidence") ||
+  !appSource.includes("Avg mixedness") ||
+  !appSource.includes("Hover over data points to see the full details.") ||
+  !appSource.includes(
+    "The circled points indicate years where there was a change in player archetype from the previous year.",
+  ) ||
+  !appSource.includes("Archetype and Career Stats by Season") ||
+  careerLabels.some((label) => !appSource.includes(label)) ||
+  !appSource.includes("function setupCareerTimeline(rows)") ||
+  !appSource.includes("index > 0 && row.profile !== sorted[index - 1].profile") ||
+  !appSource.includes("mean(rows.map((row) => row.confidencePct))") ||
+  !appSource.includes("mean(rows.map((row) => row.mixedness))") ||
+  !appSource.includes("data-career-point=") ||
+  !appSource.includes("careerSeasonCard(row, index, rows.length)") ||
+  appSource.includes("Style is a timeline, not a label.") ||
+  !stylesSource.includes(".career-picker") ||
+  !stylesSource.includes(".career-summary-grid") ||
+  !stylesSource.includes(".career-chart-point.is-change::after") ||
+  !stylesSource.includes(".career-season-card") ||
+  !stylesSource.includes(".career-stat-grid")
+) {
+  throw new Error(
+    "Career paths is missing Streamlit content, exact summary logic, or the accessible career-tape presentation.",
+  );
+}
+
+const requiredCareerFields = [
+  "season",
+  "group",
+  "id",
+  "name",
+  "team",
+  "position",
+  "profile",
+  "confidence",
+  "confidencePct",
+  "mixedness",
+  "games",
+  "regAtoi",
+  "points",
+  "goals",
+  "assists",
+  "shots",
+  "plusMinus",
+  "pim",
+  "playoffGames",
+  "playoffAtoi",
+  "playoffPoints",
+  "playoffGoals",
+  "playoffAssists",
+  "playoffShots",
+  "playoffPlusMinus",
+  "playoffPim",
+];
+const careerKeys = new Set();
+for (const row of careers) {
+  const key = `${row.group}:${row.id}:${row.season}`;
+  if (
+    careerKeys.has(key) ||
+    requiredCareerFields.some((field) => !(field in row)) ||
+    !/^\d{2,}:\d{2}$/.test(row.regAtoi) ||
+    !/^\d{2,}:\d{2}$/.test(row.playoffAtoi) ||
+    !Number.isFinite(Number(row.confidencePct)) ||
+    Number(row.confidencePct) < 0 ||
+    Number(row.confidencePct) > 100 ||
+    !Number.isFinite(Number(row.mixedness)) ||
+    Number(row.mixedness) < 0 ||
+    Number(row.mixedness) > 1
+  ) {
+    throw new Error(`${key} has incomplete or invalid career data.`);
+  }
+  careerKeys.add(key);
+}
+if (
+  careers.length !== data.meta.playerSeasonCount ||
+  careerKeys.size !== careers.length
+) {
+  throw new Error("Career history rows do not match the model-eligible seasons.");
+}
+const careerByKey = new Map(
+  careers.map((row) => [
+    `${row.group}:${row.id}:${row.season}`,
+    row,
+  ]),
+);
+
+const pierreLucDubois = careers
+  .filter(
+    (row) =>
+      row.group === "forwards" &&
+      Number(row.id) === 8479400,
+  )
+  .sort((a, b) => a.season.localeCompare(b.season));
+const pierreLucConfidence =
+  pierreLucDubois.reduce(
+    (total, row) => total + Number(row.confidencePct),
+    0,
+  ) / pierreLucDubois.length;
+const pierreLucMixedness =
+  pierreLucDubois.reduce(
+    (total, row) => total + Number(row.mixedness),
+    0,
+  ) / pierreLucDubois.length;
+const pierreLuc2022 = pierreLucDubois.find(
+  (row) => row.season === "20222023",
+);
+if (
+  pierreLucDubois.length !== 9 ||
+  Math.abs(pierreLucConfidence - 93.4) > 0.05 ||
+  Math.abs(pierreLucMixedness - 0.066) > 0.0005 ||
+  Number(pierreLuc2022?.confidencePct) !== 58.4 ||
+  Number(pierreLuc2022?.mixedness) !== 0.416
+) {
+  throw new Error(
+    "Career rounding no longer matches the Streamlit Pierre-Luc Dubois fixture.",
+  );
+}
+
 const seasonPayloads = await Promise.all(
   data.meta.seasons.map(async ({ key }) => ({
     key,
@@ -158,6 +319,30 @@ for (const { key, payload } of seasonPayloads) {
       );
     }
     for (const player of payload[group].players) {
+      const career = careerByKey.get(`${group}:${player.id}:${key}`);
+      const careerPlayerFields = [
+        ["name", "name"],
+        ["team", "team"],
+        ["position", "position"],
+        ["profile", "profile"],
+        ["confidence", "confidence"],
+        ["games", "games"],
+        ["regAtoi", "regAtoi"],
+        ["points", "points"],
+        ["goals", "goals"],
+        ["assists", "assists"],
+        ["shots", "shots"],
+        ["plusMinus", "plusMinus"],
+        ["pim", "pim"],
+        ["playoffGames", "playoffGames"],
+        ["playoffAtoi", "playoffAtoi"],
+        ["playoffPoints", "playoffPoints"],
+        ["playoffGoals", "playoffGoals"],
+        ["playoffAssists", "playoffAssists"],
+        ["playoffShots", "playoffShots"],
+        ["playoffPlusMinus", "playoffPlusMinus"],
+        ["playoffPim", "playoffPim"],
+      ];
       const requiredPlayerFields = [
         "regAtoi",
         "playoffGames",
@@ -171,6 +356,11 @@ for (const { key, payload } of seasonPayloads) {
         "needOrder",
       ];
       if (
+        !career ||
+        careerPlayerFields.some(
+          ([careerField, playerField]) =>
+            career[careerField] !== player[playerField],
+        ) ||
         !Array.isArray(player.targetScores) ||
         player.targetScores.length <= maxTargetCluster ||
         player.targetScores.some(
@@ -184,7 +374,7 @@ for (const { key, payload } of seasonPayloads) {
         !/^\d{2,}:\d{2}$/.test(player.playoffAtoi)
       ) {
         throw new Error(
-          `${key} ${group} has incomplete Need Finder player data.`,
+          `${key} ${group} has incomplete Need Finder or career player data.`,
         );
       }
     }

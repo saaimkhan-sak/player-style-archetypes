@@ -1,5 +1,5 @@
 const DATA_ROOT = "/data";
-const DATA_VERSION = "20260729-need-finder-v4";
+const DATA_VERSION = "20260729-career-paths-v1";
 const NEED_GAME_VALUES = [
   0, 5, 10, 15, 20, 25, 30, 35, 40,
   45, 50, 55, 60, 65, 70, 75, 80, 82,
@@ -2475,79 +2475,554 @@ function careerPlayers(records, group) {
         grouped.set(record.id, {
           id: record.id,
           name: record.name,
-          position: record.position,
           seasons: 0,
+          firstSeason: record.season,
+          lastSeason: record.season,
+          latestSeason: record.season,
+          position: record.position,
+          team: record.team,
         });
       }
-      grouped.get(record.id).seasons += 1;
+      const player = grouped.get(record.id);
+      player.seasons += 1;
+      if (record.season < player.firstSeason) player.firstSeason = record.season;
+      if (record.season > player.lastSeason) player.lastSeason = record.season;
+      if (record.season >= player.latestSeason) {
+        player.latestSeason = record.season;
+        player.position = record.position;
+        player.team = record.team;
+      }
     });
-  return [...grouped.values()].sort(
-    (a, b) => b.seasons - a.seasons || a.name.localeCompare(b.name),
-  );
+  return [...grouped.values()]
+    .map((player) => ({
+      ...player,
+      display: `${player.name} — ${player.position || "UNK"} — ${careerSeasonLabel(player.firstSeason)} - ${careerSeasonLabel(player.lastSeason)}`,
+    }))
+    .sort(
+      (a, b) =>
+        b.latestSeason.localeCompare(a.latestSeason) ||
+        a.name.localeCompare(b.name),
+    );
 }
 
 function careerSearchResults(players, query) {
   const normalized = query.trim().toLowerCase();
-  if (!normalized) return players.slice(0, 7);
-  return players
-    .filter((player) => player.name.toLowerCase().includes(normalized))
-    .slice(0, 8);
+  if (!normalized) return players;
+  return players.filter((player) =>
+    player.name.toLowerCase().includes(normalized),
+  );
 }
 
-function careerView(history) {
-  const sorted = [...history].sort((a, b) => a.season.localeCompare(b.season));
-  const switches = sorted.filter(
-    (row, index) => index > 0 && row.profile !== sorted[index - 1].profile,
-  ).length;
-  const common = [...Counter(sorted.map((row) => row.profile)).entries()].sort(
-    (a, b) => b[1] - a[1],
-  )[0]?.[0];
+function careerSeasonLabel(season) {
+  const key = String(season || "");
+  return /^\d{8}$/.test(key)
+    ? `${key.slice(0, 4)}-${key.slice(4)}`
+    : key;
+}
+
+function careerCompactSeasonLabel(season) {
+  return (
+    appState.core.meta.seasons.find((item) => item.key === season)?.label ||
+    careerSeasonLabel(season)
+  );
+}
+
+function careerGroupControl(group) {
   return `
-    <section class="metric-grid">
-      ${metric("Seasons", number(sorted.length))}
-      ${metric("Average fit", percent(mean(sorted.map((row) => row.confidence))))}
-      ${metric("Style changes", number(switches))}
-      ${metric("Most common", common || "—")}
-    </section>
-    <section class="chart-panel" style="margin-bottom:24px">
-      <div class="chart-title-row">
-        <div><h3>Top-style confidence</h3><p>Changes are marked where the leading profile switches.</p></div>
+    <div class="field">
+      <span class="field-label">Group</span>
+      <div class="segmented" data-group-control="career-group">
+        <button type="button" data-value="forwards" aria-pressed="${group === "forwards"}">Forwards</button>
+        <button type="button" data-value="defense" aria-pressed="${group === "defense"}">Defense</button>
       </div>
-      <div class="canvas-wrap">
-        <canvas id="career-chart" role="img" aria-label="Top style confidence by season"></canvas>
-      </div>
-    </section>
-    <div class="table-wrap timeline-table">
-      <table class="data-table">
-        <thead><tr><th>Season</th><th>Style</th><th class="numeric">Fit</th><th>Team</th><th class="numeric">GP</th><th class="numeric">PTS</th><th class="numeric">TOI</th></tr></thead>
-        <tbody>
-          ${sorted
-            .map(
-              (row) => `
-                <tr>
-                  <td>${escapeHTML(appState.core.meta.seasons.find((item) => item.key === row.season)?.label || row.season)}</td>
-                  <td class="profile-cell">${profileChip(row.profile)}</td>
-                  <td class="numeric">${percent(row.confidence)}</td>
-                  <td>${escapeHTML(row.team)}</td>
-                  <td class="numeric">${number(row.games)}</td>
-                  <td class="numeric">${number(row.points)}</td>
-                  <td class="numeric">${number(row.toi, 1)}</td>
-                </tr>
-              `,
-            )
-            .join("")}
-        </tbody>
-      </table>
     </div>
   `;
+}
+
+function careerExplainer(latestSeason) {
+  return `
+    <details class="methodology-expander career-explainer">
+      <summary>
+        <span>Understanding the Evolution of a Player's Archetype</span>
+        <span class="methodology-toggle" aria-hidden="true"></span>
+      </summary>
+      <div class="methodology-body">
+        <section class="methodology-section">
+          <h2>How to Use This Tool</h2>
+          <p>
+            When you search and select a player, the dropdown shows their
+            <strong>name</strong>, <strong>position</strong>, and the
+            <strong>most recent season in the dataset</strong> for that player
+            (i.e. ${escapeHTML(latestSeason)}).
+          </p>
+        </section>
+        <section class="methodology-section">
+          <h2>What Does the Evolution Really Mean?</h2>
+          <ul class="career-explainer-list">
+            <li><strong>Stable top archetype + high confidence</strong> → consistent role/style across years</li>
+            <li><strong>Shifts in top archetype</strong> → role changes, team/system changes, aging, or deployment changes</li>
+            <li><strong>Lower confidence</strong> → “mixed profile” seasons where the player blends multiple archetype patterns</li>
+          </ul>
+        </section>
+        <section class="methodology-section">
+          <h2>What is Mixedness?</h2>
+          <p>In this table, you will see a value for each player called "mixedness". What is that?</p>
+          <p>I define <strong>Mixedness</strong> as:</p>
+          <div
+            class="career-formula"
+            role="img"
+            aria-label="Mixedness equals one minus the maximum archetype probability for player i"
+          >
+            <span>Mixedness</span>
+            <span>=</span>
+            <span>1 − max<sub>k</sub>(p<sub>ik</sub>)</span>
+          </div>
+          <p>
+            where <strong>max<sub>k</sub>(p<sub>ik</sub>)</strong> is the probability
+            of the player’s <strong>top archetype</strong> that season.
+          </p>
+          <ul class="career-explainer-list">
+            <li>Mixedness near <strong>0.00</strong> → the model is very confident the player fits a single archetype</li>
+            <li>Mixedness &gt;= <strong>0.40</strong> → the player blends multiple archetypes (probability mass is spread out)</li>
+          </ul>
+        </section>
+      </div>
+    </details>
+  `;
+}
+
+function careerHistoryRows(history) {
+  const sorted = [...history].sort((a, b) => a.season.localeCompare(b.season));
+  return sorted.map((row, index) => {
+    const confidencePct =
+      row.confidencePct === null || row.confidencePct === undefined
+        ? Math.round(Number(row.confidence || 0) * 1000) / 10
+        : Number(row.confidencePct);
+    const mixedness =
+      row.mixedness === null || row.mixedness === undefined
+        ? Math.round((1 - Number(row.confidence || 0)) * 1000) / 1000
+        : Number(row.mixedness);
+    return {
+      ...row,
+      confidencePct,
+      mixedness,
+      displaySeason: careerSeasonLabel(row.season),
+      compactSeason: careerCompactSeasonLabel(row.season),
+      changed:
+        index > 0 && row.profile !== sorted[index - 1].profile,
+    };
+  });
+}
+
+function careerConfidenceStatus(value) {
+  if (value >= 95) return ["Very stable", "is-very-stable"];
+  if (value >= 90) return ["Stable", "is-stable"];
+  if (value >= 80) return ["Moderate", "is-moderate"];
+  if (value >= 70) return ["Mixed", "is-mixed"];
+  return ["Highly mixed", "is-highly-mixed"];
+}
+
+function careerMixednessStatus(value) {
+  if (value <= 0.05) return ["Very consistent", "is-very-stable"];
+  if (value <= 0.1) return ["Consistent", "is-stable"];
+  if (value <= 0.2) return ["Some variety", "is-moderate"];
+  if (value <= 0.3) return ["Role-shifting", "is-mixed"];
+  return ["Blend of styles", "is-highly-mixed"];
+}
+
+function careerTeamMarks(teamValue, season) {
+  const teams = teamCodes(teamValue);
+  if (!teams.length) return "";
+  return `
+    <span
+      class="career-team-marks"
+      role="list"
+      aria-label="${escapeHTML(`Team logos: ${teams.join(", ")}`)}"
+    >
+      ${teams
+        .map(
+          (team) => `
+            <span
+              class="career-team-mark"
+              data-asset-frame
+              role="listitem"
+              title="${escapeHTML(team)}"
+            >
+              <span class="career-team-code" aria-hidden="true">${escapeHTML(team)}</span>
+              <img
+                class="career-team-logo"
+                data-asset-sources="${assetSources(teamLogoSources(team, season))}"
+                alt=""
+                loading="lazy"
+                decoding="async"
+              />
+            </span>
+          `,
+        )
+        .join("")}
+    </span>
+  `;
+}
+
+function careerStat(label, value) {
+  return `
+    <div>
+      <dt>${escapeHTML(label)}</dt>
+      <dd>${escapeHTML(value)}</dd>
+    </div>
+  `;
+}
+
+function careerSeasonCard(row, index, total) {
+  const isLatest = index === total - 1;
+  return `
+    <li class="career-season-item">
+      <details
+        class="career-season-card"
+        id="career-season-${escapeHTML(row.season)}"
+        style="--profile:${profileColor(row.profile)}"
+        ${isLatest ? "open" : ""}
+      >
+        <summary>
+          <span class="career-season-node" aria-hidden="true"></span>
+          <span class="career-season-summary">
+            <span class="career-season-identity">
+              <span class="career-season-title-row">
+                <span class="career-field-label">Season</span>
+                <strong>${escapeHTML(row.displaySeason)}</strong>
+                ${row.changed ? '<span class="career-change-label">Profile change</span>' : ""}
+              </span>
+              <span class="career-team-line">
+                <span class="career-field-label">Team(s)</span>
+                ${careerTeamMarks(row.team, row.season)}
+                <span>${escapeHTML(row.team || "—")}</span>
+                <span aria-hidden="true">·</span>
+                <span class="career-field-label">Pos</span>
+                <span>${escapeHTML(row.position || "UNK")}</span>
+              </span>
+            </span>
+            <span class="career-season-profile">
+              <span>Top archetype (season-specific)</span>
+              ${profileChip(row.profile)}
+            </span>
+            <span class="career-season-measures">
+              <span>
+                <small>Confidence (%)</small>
+                <strong>${number(row.confidencePct, 1)}%</strong>
+              </span>
+              <span>
+                <small>Mixedness</small>
+                <strong>${number(row.mixedness, 3)}</strong>
+              </span>
+            </span>
+            <span class="career-season-disclosure" aria-hidden="true"></span>
+          </span>
+        </summary>
+        <div class="career-season-detail">
+          <section>
+            <h3>Regular season</h3>
+            <dl class="career-stat-grid">
+              ${careerStat("REG GP", number(row.games))}
+              ${careerStat("REG ATOI", row.regAtoi || minuteClock(row.toi))}
+              ${careerStat("REG P", number(row.points))}
+              ${careerStat("REG G", number(row.goals))}
+              ${careerStat("REG A", number(row.assists))}
+              ${careerStat("REG SOG", number(row.shots))}
+              ${careerStat("REG +/-", signedNumber(row.plusMinus))}
+              ${careerStat("REG PIM", number(row.pim))}
+            </dl>
+          </section>
+          <section>
+            <h3>Playoffs</h3>
+            <dl class="career-stat-grid">
+              ${careerStat("PO GP", number(row.playoffGames))}
+              ${careerStat("PO ATOI", row.playoffAtoi || minuteClock(row.playoffToi))}
+              ${careerStat("PO P", number(row.playoffPoints))}
+              ${careerStat("PO G", number(row.playoffGoals))}
+              ${careerStat("PO A", number(row.playoffAssists))}
+              ${careerStat("PO SOG", number(row.playoffShots))}
+              ${careerStat("PO +/-", signedNumber(row.playoffPlusMinus))}
+              ${careerStat("PO PIM", number(row.playoffPim))}
+            </dl>
+          </section>
+        </div>
+      </details>
+    </li>
+  `;
+}
+
+function careerLegend(rows) {
+  const profiles = [...new Set(rows.map((row) => row.profile))];
+  return `
+    <div class="career-profile-legend" aria-label="Top archetype legend">
+      <span class="career-legend-title">Top archetype</span>
+      ${profiles
+        .map(
+          (profile) => `
+            <span>
+              <i style="--profile:${profileColor(profile)}" aria-hidden="true"></i>
+              ${escapeHTML(profile)}
+            </span>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function careerTimeline(rows) {
+  const chartWidth = Math.max(720, rows.length * 88 + 110);
+  return `
+    <section class="career-timeline-panel" aria-labelledby="career-timeline-title">
+      <header class="career-timeline-head">
+        <h2 id="career-timeline-title">Style timeline</h2>
+        <ul>
+          <li>Hover over data points to see the full details.</li>
+          <li>The circled points indicate years where there was a change in player archetype from the previous year.</li>
+        </ul>
+      </header>
+      <div
+        class="career-chart-scroll"
+        tabindex="0"
+        aria-label="Career confidence timeline; scroll horizontally when needed"
+      >
+        <div
+          class="career-chart-stage"
+          style="--career-chart-width:${chartWidth}px"
+          role="group"
+          aria-label="Top-archetype confidence by season"
+        >
+          <span class="career-y-axis-title" aria-hidden="true">Top-archetype confidence (%)</span>
+          <canvas id="career-chart" aria-hidden="true"></canvas>
+          <div class="career-chart-points" role="group" aria-label="Career seasons">
+            ${rows
+              .map(
+                (row, index) => `
+                  <button
+                    class="career-chart-point ${row.changed ? "is-change" : ""}"
+                    type="button"
+                    data-career-point="${index}"
+                    style="--profile:${profileColor(row.profile)}"
+                    aria-controls="career-season-${escapeHTML(row.season)}"
+                    aria-label="${escapeHTML(
+                      `${row.displaySeason}. ${row.profile}. Confidence ${number(row.confidencePct, 1)} percent. Mixedness ${number(row.mixedness, 3)}. Teams ${row.team || "none"}. Position ${row.position || "unknown"}.${row.changed ? " Archetype changed from the previous season." : ""} Open season details.`,
+                    )}"
+                  ></button>
+                `,
+              )
+              .join("")}
+          </div>
+          <div class="career-chart-tooltip" role="status" hidden></div>
+        </div>
+      </div>
+      ${careerLegend(rows)}
+    </section>
+  `;
+}
+
+function careerView(rows) {
+  if (!rows.length) {
+    return '<div class="empty-state">No multi-season data found for this group in data/app/.</div>';
+  }
+  const avgConfidence = mean(rows.map((row) => row.confidencePct));
+  const avgMixedness = mean(rows.map((row) => row.mixedness));
+  const [confidenceLabel, confidenceClass] =
+    careerConfidenceStatus(avgConfidence);
+  const [mixednessLabel, mixednessClass] =
+    careerMixednessStatus(avgMixedness);
+  return `
+    <section class="career-summary-grid" aria-label="Career model summary">
+      <article class="career-summary-card">
+        <span>Seasons in dataset</span>
+        <strong>${number(rows.length)}</strong>
+      </article>
+      <article class="career-summary-card">
+        <span>Avg confidence</span>
+        <div>
+          <strong>${number(avgConfidence, 1)}%</strong>
+          <em class="career-status ${confidenceClass}">${escapeHTML(confidenceLabel)}</em>
+        </div>
+      </article>
+      <article class="career-summary-card">
+        <span>Avg mixedness</span>
+        <div>
+          <strong>${number(avgMixedness, 3)}</strong>
+          <em class="career-status ${mixednessClass}">${escapeHTML(mixednessLabel)}</em>
+        </div>
+      </article>
+    </section>
+    ${careerTimeline(rows)}
+    <section class="career-season-section" aria-labelledby="career-season-title">
+      <h2 id="career-season-title">Archetype and Career Stats by Season</h2>
+      <ol class="career-season-list">
+        ${rows
+          .map((row, index) => careerSeasonCard(row, index, rows.length))
+          .join("")}
+      </ol>
+    </section>
+  `;
+}
+
+function setupCareerTimeline(rows) {
+  const stage = document.querySelector(".career-chart-stage");
+  const canvas = document.querySelector("#career-chart");
+  if (!stage || !canvas || !rows.length) return;
+  const context = canvas.getContext("2d");
+  const points = [...stage.querySelectorAll("[data-career-point]")];
+  const tooltip = stage.querySelector(".career-chart-tooltip");
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const listeners = [];
+  const listen = (element, type, handler) => {
+    element.addEventListener(type, handler);
+    listeners.push(() => element.removeEventListener(type, handler));
+  };
+
+  function draw() {
+    const width = Math.max(stage.clientWidth, 720);
+    const height = 320;
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    const padding = { top: 24, right: 28, bottom: 48, left: 58 };
+    const plotWidth = width - padding.left - padding.right;
+    const plotHeight = height - padding.top - padding.bottom;
+    const xAt = (index) =>
+      padding.left +
+      (rows.length <= 1
+        ? plotWidth / 2
+        : (plotWidth * index) / (rows.length - 1));
+    const yAt = (value) =>
+      padding.top + plotHeight - (Math.max(0, Math.min(100, value)) / 100) * plotHeight;
+
+    canvas.width = width * ratio;
+    canvas.height = height * ratio;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, width, height);
+
+    const styles = getComputedStyle(document.documentElement);
+    const grid = styles.getPropertyValue("--line").trim();
+    const muted = styles.getPropertyValue("--muted").trim();
+    context.font = "11px Inter, system-ui, sans-serif";
+    context.textBaseline = "middle";
+
+    [100, 75, 50, 25, 0].forEach((value) => {
+      const y = yAt(value);
+      context.beginPath();
+      context.setLineDash(value === 0 ? [] : [2, 5]);
+      context.strokeStyle = grid;
+      context.lineWidth = 1;
+      context.moveTo(padding.left, y);
+      context.lineTo(width - padding.right, y);
+      context.stroke();
+      context.setLineDash([]);
+      context.fillStyle = muted;
+      context.textAlign = "right";
+      context.fillText(`${value}%`, padding.left - 10, y);
+    });
+
+    rows.forEach((row, index) => {
+      context.fillStyle = muted;
+      context.textAlign = "center";
+      context.fillText(row.compactSeason, xAt(index), height - 17);
+    });
+
+    for (let index = 1; index < rows.length; index += 1) {
+      const previous = rows[index - 1];
+      const current = rows[index];
+      const seasonGap =
+        Number(current.season.slice(0, 4)) -
+          Number(previous.season.slice(0, 4)) >
+        1;
+      context.beginPath();
+      context.setLineDash(seasonGap ? [6, 6] : []);
+      context.strokeStyle = "#9ca3af";
+      context.lineWidth = 2.5;
+      context.lineCap = "round";
+      context.moveTo(xAt(index - 1), yAt(previous.confidencePct));
+      context.lineTo(xAt(index), yAt(current.confidencePct));
+      context.stroke();
+      context.setLineDash([]);
+    }
+
+    points.forEach((point, index) => {
+      point.style.left = `${xAt(index)}px`;
+      point.style.top = `${yAt(rows[index].confidencePct)}px`;
+    });
+    if (tooltip) tooltip.hidden = true;
+  }
+
+  function showTooltip(index) {
+    if (!tooltip) return;
+    const row = rows[index];
+    const point = points[index];
+    tooltip.innerHTML = `
+      <strong>${escapeHTML(row.displaySeason)}</strong>
+      <span>${escapeHTML(row.profile)}</span>
+      <dl>
+        <div><dt>Confidence</dt><dd>${number(row.confidencePct, 1)}%</dd></div>
+        <div><dt>Mixedness</dt><dd>${number(row.mixedness, 3)}</dd></div>
+        <div><dt>Teams</dt><dd>${escapeHTML(row.team || "—")}</dd></div>
+        <div><dt>Pos</dt><dd>${escapeHTML(row.position || "UNK")}</dd></div>
+      </dl>
+    `;
+    tooltip.hidden = false;
+    const left = Number.parseFloat(point.style.left || "0");
+    const top = Number.parseFloat(point.style.top || "0");
+    const tooltipLeft = Math.max(
+      8,
+      Math.min(
+        left - tooltip.offsetWidth / 2,
+        stage.clientWidth - tooltip.offsetWidth - 8,
+      ),
+    );
+    const tooltipTop =
+      top > tooltip.offsetHeight + 32
+        ? top - tooltip.offsetHeight - 18
+        : top + 18;
+    tooltip.style.left = `${tooltipLeft}px`;
+    tooltip.style.top = `${tooltipTop}px`;
+  }
+
+  function hideTooltip() {
+    if (tooltip) tooltip.hidden = true;
+  }
+
+  points.forEach((point, index) => {
+    listen(point, "mouseenter", () => showTooltip(index));
+    listen(point, "mouseleave", hideTooltip);
+    listen(point, "focus", () => showTooltip(index));
+    listen(point, "blur", hideTooltip);
+    listen(point, "click", () => {
+      const seasonCard = document.querySelector(
+        `#career-season-${rows[index].season}`,
+      );
+      if (!seasonCard) return;
+      seasonCard.open = true;
+      seasonCard.scrollIntoView({
+        behavior: reducedMotion ? "auto" : "smooth",
+        block: "center",
+      });
+    });
+  });
+
+  draw();
+  const observer = new ResizeObserver(draw);
+  observer.observe(stage);
+  appState.canvasCleanups.push(() => {
+    observer.disconnect();
+    listeners.forEach((remove) => remove());
+  });
 }
 
 async function renderCareer() {
   if (!appState.careers) {
     loading("Loading career histories…");
-    appState.careers = await getJSON(`${DATA_ROOT}/careers.json`);
+    appState.careers = await getJSON(
+      `${DATA_ROOT}/careers.json?v=${DATA_VERSION}`,
+    );
   }
   if (appState.route !== "career") return;
+  cleanupCanvases();
   const players = careerPlayers(appState.careers, appState.careerGroup);
   if (appState.careerPlayerName) {
     const requestedName = appState.careerPlayerName.trim().toLowerCase();
@@ -2566,6 +3041,7 @@ async function renderCareer() {
       record.group === appState.careerGroup &&
       record.id === appState.careerPlayerId,
   );
+  const rows = careerHistoryRows(history);
   const latest = [...history].sort((a, b) => b.season.localeCompare(a.season))[0];
   const selectedWithTeam = selected
     ? {
@@ -2576,46 +3052,74 @@ async function renderCareer() {
     : null;
 
   main.innerHTML = `
-    <article class="page">
-      ${pageHeader(
-        "Career paths",
-        "Style is a timeline, not a label.",
-        "Track how a player’s role, confidence, and production move from season to season.",
-        groupControl(appState.careerGroup, "career-group"),
+    <article class="page career-page">
+      <header class="career-page-head">
+        <h1>How Does a Player's Play Style Evolve Over Their Career?</h1>
+        <div class="controls">${careerGroupControl(appState.careerGroup)}</div>
+      </header>
+      ${careerExplainer(
+        careerSeasonLabel(appState.core.meta.seasons[0]?.key),
       )}
-      <div class="two-column" style="margin-bottom:28px">
-        <div>
+      <section class="career-picker" aria-labelledby="career-picker-title">
+        <div class="career-picker-controls">
+          <h2 id="career-picker-title">Select a player</h2>
           <div class="field">
-            <label for="career-search">Find a player</label>
+            <label for="career-search">Search player name</label>
             <input
               class="search-input"
               id="career-search"
               type="search"
               value="${escapeHTML(appState.careerQuery)}"
-              placeholder="Search by name"
               autocomplete="off"
+              aria-controls="career-matches"
+              aria-describedby="career-match-status"
             />
           </div>
-          <div class="search-results" id="career-search-results"></div>
+          <div class="field">
+            <label for="career-matches">Matches</label>
+            <select id="career-matches" size="6">
+              ${careerSearchResults(players, appState.careerQuery)
+                .map(
+                  (player) => `
+                    <option
+                      value="${player.id}"
+                      ${player.id === appState.careerPlayerId ? "selected" : ""}
+                    >${escapeHTML(player.display)}</option>
+                  `,
+                )
+                .join("")}
+            </select>
+          </div>
+          <p
+            class="career-match-status"
+            id="career-match-status"
+            aria-live="polite"
+          ></p>
+          <p class="career-no-matches" hidden>No matches. Try a different search.</p>
+          <p class="career-selected-caption">
+            Selected: ${escapeHTML(selected?.display || "No player")}
+          </p>
         </div>
-        <div class="detail-panel">
+        <div
+          class="detail-panel career-selected-player"
+          tabindex="-1"
+          aria-label="${escapeHTML(`Selected player: ${selected?.name || "No player"}`)}"
+        >
           ${
             selectedWithTeam
               ? playerIdentity(
                   selectedWithTeam,
                   latest?.season,
                   "Selected player",
-                  `${selectedWithTeam.position} · ${number(selected?.seasons || 0)} seasons`,
+                  `${selectedWithTeam.position} · ${careerSeasonLabel(
+                    selected?.firstSeason,
+                  )} - ${careerSeasonLabel(selected?.lastSeason)}`,
                 )
               : '<div class="detail-name">No player</div>'
           }
         </div>
-      </div>
-      <section id="career-view">${careerView(history)}</section>
-      <footer class="page-footer">
-        <span>Styles are re-learned each season.</span>
-        <span>A switch means the top probability changed.</span>
-      </footer>
+      </section>
+      <section id="career-view">${careerView(rows)}</section>
     </article>
   `;
   hydratePlayerAssets(main);
@@ -2628,49 +3132,45 @@ async function renderCareer() {
     renderCareer();
   });
   const search = document.querySelector("#career-search");
-  const results = document.querySelector("#career-search-results");
-  const drawSearch = () => {
+  const matchesSelect = document.querySelector("#career-matches");
+  const matchStatus = document.querySelector("#career-match-status");
+  const noMatches = document.querySelector(".career-no-matches");
+  const drawMatches = () => {
     appState.careerQuery = search.value;
-    results.innerHTML = careerSearchResults(players, search.value)
+    const matches = careerSearchResults(players, search.value);
+    matchesSelect.innerHTML = matches
       .map(
         (player) => `
-          <button class="search-result" type="button" data-career-id="${player.id}">
-            <span>${escapeHTML(player.name)}</span>
-            <span>${player.seasons} seasons</span>
-          </button>
+          <option
+            value="${player.id}"
+            ${player.id === appState.careerPlayerId ? "selected" : ""}
+          >${escapeHTML(player.display)}</option>
         `,
       )
       .join("");
+    matchesSelect.disabled = matches.length === 0;
+    matchStatus.textContent = `${number(matches.length)} match${matches.length === 1 ? "" : "es"}`;
+    noMatches.hidden = matches.length > 0;
   };
-  search.addEventListener("input", drawSearch);
-  results.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-career-id]");
-    if (!button) return;
-    appState.careerPlayerId = Number(button.dataset.careerId);
+  search.addEventListener("input", drawMatches);
+  matchesSelect.addEventListener("change", () => {
+    const playerId = Number(matchesSelect.value);
+    if (!playerId) return;
+    appState.careerPlayerId = playerId;
     appState.careerQuery = "";
-    renderCareer();
+    window.history.replaceState(
+      null,
+      "",
+      `#career?player=${encodeURIComponent(playerId)}&group=${encodeURIComponent(appState.careerGroup)}`,
+    );
+    renderCareer().then(() => {
+      document
+        .querySelector(".career-selected-player")
+        ?.focus({ preventScroll: true });
+    });
   });
-  drawSearch();
-
-  const sortedHistory = [...history].sort((a, b) => a.season.localeCompare(b.season));
-  setupLineChart(
-    document.querySelector("#career-chart"),
-    [
-      {
-        color: "#21b6a8",
-        values: sortedHistory.map((row) => ({
-          label:
-            appState.core.meta.seasons.find((item) => item.key === row.season)
-              ?.label || row.season,
-          value: row.confidence * 100,
-          profile: row.profile,
-        })),
-        highlight: (point, index) =>
-          index > 0 && point.profile !== sortedHistory[index - 1].profile,
-      },
-    ],
-    { min: 0, max: 100, unit: "%" },
-  );
+  drawMatches();
+  setupCareerTimeline(rows);
 }
 
 function playoffFiltered() {
