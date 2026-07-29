@@ -226,7 +226,12 @@ function setupLineChart(canvas, series, options = {}) {
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, width, height);
 
-    const padding = { top: 16, right: 16, bottom: 38, left: 44 };
+    const padding = {
+      top: 16,
+      right: width < 520 ? 28 : 16,
+      bottom: 38,
+      left: 44,
+    };
     const plotWidth = width - padding.left - padding.right;
     const plotHeight = height - padding.top - padding.bottom;
     const allValues = series.flatMap((item) => item.values.map((point) => point.value));
@@ -235,7 +240,7 @@ function setupLineChart(canvas, series, options = {}) {
     const range = Math.max(max - min, 1);
     const labels = series[0]?.values.map((point) => point.label) || [];
 
-    context.font = "10px Inter, system-ui, sans-serif";
+    context.font = "11px Inter, system-ui, sans-serif";
     context.textBaseline = "middle";
     context.strokeStyle = grid;
     context.fillStyle = muted;
@@ -259,8 +264,15 @@ function setupLineChart(canvas, series, options = {}) {
       padding.top + plotHeight - ((value - min) / range) * plotHeight;
 
     const labelEvery = width < 520 ? 4 : width < 760 ? 3 : 2;
+    const lastLabelIndex = labels.length - 1;
     labels.forEach((label, index) => {
-      if (index % labelEvery !== 0 && index !== labels.length - 1) return;
+      if (index !== lastLabelIndex && index % labelEvery !== 0) return;
+      if (
+        index !== lastLabelIndex &&
+        lastLabelIndex - index < labelEvery * 0.8
+      ) {
+        return;
+      }
       context.textAlign = "center";
       context.fillStyle = muted;
       context.fillText(label.replace("–", "–"), xAt(index), height - 14);
@@ -311,18 +323,195 @@ function setupLineChart(canvas, series, options = {}) {
   appState.canvasCleanups.push(() => observer.disconnect());
 }
 
+function setupHeroRink(canvas) {
+  if (!canvas) return;
+  // NHL 2025-26 Official Rules, Section 1: 200' x 85' rink, 28' corners,
+  // goal/blue-line locations, faceoff geometry, crease, and restricted area.
+  const context = canvas.getContext("2d");
+  const wrapper = canvas.parentElement;
+  const styles = getComputedStyle(document.documentElement);
+  const colors = {
+    board: styles.getPropertyValue("--navy-900").trim(),
+    ice: styles.getPropertyValue("--paper-strong").trim(),
+    red: styles.getPropertyValue("--coral").trim(),
+    blue: "#3974bb",
+    crease: "rgba(33, 182, 168, 0.22)",
+  };
+
+  function draw() {
+    const width = Math.max(wrapper.clientWidth, 250);
+    const height = Math.max(wrapper.clientHeight, 250);
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = width * ratio;
+    canvas.height = height * ratio;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, width, height);
+
+    const padding = width < 320 ? 14 : 20;
+    const scale = Math.min(
+      (width - padding * 2) / 100,
+      (height - padding * 2) / 85,
+    );
+    const rinkWidth = 100 * scale;
+    const rinkHeight = 85 * scale;
+    const left = (width - rinkWidth) / 2;
+    const top = (height - rinkHeight) / 2;
+    const x = (feet) => left + feet * scale;
+    const y = (feet) => top + (42.5 + feet) * scale;
+    const lineWidth = (feet, minimum = 1) =>
+      Math.max(minimum, feet * scale);
+
+    const rink = new Path2D();
+    rink.moveTo(x(0), y(-42.5));
+    rink.lineTo(x(72), y(-42.5));
+    rink.arc(x(72), y(-14.5), 28 * scale, -Math.PI / 2, 0);
+    rink.lineTo(x(100), y(14.5));
+    rink.arc(x(72), y(14.5), 28 * scale, 0, Math.PI / 2);
+    rink.lineTo(x(0), y(42.5));
+    rink.closePath();
+
+    context.save();
+    context.clip(rink);
+    context.fillStyle = colors.ice;
+    context.fillRect(left, top, rinkWidth, rinkHeight);
+
+    function drawVerticalLine(feet, color, thicknessFeet) {
+      context.fillStyle = color;
+      context.fillRect(
+        x(feet - thicknessFeet / 2),
+        y(-42.5),
+        lineWidth(thicknessFeet),
+        rinkHeight,
+      );
+    }
+
+    drawVerticalLine(0, colors.red, 1);
+    drawVerticalLine(25, colors.blue, 1);
+    drawVerticalLine(89, colors.red, 2 / 12);
+
+    function strokeCircle(cx, cy, radius, color, thicknessFeet = 2 / 12) {
+      context.beginPath();
+      context.arc(x(cx), y(cy), radius * scale, 0, Math.PI * 2);
+      context.strokeStyle = color;
+      context.lineWidth = lineWidth(thicknessFeet);
+      context.stroke();
+    }
+
+    function drawSpot(cx, cy, radius, color) {
+      context.beginPath();
+      context.arc(x(cx), y(cy), radius * scale, 0, Math.PI * 2);
+      context.fillStyle = color;
+      context.fill();
+    }
+
+    strokeCircle(0, 0, 15, colors.blue);
+    drawSpot(0, 0, 0.5, colors.blue);
+
+    for (const spotY of [-22, 22]) {
+      drawSpot(20, spotY, 1, colors.red);
+      strokeCircle(69, spotY, 15, colors.red);
+      drawSpot(69, spotY, 1, colors.red);
+
+      context.strokeStyle = colors.red;
+      context.lineWidth = lineWidth(2 / 12);
+      for (const circleSide of [-1, 1]) {
+        for (const offsetY of [-3.79, 3.79]) {
+          context.beginPath();
+          context.moveTo(x(69 + circleSide * 15), y(spotY + offsetY - 1));
+          context.lineTo(x(69 + circleSide * 15), y(spotY + offsetY + 1));
+          context.stroke();
+        }
+      }
+
+      for (const sideX of [-1, 1]) {
+        for (const sideY of [-1, 1]) {
+          const nearX = 69 + sideX * 2;
+          const farX = 69 + sideX * 6;
+          const markY = spotY + sideY * 0.75;
+          context.beginPath();
+          context.moveTo(x(nearX), y(markY));
+          context.lineTo(x(farX), y(markY));
+          context.lineTo(x(farX), y(markY + sideY * 3));
+          context.stroke();
+        }
+      }
+    }
+
+    context.strokeStyle = colors.red;
+    context.lineWidth = lineWidth(2 / 12);
+    context.beginPath();
+    context.moveTo(x(89), y(-11));
+    context.lineTo(x(100), y(-14));
+    context.moveTo(x(89), y(11));
+    context.lineTo(x(100), y(14));
+    context.stroke();
+
+    const creaseRadius = 6 * scale;
+    const creaseAngle = Math.atan2(4, Math.sqrt(20));
+    context.beginPath();
+    context.moveTo(x(89), y(-4));
+    context.lineTo(x(89 - Math.sqrt(20)), y(-4));
+    context.arc(
+      x(89),
+      y(0),
+      creaseRadius,
+      -Math.PI + creaseAngle,
+      Math.PI - creaseAngle,
+      true,
+    );
+    context.lineTo(x(89), y(4));
+    context.closePath();
+    context.fillStyle = colors.crease;
+    context.fill();
+    context.strokeStyle = colors.red;
+    context.lineWidth = lineWidth(2 / 12);
+    context.stroke();
+
+    for (const creaseY of [-4, 4]) {
+      context.beginPath();
+      context.moveTo(x(85), y(creaseY));
+      context.lineTo(x(85 + 5 / 12), y(creaseY));
+      context.stroke();
+    }
+
+    context.strokeStyle = colors.red;
+    context.lineWidth = Math.max(1.5, lineWidth(2 / 12));
+    context.lineJoin = "round";
+    context.beginPath();
+    context.moveTo(x(89), y(-3));
+    context.lineTo(x(92.68), y(-2.4));
+    context.lineTo(x(92.68), y(2.4));
+    context.lineTo(x(89), y(3));
+    context.moveTo(x(89), y(-3));
+    context.lineTo(x(89), y(3));
+    context.stroke();
+
+    context.restore();
+    context.strokeStyle = colors.board;
+    context.lineWidth = Math.max(2, lineWidth(8 / 12));
+    context.stroke(rink);
+  }
+
+  draw();
+  const observer = new ResizeObserver(draw);
+  observer.observe(wrapper);
+  appState.canvasCleanups.push(() => observer.disconnect());
+}
+
 function renderOverview() {
   const { meta } = appState.core;
   const oldest = meta.seasons.at(-1).label;
   const latest = meta.seasons[0].label;
-  const forwardSwitch = Math.round(meta.switchRates.forwards * 100);
-  const defenseSwitch = Math.round(meta.switchRates.defense * 100);
+  const styleBreakdown = meta.namedStyleBreakdown;
+  const latestBreakdown = meta.latestSeasonBreakdown;
 
   main.innerHTML = `
     <article class="page">
       <section class="hero">
         <div class="hero-copy">
-          <p class="eyebrow">NHL PLAYER STYLE MODEL · ${escapeHTML(oldest)}–${escapeHTML(latest)}</p>
+          <p class="eyebrow">NHL PLAYER STYLE MODEL · <span class="season-token">${escapeHTML(oldest)} to ${escapeHTML(latest)}</span></p>
           <h1>See how players play, <span class="hero-accent">not just what they score.</span></h1>
           <p class="lede">Explore role, identity, and change across seasons, teams, careers, and playoff runs.</p>
           <div class="hero-actions">
@@ -330,25 +519,49 @@ function renderOverview() {
             <a class="button" href="#glossary">Browse styles</a>
           </div>
         </div>
-        <div class="hero-board" aria-label="${number(meta.playerCount)} players across ${meta.seasonCount} seasons">
-          <span class="board-center" aria-hidden="true"></span>
-          <span class="board-puck" aria-hidden="true"></span>
-          <span class="board-stat board-stat-top">
-            <strong>${number(meta.playerCount)}</strong>
-            <span>players</span>
-          </span>
-          <span class="board-stat board-stat-bottom">
-            <strong>${meta.seasonCount}</strong>
-            <span>seasons</span>
-          </span>
+        <div class="hero-board">
+          <div class="rink-stage">
+            <canvas
+              id="hero-rink"
+              role="img"
+              aria-label="Regulation NHL half-rink drawn to scale with a 100 by 85 foot surface, 28 foot corner radius, official lines, faceoff markings, goal crease, net, and goalkeeper restricted area"
+            ></canvas>
+          </div>
+          <div class="rink-caption">
+            <span>NHL regulation proportions</span>
+            <span>100′ × 85′ half-rink</span>
+          </div>
+          <div class="rink-facts" aria-label="${number(meta.playerCount)} players across ${meta.seasonCount} seasons">
+            <span><strong>${number(meta.playerCount)}</strong> players</span>
+            <span><strong>${meta.seasonCount}</strong> seasons</span>
+          </div>
         </div>
       </section>
 
       <section class="metric-grid" aria-label="Dataset summary">
-        ${metric("Season coverage", `${oldest}–${latest}`)}
-        ${metric("Player-seasons", number(meta.playerSeasonCount), `${number(Object.values(meta.profileDefinitions).reduce((a, b) => a + b, 0))} profiles learned`)}
-        ${metric("Forward switch rate", `${forwardSwitch}%`, "median year-to-year change")}
-        ${metric("Defense switch rate", `${defenseSwitch}%`, "median year-to-year change")}
+        <div class="metric metric-coverage">
+          <span class="metric-label">Season coverage</span>
+          <span class="metric-value metric-season-range">
+            <span>${escapeHTML(oldest)}</span>
+            <span><small>to</small> ${escapeHTML(latest)}</span>
+          </span>
+        </div>
+        ${metric("Players analyzed", number(meta.playerCount), "unique NHL players")}
+        ${metric("Named styles", number(meta.namedStyleCount), `${styleBreakdown.forwards} forward · ${styleBreakdown.defense} defense`)}
+        ${metric(`${latest} profiles`, number(meta.latestSeasonPlayerCount), `${latestBreakdown.forwards} forwards · ${latestBreakdown.defense} defense`)}
+      </section>
+
+      <section class="philosophy-section">
+        <div class="philosophy-copy">
+          <h2>Why this project exists</h2>
+          <p>Hockey describes players by identity: finisher, playmaker, shutdown defenseman, role specialist. Those labels shape roster decisions, but they are often based on reputation. This project tests whether identity can be derived consistently from how a player is used and what they produce.</p>
+          <p class="philosophy-source">Built from public NHL Gamecenter and MoneyPuck data from 2008–09 onward.</p>
+        </div>
+        <div class="philosophy-questions" aria-label="Questions this project is designed to answer">
+          <p><span>01</span>Which player styles exist in a season?</p>
+          <p><span>02</span>What does a roster have—and what is missing?</p>
+          <p><span>03</span>How does a player’s style change over a career?</p>
+        </div>
       </section>
 
       <section class="analysis-grid">
@@ -367,21 +580,19 @@ function renderOverview() {
             <canvas id="confidence-chart" role="img" aria-label="Average model confidence for forwards and defense by season"></canvas>
           </div>
         </div>
-        <div class="info-panel">
-          <p class="eyebrow">What changes</p>
-          <div class="insight-stack">
-            <div class="insight">
-              <strong>${forwardSwitch}%</strong>
-              <span>Median forward style changes between adjacent seasons.</span>
-            </div>
-            <div class="insight">
-              <strong>${defenseSwitch}%</strong>
-              <span>Median defense style changes between adjacent seasons.</span>
-            </div>
-            <div class="insight">
-              <strong>Soft fit</strong>
-              <span>Every player keeps a probability mix, not a forced label.</span>
-            </div>
+        <div class="info-panel confidence-guide">
+          <h3>How to read it</h3>
+          <div>
+            <strong>Higher confidence</strong>
+            <p>One style clearly leads the player’s probability mix.</p>
+          </div>
+          <div>
+            <strong>Lower confidence</strong>
+            <p>The player fits several styles more evenly.</p>
+          </div>
+          <div>
+            <strong>Not a performance grade</strong>
+            <p>Confidence measures how distinct the style is, not how good the player is.</p>
           </div>
         </div>
       </section>
@@ -389,31 +600,30 @@ function renderOverview() {
       <section>
         <div class="section-heading">
           <div>
-            <p class="eyebrow">The model</p>
-            <h2>From stat line to style mix</h2>
+            <h2>Understanding the model</h2>
           </div>
-          <p>Public NHL and MoneyPuck data becomes a season-specific probability profile.</p>
+          <p>Each player receives a ranked probability mix for that season.</p>
         </div>
         <div class="method-grid">
           <article class="method-step" style="--step-color:var(--aqua)">
-            <span>01 · RATE</span>
-            <h3>Normalize usage</h3>
-            <p>Convert counting stats to per-60 rates and usage shares.</p>
+            <span>01</span>
+            <h3>Normalize</h3>
+            <p>Per-60 rates and usage shares make players comparable.</p>
           </article>
           <article class="method-step" style="--step-color:var(--coral)">
-            <span>02 · SCALE</span>
-            <h3>Balance signals</h3>
-            <p>Robust scaling keeps extreme values from owning the result.</p>
+            <span>02</span>
+            <h3>Scale</h3>
+            <p>Robust scaling limits the influence of statistical outliers.</p>
           </article>
           <article class="method-step" style="--step-color:var(--gold)">
-            <span>03 · COMPRESS</span>
-            <h3>Build fingerprints</h3>
-            <p>NMF reduces correlated stats into compact style components.</p>
+            <span>03</span>
+            <h3>Reduce</h3>
+            <p>NMF groups correlated statistics into style components.</p>
           </article>
           <article class="method-step" style="--step-color:#5f8dd3">
-            <span>04 · CLUSTER</span>
-            <h3>Assign probabilities</h3>
-            <p>A mixture model returns a ranked set of style fits per player.</p>
+            <span>04</span>
+            <h3>Assign</h3>
+            <p>A mixture model returns each player’s ranked style probabilities.</p>
           </article>
         </div>
       </section>
@@ -425,6 +635,7 @@ function renderOverview() {
     </article>
   `;
 
+  setupHeroRink(document.querySelector("#hero-rink"));
   const trend = meta.confidenceTrend;
   setupLineChart(
     document.querySelector("#confidence-chart"),
@@ -1473,7 +1684,7 @@ async function init() {
     const oldest = appState.core.meta.seasons.at(-1).label;
     const latest = appState.core.meta.seasons[0].label;
     document.querySelector("#coverage-label").textContent =
-      `${oldest}–${latest} · public data`;
+      `${oldest} to ${latest} · public data`;
     await renderRoute();
   } catch (error) {
     showError(error);

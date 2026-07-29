@@ -184,7 +184,7 @@ select:focus-visible {
 .brand-copy small {
   margin-top: 2px;
   color: var(--aqua);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.2em;
 }
@@ -203,7 +203,7 @@ select:focus-visible {
   padding: 0 11px;
   border-radius: 11px;
   color: rgba(255, 255, 255, 0.68);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 560;
   text-decoration: none;
   transition:
@@ -224,7 +224,7 @@ select:focus-visible {
 
 .nav-index {
   color: var(--aqua);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 760;
   letter-spacing: 0.12em;
 }
@@ -237,7 +237,7 @@ select:focus-visible {
   padding: 14px 4px 0;
   border-top: 1px solid var(--line-dark);
   color: rgba(255, 255, 255, 0.54);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .status-dot {
@@ -278,10 +278,14 @@ select:focus-visible {
 .eyebrow {
   margin: 0 0 12px;
   color: var(--aqua-dark);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 780;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+.season-token {
+  white-space: nowrap;
 }
 
 h1,
@@ -318,7 +322,7 @@ h2 {
 
 h3 {
   margin-bottom: 8px;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -387,7 +391,7 @@ h3 {
   background: transparent;
   color: var(--ink);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 680;
   text-decoration: none;
   transition:
@@ -408,108 +412,69 @@ h3 {
 }
 
 .hero-board {
-  position: relative;
-  min-height: 380px;
-  overflow: hidden;
-  border-radius: 46% 46% 28px 28px;
+  display: grid;
+  grid-template-rows: minmax(260px, 1fr) auto auto;
+  min-height: 430px;
+  padding: 18px;
+  border-radius: 28px;
   background: var(--navy-900);
   box-shadow: var(--shadow);
   color: white;
 }
 
-.hero-board::before {
-  position: absolute;
-  inset: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 44% 44% 18px 18px;
-  content: "";
+.rink-stage {
+  min-height: 280px;
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--paper-strong);
 }
 
-.hero-board::after {
-  position: absolute;
-  top: 22px;
-  bottom: 22px;
-  left: 50%;
-  width: 1px;
-  background: rgba(255, 255, 255, 0.13);
-  content: "";
+.rink-stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
-.board-center {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  z-index: 1;
-  width: 102px;
-  height: 102px;
-  border: 1px solid rgba(240, 100, 69, 0.72);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.board-center::before,
-.board-center::after {
-  position: absolute;
-  top: 49px;
-  width: 26px;
-  height: 1px;
-  background: rgba(240, 100, 69, 0.72);
-  content: "";
-}
-
-.board-center::before {
-  left: -26px;
-}
-
-.board-center::after {
-  right: -26px;
-}
-
-.board-stat {
-  position: absolute;
-  z-index: 2;
+.rink-caption {
   display: flex;
-  flex-direction: column;
-}
-
-.board-stat strong {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 38px;
-  font-weight: 500;
-}
-
-.board-stat span {
-  margin-top: 3px;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 2px 14px;
   color: rgba(255, 255, 255, 0.58);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.board-stat-top {
-  top: 58px;
-  left: 52px;
-}
-
-.board-stat-bottom {
-  right: 48px;
-  bottom: 54px;
+.rink-caption span:last-child {
   text-align: right;
 }
 
-.board-puck {
-  position: absolute;
-  right: 48px;
-  top: 72px;
-  z-index: 2;
-  width: 18px;
-  height: 18px;
-  border: 5px solid var(--aqua);
-  border-radius: 50%;
-  box-shadow:
-    -46px 144px 0 -4px var(--coral),
-    -156px 209px 0 -6px var(--gold);
+.rink-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+  border: 1px solid var(--line-dark);
+  border-radius: 12px;
+}
+
+.rink-facts span {
+  padding: 12px 14px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 12px;
+}
+
+.rink-facts span + span {
+  border-left: 1px solid var(--line-dark);
+}
+
+.rink-facts strong {
+  margin-right: 4px;
+  color: white;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 20px;
+  font-weight: 500;
 }
 
 .metric-grid {
@@ -533,7 +498,7 @@ h3 {
   display: block;
   margin-bottom: 22px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 720;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -551,8 +516,80 @@ h3 {
   display: block;
   margin-top: 8px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.4;
+}
+
+.metric-season-range {
+  display: grid;
+  gap: 5px;
+  font-size: clamp(25px, 2.6vw, 38px);
+  line-height: 0.95;
+}
+
+.metric-season-range > span {
+  white-space: nowrap;
+}
+
+.metric-season-range small {
+  color: var(--muted);
+  font-family:
+    Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 0.38em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.philosophy-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+  gap: clamp(32px, 6vw, 82px);
+  align-items: start;
+  margin: 0 0 72px;
+  padding: clamp(30px, 5vw, 54px);
+  border-radius: var(--radius-lg);
+  background: var(--ice);
+}
+
+.philosophy-copy > p {
+  max-width: 680px;
+  margin-bottom: 16px;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.68;
+}
+
+.philosophy-copy .philosophy-source {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.philosophy-questions {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+
+.philosophy-questions p {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 12px;
+  margin: 0;
+  padding: 17px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.philosophy-questions span {
+  color: var(--aqua-dark);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
 }
 
 .analysis-grid {
@@ -586,7 +623,7 @@ h3 {
 .chart-title-row p {
   margin: 4px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .legend {
@@ -595,7 +632,7 @@ h3 {
   justify-content: flex-end;
   gap: 12px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .legend span {
@@ -623,34 +660,32 @@ h3 {
   height: 280px;
 }
 
-.insight-stack {
+.confidence-guide {
   display: grid;
-  gap: 20px;
+  align-content: start;
+  gap: 0;
 }
 
-.insight {
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--line);
+.confidence-guide h3 {
+  margin-bottom: 12px;
 }
 
-.insight:last-child {
-  padding-bottom: 0;
-  border-bottom: 0;
+.confidence-guide > div {
+  padding: 17px 0;
+  border-top: 1px solid var(--line);
 }
 
-.insight strong {
+.confidence-guide strong {
   display: block;
   margin-bottom: 5px;
-  color: var(--navy-950);
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 30px;
-  font-weight: 500;
+  font-size: 14px;
 }
 
-.insight span {
+.confidence-guide p {
+  margin-bottom: 0;
   color: var(--muted);
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .method-grid {
@@ -671,7 +706,7 @@ h3 {
   display: block;
   margin-bottom: 44px;
   color: var(--aqua-dark);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 780;
   letter-spacing: 0.1em;
 }
@@ -679,7 +714,7 @@ h3 {
 .method-step p {
   margin-bottom: 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
 }
 
@@ -692,7 +727,7 @@ h3 {
   padding-top: 22px;
   border-top: 1px solid var(--line);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .controls {
@@ -710,7 +745,7 @@ h3 {
 .field label,
 .field-label {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 760;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -755,7 +790,7 @@ h3 {
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 690;
 }
 
@@ -786,7 +821,7 @@ h3 {
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -806,7 +841,7 @@ h3 {
 
 .result-count {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .glossary-list {
@@ -829,14 +864,14 @@ h3 {
 .profile-name {
   margin-bottom: 7px;
   color: var(--navy-950);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.25;
 }
 
 .profile-row p {
   margin-bottom: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.5;
 }
 
@@ -850,7 +885,7 @@ h3 {
   display: block;
   margin-bottom: 8px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -864,7 +899,7 @@ h3 {
 }
 
 .trait-column li {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.35;
 }
 
@@ -878,7 +913,7 @@ h3 {
 
 .examples {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.55;
 }
 
@@ -886,7 +921,7 @@ h3 {
   display: block;
   margin-bottom: 7px;
   color: var(--ink);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -905,7 +940,7 @@ h3 {
 
 .bar-label {
   color: var(--ink);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.3;
 }
 
@@ -924,7 +959,7 @@ h3 {
 
 .bar-value {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -946,7 +981,7 @@ h3 {
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .data-table th,
@@ -959,7 +994,7 @@ h3 {
 
 .data-table th {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 760;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -998,7 +1033,7 @@ h3 {
   gap: 7px;
   max-width: 260px;
   color: var(--ink);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 630;
   line-height: 1.25;
 }
@@ -1028,7 +1063,7 @@ h3 {
 .detail-kicker {
   margin-bottom: 7px;
   color: var(--coral);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 760;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1044,7 +1079,7 @@ h3 {
 .detail-meta {
   margin-bottom: 24px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .detail-stats {
@@ -1066,7 +1101,7 @@ h3 {
 .detail-stat span {
   display: block;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
   text-transform: uppercase;
 }
 
@@ -1092,13 +1127,13 @@ h3 {
 
 .probability-label {
   margin-bottom: 5px;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.25;
 }
 
 .probability-value {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   text-align: right;
 }
 
@@ -1129,7 +1164,7 @@ h3 {
 
 .search-result span:last-child {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .timeline-table .profile-cell {
@@ -1159,7 +1194,7 @@ h3 {
 
 .transition-count {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   text-align: right;
 }
 
@@ -1239,6 +1274,11 @@ h3 {
     border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   }
 
+  .sidebar::before,
+  .sidebar::after {
+    display: none;
+  }
+
   .sidebar .brand,
   .sidebar-meta {
     display: none;
@@ -1266,7 +1306,7 @@ h3 {
     padding: 0 18px;
     border-bottom: 1px solid var(--line);
     background: rgba(251, 248, 242, 0.9);
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .mobile-brand {
@@ -1298,7 +1338,13 @@ h3 {
   }
 
   .hero-board {
-    min-height: 330px;
+    width: min(100%, 520px);
+    min-height: 420px;
+  }
+
+  .philosophy-section {
+    grid-template-columns: 1fr;
+    gap: 30px;
   }
 
   .analysis-grid,
@@ -1340,7 +1386,15 @@ h3 {
 
   .metric-label {
     margin-bottom: 16px;
-    font-size: 9px;
+    font-size: 11px;
+  }
+
+  .philosophy-section {
+    padding: 26px 22px;
+  }
+
+  .philosophy-copy > p {
+    font-size: 15px;
   }
 
   .method-grid {
@@ -1390,6 +1444,29 @@ h3 {
 
   .transition-count {
     grid-column: 1 / -1;
+    text-align: left;
+  }
+}
+
+@media (max-width: 420px) {
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metric {
+    min-height: 0;
+  }
+
+  .metric-season-range {
+    font-size: 30px;
+  }
+
+  .rink-caption {
+    display: grid;
+    gap: 5px;
+  }
+
+  .rink-caption span:last-child {
     text-align: left;
   }
 }

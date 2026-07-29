@@ -413,6 +413,12 @@ def main() -> None:
         for group in ("forwards", "defense")
     }
     playoffs = playoff_records(seasons, maps, frames_by_key)
+    glossary = build_glossary(seasons, maps, all_frames)
+    latest_season = seasons[0]
+    latest_season_breakdown = {
+        group: len(frames_by_key[(group, latest_season)])
+        for group in ("forwards", "defense")
+    }
 
     core_payload = {
         "meta": {
@@ -425,13 +431,20 @@ def main() -> None:
             "playerCount": len(unique_ids),
             "playerSeasonCount": player_season_count,
             "profileDefinitions": profile_definition_counts,
+            "namedStyleCount": sum(len(rows) for rows in glossary.values()),
+            "namedStyleBreakdown": {
+                group: len(glossary[group])
+                for group in ("forwards", "defense")
+            },
+            "latestSeasonPlayerCount": sum(latest_season_breakdown.values()),
+            "latestSeasonBreakdown": latest_season_breakdown,
             "switchRates": {
                 group: switch_rate(all_frames[group])
                 for group in ("forwards", "defense")
             },
             "confidenceTrend": confidence_trend,
         },
-        "glossary": build_glossary(seasons, maps, all_frames),
+        "glossary": glossary,
     }
 
     data_output = WEB_DIR / "data"
