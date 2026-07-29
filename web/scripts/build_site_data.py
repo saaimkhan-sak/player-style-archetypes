@@ -11,6 +11,7 @@ import json
 import math
 import sys
 from collections import Counter, defaultdict
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
 
@@ -50,6 +51,14 @@ def clean(value: Any, digits: int = 4) -> Any:
     if hasattr(value, "item"):
         return clean(value.item(), digits=digits)
     return value
+
+
+def one_decimal(value: float) -> str:
+    rounded = Decimal(str(value)).quantize(
+        Decimal("0.1"),
+        rounding=ROUND_HALF_UP,
+    )
+    return f"{rounded:.1f}"
 
 
 def season_label(key: str) -> str:
@@ -125,6 +134,543 @@ def describe_profile(name: str, high: list[tuple[str, float]], low: list[tuple[s
     if signals:
         return f"Defined by {', '.join(signals)}."
     return "A blended profile without one dominant statistical signal."
+
+
+STYLE_READS: dict[str, tuple[str, str]] = {
+    "Agitating Heavy-Contact Forward": (
+        "Edge and Contact",
+        "Forecheck pressure, confrontation and disruption are carrying as "
+        "much roster value as clean possession.",
+    ),
+    "Balanced Net-Front Contributor": (
+        "Net-Front Balance",
+        "The premium is on players who can win interior ice and keep a play "
+        "alive without becoming one-dimensional.",
+    ),
+    "Checking-Line Disruptor": (
+        "Checking-Line Pressure",
+        "The hockey value sits in pursuit, contact and nuisance work—the "
+        "shifts that bend a game before they reach the scoring line.",
+    ),
+    "Cycle Pressure Play-Driver": (
+        "Cycle Pressure",
+        "This is an offensive-zone profile: retrievals, possession and "
+        "second efforts are doing more of the separating than one-and-done "
+        "rushes.",
+    ),
+    "Defensive Role Defenseman": (
+        "Defensive Structure",
+        "The blue-line economy is built on structure and assignment "
+        "discipline, with fewer defenders asked to freelance their way into "
+        "value.",
+    ),
+    "High-Event Physical Defenseman": (
+        "Physical Event Hockey",
+        "The back end is being defined by confrontation and event volume, a "
+        "trade-off that can tilt territory but also raises the temperature.",
+    ),
+    "High-Touch Puck Mover": (
+        "Puck Movement",
+        "The puck is flowing through players trusted to handle it often and "
+        "extend sequences, not simply finish them.",
+    ),
+    "High-Touch Risk/Reward Scorer": (
+        "Puck-Dominant Scoring",
+        "Creation is being driven by frequent touches and scoring ambition, "
+        "with some turnover risk accepted as the cost of doing business.",
+    ),
+    "High-Volume Playmaking Scorer": (
+        "Volume Playmaking",
+        "The separating skill is dual-threat creation: shooting often enough "
+        "to hold defenders while still moving the puck to the next option.",
+    ),
+    "Interior Net-Front Finisher": (
+        "Inside Finishing",
+        "The premium is on getting to the hard areas and ending plays around "
+        "the crease rather than living on low-contact volume.",
+    ),
+    "Low-Event Puck-Moving Defenseman": (
+        "Low-Noise Puck Movement",
+        "The back end is favoring controlled puck movement—advancing play "
+        "without turning every touch into a high-variance event.",
+    ),
+    "Offensive Puck-Moving Defenseman": (
+        "Blue-Line Offense",
+        "The defense corps is being asked to add offense through exits, point "
+        "touches and distribution, not merely survive its minutes.",
+    ),
+    "Perimeter Skill Scorer": (
+        "Perimeter Skill",
+        "Skill and shooting remain central, but much of the offense is "
+        "arriving from space rather than constant net-front pressure.",
+    ),
+    "Physical Shutdown Defenseman": (
+        "Physical Shutdown Hockey",
+        "The blue-line value is direct: close space, protect the middle and "
+        "make difficult minutes physically expensive.",
+    ),
+    "Play-Driving Puck-Moving Defenseman": (
+        "Puck-Moving Control",
+        "Possession is being tilted from the back end, with defenders expected "
+        "to start exits and keep attacks alive.",
+    ),
+    "Point-Usage Power-Play Defenseman": (
+        "Power-Play Point Usage",
+        "Power-play touches and point usage are carrying unusual weight, "
+        "making deployment part of the style rather than a footnote.",
+    ),
+    "Puck-Pressure Transition Defenseman": (
+        "Pressure Into Transition",
+        "Pressure is feeding transition: recoveries matter because the next "
+        "pass can turn defense into clean offense.",
+    ),
+    "Puck-Pressure Two-Way Creator": (
+        "Two-Way Puck Pressure",
+        "Puck pursuit is feeding offense, tying recoveries, support and "
+        "creation into the same job description.",
+    ),
+    "Rush / Transition Chance Creator": (
+        "Rush Creation",
+        "The season tilts toward speed through the neutral zone and offense "
+        "created before the defense can get set.",
+    ),
+    "Shot-Blocking Contact Specialist": (
+        "Defensive Detail",
+        "Contact, shot blocking and a willingness to absorb difficult minutes "
+        "hold real roster value in this mix.",
+    ),
+    "Shot-Blocking Defensive Defenseman": (
+        "Shot-Blocking Defense",
+        "The model's center of gravity is defensive detail—inside positioning, "
+        "blocks and the willingness to take hard minutes.",
+    ),
+    "Shot-Creation Scorer": (
+        "Shot Creation",
+        "The model is rewarding players who manufacture attempts and force "
+        "volume rather than live on selective finishing.",
+    ),
+    "Suppression Workload Forward": (
+        "Suppression and Workload",
+        "The roster value lives in difficult minutes, defensive responsibility "
+        "and taking air out of opposing attacks.",
+    ),
+    "Transition Risk/Reward Defenseman": (
+        "Aggressive Transition",
+        "The back end is trading some security for advancement, asking "
+        "defenders to move the puck aggressively and live with the occasional "
+        "mistake.",
+    ),
+    "Two-Way Shot-Share Driver": (
+        "Two-Way Possession",
+        "The most valuable forwards are doing more than producing: they are "
+        "helping own the ice and turn possession into repeatable offense.",
+    ),
+    "Two-Way Skill Scorer": (
+        "Two-Way Skill",
+        "Two-way utility is at the center of roster construction, with "
+        "creation and responsibility reinforcing each other.",
+    ),
+}
+
+SEASON_EDITORIALS: dict[str, dict[str, tuple[str, str]]] = {
+    "20082009": {
+        "forwards": (
+            "Transition and playmaking control the map",
+            "The two creation-first lanes—{dominant_name} and "
+            "{runner_up_name}—combine for {top_two_share}% of the forward "
+            "pool. With only {tail_share}% outside the top three, the model "
+            "resolves a clear hierarchy rather than six equal-sized roles.",
+        ),
+        "defense": (
+            "A defensive lead with an offensive counterweight",
+            "{dominant_name} leads, but {runner_up_name} still takes "
+            "{runner_up_share}% of the defense pool. The top three absorb "
+            "{top_three_share}% across {profile_count} learned styles, leaving "
+            "the last two as edge cases rather than co-equal lanes.",
+        ),
+    },
+    "20092010": {
+        "forwards": (
+            "Two creation lanes split the forward pool",
+            "Only {dominant_gap} points separate {dominant_name} from "
+            "{runner_up_name}, and together they account for "
+            "{top_two_share}% of forwards. This is less a runaway than a "
+            "two-lane division of high-creation players.",
+        ),
+        "defense": (
+            "The blue line lands in a near dead heat",
+            "The leading defense profiles sit just {dominant_gap} points "
+            "apart. With {after_top_two_share}% of defenders outside that "
+            "pair, the model sees a genuine contest at the top and a "
+            "meaningful supporting tier behind it.",
+        ),
+    },
+    "20102011": {
+        "forwards": (
+            "Net-front finishing swallows the forward map",
+            "{dominant_name} contains {dominant_share}% of the forward pool "
+            "and clears the runner-up by {dominant_gap} points. Even with "
+            "{profile_count} learned styles, this season’s feature space is "
+            "organized around one overwhelming interior-scoring identity.",
+        ),
+        "defense": (
+            "Defensive detail leads without monopolizing",
+            "{dominant_name} holds the largest share, but "
+            "{after_dominant_share}% of defenders land elsewhere. The "
+            "{tail_share}% outside the top three keeps the bottom of the map "
+            "relevant instead of reducing the season to one defensive type.",
+        ),
+    },
+    "20112012": {
+        "forwards": (
+            "Rush offense provides the anchor",
+            "Nearly one in two forwards land in {dominant_name}. The remaining "
+            "{after_dominant_share}% is spread across five other styles, so "
+            "the model shows one strong anchor above a diversified support "
+            "layer.",
+        ),
+        "defense": (
+            "No single defense identity breaks away",
+            "{dominant_name} leads at {dominant_share}%, but "
+            "{runner_up_name} remains close at {runner_up_share}%. Six "
+            "learned styles and a {tail_share}% share outside the top three "
+            "make this a comparatively distributed within-season map.",
+        ),
+    },
+    "20122013": {
+        "forwards": (
+            "Perimeter skill becomes the central lane",
+            "{dominant_name} and {runner_up_name} combine for "
+            "{top_two_share}% of the forward pool. Once the third profile is "
+            "included, only {tail_share}% remains for the other two styles—a "
+            "sharply concentrated snapshot.",
+        ),
+        "defense": (
+            "Transition pressure creates separation",
+            "{dominant_name} clears the next defense style by "
+            "{dominant_gap} points. The bottom three profiles share just "
+            "{tail_share}% of the pool, so most defenders sit inside a clear "
+            "three-tier hierarchy.",
+        ),
+    },
+    "20132014": {
+        "forwards": (
+            "Cycle pressure gives the season its shape",
+            "The leading pair accounts for {top_two_share}% of forwards, with "
+            "{dominant_name} holding the larger lane. The final three styles "
+            "combine for only {tail_share}%, leaving cycle pressure and "
+            "two-way shot-share play as the defining split.",
+        ),
+        "defense": (
+            "Puck movement and shot blocking share the stage",
+            "The gap between {dominant_name} and {runner_up_name} is "
+            "{dominant_gap} points, while {tail_share}% sits outside the top "
+            "three. The model reads the blue line as a contest between "
+            "advancement and defensive detail, not a one-style season.",
+        ),
+    },
+    "20142015": {
+        "forwards": (
+            "Contrasting identities define the top",
+            "{dominant_name} and {runner_up_name} together cover "
+            "{top_two_share}% of forwards. Their labels describe opposite "
+            "routes to a roster role—transition creation versus contact and "
+            "defensive involvement—while the other three styles share only "
+            "{tail_share}%.",
+        ),
+        "defense": (
+            "The blue line is effectively a three-style map",
+            "The top three defense profiles account for {top_three_share}% of "
+            "the pool across four learned styles. The meaningful split is "
+            "between {dominant_name} at {dominant_share}% and "
+            "{runner_up_name} at {runner_up_share}%; the fourth profile is "
+            "barely present.",
+        ),
+    },
+    "20152016": {
+        "forwards": (
+            "High-touch scoring leads without closing the field",
+            "{dominant_name} owns the plurality at {dominant_share}%, but "
+            "{tail_share}% of forwards remain outside the top three. That "
+            "leaves a clear first identity alongside a real specialist tier, "
+            "rather than a closed three-style market.",
+        ),
+        "defense": (
+            "Puck-moving control carries the plurality",
+            "{dominant_name} leads a four-style defense map without reaching "
+            "a majority. The top two take {top_two_share}%, leaving "
+            "{after_top_two_share}% split between the remaining profiles.",
+        ),
+    },
+    "20162017": {
+        "forwards": (
+            "Risk/reward scoring crosses the halfway mark",
+            "{dominant_name} reaches {dominant_share}% and leads the second "
+            "profile by {dominant_gap} points. The bottom three still account "
+            "for {tail_share}%, enough to preserve a smaller but visible "
+            "specialist layer.",
+        ),
+        "defense": (
+            "Structure and transition finish level",
+            "{dominant_name} and {runner_up_name} are separated by only "
+            "{dominant_gap} points and combine for {top_two_share}% of the "
+            "defense pool. A third style takes most of what remains, leaving "
+            "just {tail_share}% for the bottom three.",
+        ),
+    },
+    "20172018": {
+        "forwards": (
+            "Two-way puck pressure makes an outlier map",
+            "{dominant_name} contains {dominant_share}% of forwards and leads "
+            "the runner-up by {dominant_gap} points. The other four learned "
+            "styles divide only {after_dominant_share}%, making this a nearly "
+            "single-center classification.",
+        ),
+        "defense": (
+            "Defense-first profiles dominate the split",
+            "{dominant_name} and {runner_up_name} combine for "
+            "{top_two_share}% of defenders. The top three reach "
+            "{top_three_share}% across four styles, so almost the entire map "
+            "sits inside a defense-first hierarchy.",
+        ),
+    },
+    "20182019": {
+        "forwards": (
+            "The forward field opens up",
+            "The leading profile reaches only {dominant_share}%, and "
+            "{tail_share}% of forwards sit outside the top three. Across six "
+            "learned styles, the model shows several viable identities rather "
+            "than one dominant lane.",
+        ),
+        "defense": (
+            "Puck-moving control leads a tiered blue line",
+            "{dominant_name} leads at {dominant_share}%, followed by "
+            "{runner_up_name} at {runner_up_share}%. The last two profiles "
+            "share {tail_share}%, creating a clear top tier with a small tail.",
+        ),
+    },
+    "20192020": {
+        "forwards": (
+            "Transition and inside offense split the top",
+            "{dominant_name} leads, but {runner_up_name} and the third profile "
+            "keep the map from becoming a runaway. Those three styles account "
+            "for {top_three_share}%, leaving {tail_share}% across the final "
+            "three identities.",
+        ),
+        "defense": (
+            "Two profiles nearly absorb the defense pool",
+            "{dominant_name} and {runner_up_name} combine for "
+            "{top_two_share}% of defenders. With the top three at "
+            "{top_three_share}% across four learned styles, the fourth profile "
+            "is statistically peripheral.",
+        ),
+    },
+    "20202021": {
+        "forwards": (
+            "Rush creation leads a two-lane attack",
+            "{dominant_name} and {runner_up_name} account for "
+            "{top_two_share}% of the forward pool. The final three profiles "
+            "combine for {tail_share}%, so the model’s main divide sits "
+            "between transition offense and perimeter skill.",
+        ),
+        "defense": (
+            "Transition pressure clears space",
+            "{dominant_name} leads the next defense style by "
+            "{dominant_gap} points in a four-profile map. The lone style "
+            "outside the top three still takes {tail_share}%, so the season "
+            "has a clear leader without erasing its fourth lane.",
+        ),
+    },
+    "20212022": {
+        "forwards": (
+            "Shot creation becomes the primary identity",
+            "{dominant_name} reaches {dominant_share}% and pairs with "
+            "{runner_up_name} for {top_two_share}% of forwards. The bottom "
+            "three styles share only {tail_share}%, making shot volume and "
+            "two-way scoring the model’s central divide.",
+        ),
+        "defense": (
+            "Three profiles—and one overwhelming leader",
+            "Because the model learned exactly three defense profiles, the "
+            "top-three share is mechanically 100%. The meaningful result is "
+            "the imbalance inside that set: {dominant_name} holds "
+            "{dominant_share}%, compared with {runner_up_share}% for the "
+            "runner-up.",
+        ),
+    },
+    "20222023": {
+        "forwards": (
+            "Two-way possession leads a layered mix",
+            "{dominant_name} holds the largest share at {dominant_share}%, "
+            "while {runner_up_name} takes {runner_up_share}%. The bottom three "
+            "profiles still combine for {tail_share}%, leaving more texture "
+            "than the headline ranking alone suggests.",
+        ),
+        "defense": (
+            "Shot-blocking defense takes majority position",
+            "{dominant_name} contains {dominant_share}% of defenders, and the "
+            "top two styles combine for {top_two_share}%. The top three reach "
+            "{top_three_share}% in a four-profile model, leaving the final "
+            "lane almost empty.",
+        ),
+    },
+    "20232024": {
+        "forwards": (
+            "Puck pressure and defensive contact set the frame",
+            "{dominant_name} and {runner_up_name} combine for "
+            "{top_two_share}% of forwards. Once the third style is included, "
+            "only {tail_share}% remains for the final two profiles, producing "
+            "a tightly ordered five-style map.",
+        ),
+        "defense": (
+            "The blue line becomes a two-profile story",
+            "{dominant_name} and {runner_up_name} absorb {top_two_share}% of "
+            "the defense pool. The third profile lifts the concentration to "
+            "{top_three_share}% across four styles, so nearly all of the "
+            "season sits inside two main identities.",
+        ),
+    },
+    "20242025": {
+        "forwards": (
+            "The forward map has no runaway leader",
+            "The largest style reaches {dominant_share}%, while "
+            "{tail_share}% of forwards sit outside the top three. Six learned "
+            "profiles retain meaningful representation, making this a broad "
+            "within-season distribution rather than a top-heavy one.",
+        ),
+        "defense": (
+            "Five defense identities remain in play",
+            "{dominant_name} leads at {dominant_share}%, but the bottom two "
+            "profiles still account for {tail_share}% of defenders. The "
+            "distribution has a clear ordering without collapsing into a "
+            "two- or three-style map.",
+        ),
+    },
+    "20252026": {
+        "forwards": (
+            "Puck-dominant scoring pulls away",
+            "{dominant_name} and {runner_up_name} together account for "
+            "{top_two_share}% of forwards, with the leading style alone above "
+            "half. The bottom three share {tail_share}%, so specialist roles "
+            "remain visible without setting the season’s center of gravity.",
+        ),
+        "defense": (
+            "The defense pool stays genuinely plural",
+            "No defense style reaches 40%, and {tail_share}% of defenders sit "
+            "outside the top three. Across five learned profiles, the model "
+            "shows a broad distribution with a leader but no controlling "
+            "majority.",
+        ),
+    },
+}
+
+
+def build_season_read(
+    season: str,
+    group: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    profiles = payload["profiles"]
+    if len(profiles) < 2:
+        raise RuntimeError(
+            f"{season} {group} needs at least two profiles for a season read"
+        )
+
+    dominant = profiles[0]
+    runner_up = profiles[1]
+    player_count = len(payload["players"])
+    dominant_share = 100 * int(dominant["count"]) / player_count
+    runner_up_share = 100 * int(runner_up["count"]) / player_count
+    third_share = (
+        100 * int(profiles[2]["count"]) / player_count
+        if len(profiles) > 2
+        else 0.0
+    )
+    dominant_gap = dominant_share - runner_up_share
+    top_two_share = dominant_share + runner_up_share
+    top_three_share = top_two_share + third_share
+    after_dominant_share = 100 - dominant_share
+    after_top_two_share = 100 - top_two_share
+    tail_share = 100 - top_three_share
+    profile_count = len(profiles)
+    confidence_pct = float(payload["averageConfidence"]) * 100
+    mixed_count = int(payload["mixedCount"])
+    mixed_share = 100 * mixed_count / player_count if player_count else 0.0
+    player_noun = "forwards" if group == "forwards" else "defenders"
+    short_style = STYLE_READS.get(
+        str(dominant["name"]),
+        (
+            str(dominant["name"]),
+            "The leading profile sets the season's tactical center of gravity.",
+        ),
+    )[0]
+
+    editorial_headline, editorial_template = SEASON_EDITORIALS.get(
+        season,
+        {},
+    ).get(
+        group,
+        (
+            f"{short_style} leads the season",
+            "{dominant_name} holds {dominant_share}% of the group, while "
+            "{tail_share}% remains outside the three most common learned "
+            "styles.",
+        ),
+    )
+    editorial_context = {
+        "dominant_name": str(dominant["name"]),
+        "runner_up_name": str(runner_up["name"]),
+        "dominant_share": one_decimal(dominant_share),
+        "runner_up_share": one_decimal(runner_up_share),
+        "third_share": one_decimal(third_share),
+        "dominant_gap": one_decimal(dominant_gap),
+        "top_two_share": one_decimal(top_two_share),
+        "top_three_share": one_decimal(top_three_share),
+        "after_dominant_share": one_decimal(after_dominant_share),
+        "after_top_two_share": one_decimal(after_top_two_share),
+        "tail_share": one_decimal(tail_share),
+        "profile_count": profile_count,
+    }
+    style_group = "forward" if group == "forwards" else "defense"
+    factual_paragraph = (
+        f"The {season_label(season)} model learned {profile_count} "
+        f"{style_group} styles. {dominant['name']} led with "
+        f"{int(dominant['count']):,} of {player_count:,} {player_noun} "
+        f"({one_decimal(dominant_share)}%), followed by "
+        f"{runner_up['name']} at {one_decimal(runner_up_share)}%."
+    )
+    headline = f"{season_label(season)}: {editorial_headline}"
+    editorial_paragraph = editorial_template.format(**editorial_context)
+
+    return {
+        "headline": headline,
+        "paragraphs": [
+            factual_paragraph,
+            editorial_paragraph,
+        ],
+        "facts": [
+            {
+                "label": "Lead over No. 2",
+                "value": f"{one_decimal(dominant_gap)} pts",
+            },
+            {
+                "label": "Average confidence",
+                "value": f"{one_decimal(confidence_pct)}%",
+            },
+            {
+                "label": "Mixed profiles",
+                "value": f"{mixed_count:,}",
+            },
+        ],
+        "comparison": None,
+        "metrics": {
+            "dominantGap": float(one_decimal(dominant_gap)),
+            "topThreeShare": float(one_decimal(top_three_share)),
+            "confidencePct": float(one_decimal(confidence_pct)),
+            "mixedShare": float(one_decimal(mixed_share)),
+            "profileCount": profile_count,
+        },
+    }
 
 
 def build_glossary(
@@ -577,7 +1123,7 @@ def main() -> None:
                     {
                         "name": name,
                         "count": count,
-                        "share": clean(100 * count / len(players), 2),
+                        "share": clean(100 * count / len(players), 4),
                     }
                     for name, count in profile_counts.most_common()
                 ],
@@ -592,6 +1138,28 @@ def main() -> None:
                 1,
             )
         confidence_trend.append(trend_row)
+
+    generated_reads: list[str] = []
+    for season in sorted(seasons):
+        for group in ("forwards", "defense"):
+            payload = season_payload[season][group]
+            payload["seasonRead"] = build_season_read(
+                season,
+                group,
+                payload,
+            )
+            generated_reads.append(
+                " ".join(payload["seasonRead"]["paragraphs"])
+            )
+
+    expected_reads = len(seasons) * 2
+    if (
+        len(generated_reads) != expected_reads
+        or len(set(generated_reads)) != expected_reads
+    ):
+        raise RuntimeError(
+            "Season reads must be present and unique for every season and group"
+        )
 
     confidence_trend.sort(key=lambda row: row["season"])
     profile_definition_counts = {

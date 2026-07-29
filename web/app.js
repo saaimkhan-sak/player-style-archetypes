@@ -1,5 +1,5 @@
 const DATA_ROOT = "/data";
-const CORE_DATA_VERSION = "20260729-glossary-examples-v2";
+const DATA_VERSION = "20260729-season-reads-v1";
 
 const appState = {
   core: null,
@@ -94,7 +94,7 @@ async function getSeasonData(season) {
   if (!appState.seasonCache.has(season)) {
     appState.seasonCache.set(
       season,
-      getJSON(`${DATA_ROOT}/seasons/${season}.json`),
+      getJSON(`${DATA_ROOT}/seasons/${season}.json?v=${DATA_VERSION}`),
     );
   }
   return appState.seasonCache.get(season);
@@ -1197,24 +1197,29 @@ function seasonControls() {
 }
 
 function profileBars(profiles, limit = 10) {
-  const maxShare = Math.max(...profiles.map((profile) => profile.share), 1);
   return `
     <div class="bar-list">
       ${profiles
         .slice(0, limit)
         .map(
-          (profile) => `
+          (profile) => {
+            const share = Math.min(
+              100,
+              Math.max(0, Number(profile.share) || 0),
+            );
+            return `
             <div class="bar-row">
               <span class="bar-label">${escapeHTML(profile.name)}</span>
               <span class="bar-track" aria-hidden="true">
                 <span
                   class="bar-fill"
-                  style="width:${(profile.share / maxShare) * 100}%;--profile:${profileColor(profile.name)}"
+                  style="width:${share}%;--profile:${profileColor(profile.name)}"
                 ></span>
               </span>
               <span class="bar-value">${number(profile.share, 1)}%</span>
             </div>
-          `,
+          `;
+          },
         )
         .join("")}
     </div>
@@ -1226,14 +1231,38 @@ function renderSeasonSnapshot(groupData) {
   const topThree = groupData.profiles
     .slice(0, 3)
     .reduce((sum, profile) => sum + profile.share, 0);
+  const seasonRead = groupData.seasonRead || {
+    headline: `${dominant.name} leads the season`,
+    paragraphs: [
+      `${dominant.name} accounts for ${number(dominant.share, 1)}% of the group, while the three most common styles cover ${number(topThree, 1)}%.`,
+    ],
+    facts: [
+      {
+        label: "Average confidence",
+        value: percent(groupData.averageConfidence, 1),
+      },
+      {
+        label: "Styles present",
+        value: number(groupData.profiles.length),
+      },
+      {
+        label: "Mixed profiles",
+        value: number(groupData.mixedCount),
+      },
+    ],
+  };
   return `
     <section class="metric-grid">
       ${metric("Players", number(groupData.players.length))}
       ${metric("Dominant style", `${number(dominant.share, 1)}%`, dominant.name)}
-      ${metric("Top-three share", `${number(topThree, 1)}%`)}
+      ${metric(
+        "Top-three share",
+        `${number(topThree, 1)}%`,
+        "Players in that season’s 3 most common learned styles",
+      )}
       ${metric("Mixed profiles", number(groupData.mixedCount), "below 80% top-style confidence")}
     </section>
-    <section class="analysis-grid">
+    <section class="analysis-grid season-snapshot-layout">
       <div class="chart-panel">
         <div class="chart-title-row">
           <div>
@@ -1243,23 +1272,29 @@ function renderSeasonSnapshot(groupData) {
         </div>
         ${profileBars(groupData.profiles)}
       </div>
-      <div class="info-panel">
-        <p class="eyebrow">Season read</p>
-        <div class="insight-stack">
-          <div class="insight">
-            <strong>${percent(groupData.averageConfidence, 0)}</strong>
-            <span>Average top-style confidence.</span>
-          </div>
-          <div class="insight">
-            <strong>${groupData.profiles.length}</strong>
-            <span>Distinct profiles present.</span>
-          </div>
-          <div class="insight">
-            <strong>${escapeHTML(dominant.name)}</strong>
-            <span>Most common top assignment.</span>
-          </div>
+      <article class="info-panel season-read-panel">
+        <div class="season-read-heading">
+          <p class="eyebrow">Season read</p>
+          <h3>${escapeHTML(seasonRead.headline)}</h3>
         </div>
-      </div>
+        <div class="season-read-copy">
+          ${seasonRead.paragraphs
+            .map((paragraph) => `<p>${escapeHTML(paragraph)}</p>`)
+            .join("")}
+        </div>
+        <div class="season-read-facts" aria-label="Season read supporting figures">
+          ${seasonRead.facts
+            .map(
+              (fact) => `
+                <div class="season-read-fact">
+                  <strong>${escapeHTML(fact.value)}</strong>
+                  <span>${escapeHTML(fact.label)}</span>
+                </div>
+              `,
+            )
+            .join("")}
+        </div>
+      </article>
     </section>
   `;
 }
@@ -2125,7 +2160,7 @@ async function renderRoute() {
 async function init() {
   try {
     appState.core = await getJSON(
-      `${DATA_ROOT}/core.json?v=${CORE_DATA_VERSION}`,
+      `${DATA_ROOT}/core.json?v=${DATA_VERSION}`,
     );
     appState.season = appState.core.meta.seasons[0].key;
     const oldest = appState.core.meta.seasons.at(-1).label;
