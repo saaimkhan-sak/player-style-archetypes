@@ -29,7 +29,7 @@ const appState = {
 const ROUTE_LABELS = {
   overview: "Overview",
   glossary: "Style glossary",
-  season: "Season lab",
+  season: "Season level trends",
   career: "Career paths",
   playoffs: "Playoff pressure",
 };
@@ -135,6 +135,158 @@ function pageHeader(kicker, title, lede, controls = "") {
       </div>
       ${controls ? `<div class="controls">${controls}</div>` : ""}
     </header>
+  `;
+}
+
+function seasonMethodology() {
+  return `
+    <details class="methodology-expander">
+      <summary>
+        <span>A Quick Review of How Player Archetype is Calculated</span>
+        <span class="methodology-toggle" aria-hidden="true"></span>
+      </summary>
+      <div class="methodology-body">
+        <section class="methodology-section" aria-labelledby="method-data">
+          <h2 id="method-data">Data used</h2>
+          <p>
+            I pulled <strong>public game-by-game NHL boxscore and time-on-ice data</strong>
+            from the NHL Gamecenter endpoints, then aggregated it into
+            <strong>regular season vs playoff</strong> splits.
+          </p>
+          <p>Each data point contributes to “style” like this:</p>
+          <ul class="methodology-signals">
+            <li><strong>Scoring/creation:</strong> shots, goals, assists, points → turned into per-60 rates (e.g., Shots/60)</li>
+            <li><strong>Physical/defensive involvement:</strong> hits, blocks → per-60 rates</li>
+            <li><strong>Puck pressure vs risk:</strong> takeaways vs giveaways → per-60 rates</li>
+            <li><strong>Discipline/edge:</strong> penalty minutes → per-60 rate</li>
+            <li><strong>Role/usage:</strong> PP TOI share and PK TOI share (how a coach deploys the player)</li>
+            <li><strong>Deployment signals:</strong> faceoffs per game and faceoff percentage</li>
+          </ul>
+        </section>
+
+        <section class="methodology-section" aria-labelledby="method-step-1">
+          <h2 id="method-step-1">Step 1 — Normalize for ice time</h2>
+          <p>Counting stats scale with ice time, so I convert them to <em>per-60</em> rates.</p>
+          <div
+            class="equation"
+            role="math"
+            aria-label="Shots per 60 equals shots divided by the quantity time on ice in seconds divided by 3,600"
+          >
+            <span>Shots/60</span>
+            <span class="equation-symbol">=</span>
+            <span class="fraction">
+              <span>Shots</span>
+              <span>TOI<sub>seconds</sub> / 3600</span>
+            </span>
+          </div>
+          <p>I also compute special-teams usage share:</p>
+          <div class="equation-row">
+            <div
+              class="equation"
+              role="math"
+              aria-label="Power-play share equals power-play time on ice divided by total time on ice"
+            >
+              <span>PP Share</span>
+              <span class="equation-symbol">=</span>
+              <span class="fraction">
+                <span>PP TOI</span>
+                <span>Total TOI</span>
+              </span>
+            </div>
+            <div
+              class="equation"
+              role="math"
+              aria-label="Penalty-kill share equals penalty-kill time on ice divided by total time on ice"
+            >
+              <span>PK Share</span>
+              <span class="equation-symbol">=</span>
+              <span class="fraction">
+                <span>PK TOI</span>
+                <span>Total TOI</span>
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section class="methodology-section" aria-labelledby="method-step-2">
+          <h2 id="method-step-2">Step 2 — Put every feature on the same scale</h2>
+          <p>To keep extreme values from dominating the model, I robust-scale each feature:</p>
+          <div
+            class="equation"
+            role="math"
+            aria-label="x star equals the quantity x minus the median of x, divided by the interquartile range of x"
+          >
+            <span><var>x</var><sup>*</sup></span>
+            <span class="equation-symbol">=</span>
+            <span class="fraction">
+              <span><var>x</var> − median(<var>x</var>)</span>
+              <span>IQR(<var>x</var>)</span>
+            </span>
+          </div>
+        </section>
+
+        <section class="methodology-section" aria-labelledby="method-step-3">
+          <h2 id="method-step-3">Step 3 — Compress the stats into a smaller “style fingerprint”</h2>
+          <p>I reduce each skill block using Non-negative Matrix Factorization (NMF):</p>
+          <div
+            class="equation equation-compact"
+            role="math"
+            aria-label="X is approximately equal to W times H"
+          >
+            <var>X</var>
+            <span class="equation-symbol">≈</span>
+            <var>WH</var>
+          </div>
+          <p>
+            You can think of each row of <strong>W</strong> as a compact
+            <em>style fingerprint</em> for that player.
+          </p>
+        </section>
+
+        <section class="methodology-section" aria-labelledby="method-step-4">
+          <h2 id="method-step-4">Step 4 — Learn archetypes and assign probabilities</h2>
+          <p>I fit a Gaussian Mixture Model (GMM) to those fingerprints:</p>
+          <div
+            class="equation equation-model"
+            role="math"
+            aria-label="p of z equals the sum from k equals 1 to K of pi k times a normal distribution of z given mu k and sigma k"
+          >
+            <span><var>p</var>(<var>z</var>)</span>
+            <span class="equation-symbol">=</span>
+            <span>∑<sub>k=1</sub><sup>K</sup> π<sub>k</sub> N(<var>z</var> | μ<sub>k</sub>, Σ<sub>k</sub>)</span>
+          </div>
+          <p>For each player (<var>i</var>), the model outputs a probability for each archetype:</p>
+          <div
+            class="equation equation-model"
+            role="math"
+            aria-label="p i k equals the probability that archetype equals k given z i"
+          >
+            <span><var>p</var><sub>ik</sub></span>
+            <span class="equation-symbol">=</span>
+            <span>P(Archetype = <var>k</var> | <var>z</var><sub>i</sub>)</span>
+          </div>
+        </section>
+
+        <section
+          class="methodology-section methodology-interpretation"
+          aria-labelledby="method-blends"
+        >
+          <h2 id="method-blends">Why do blended style profiles exist?</h2>
+          <p>
+            The model is probabilistic: instead of forcing every player into exactly one
+            bucket, it assigns a probability over archetypes. Some players genuinely
+            combine traits that sit between multiple clusters (e.g., moderate scoring +
+            moderate physical play), so their profile names describe the strongest trait
+            combination rather than pretending every cluster is one clean role.
+          </p>
+          <p>
+            <strong>Interpretation:</strong> if a player’s probabilities are
+            (0.1, 87.3, 6.4, 6.3)% then the player is mostly aligned to one profile with
+            <strong>87.3% confidence</strong>.
+          </p>
+        </section>
+      </div>
+    </details>
   `;
 }
 
@@ -1341,13 +1493,14 @@ async function renderSeason() {
     appState.core.meta.seasons.find((item) => item.key === appState.season)?.label ||
     appState.season;
   main.innerHTML = `
-    <article class="page">
+    <article class="page season-page">
       ${pageHeader(
-        "Season lab",
-        "How was the league built?",
-        "Move from league-wide style mix to a player, roster, or acquisition need.",
+        "Season level trends",
+        "What Are the Season Level Trends in Play Style?",
+        "Explore league-wide styles, players, teams, and roster needs for any season.",
         seasonControls(),
       )}
+      ${seasonMethodology()}
       <div id="season-content">
         <div class="loading-state" style="min-height:45vh"><span class="loading-mark"></span><p>Loading ${escapeHTML(seasonLabel)}…</p></div>
       </div>
