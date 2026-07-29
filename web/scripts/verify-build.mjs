@@ -11,11 +11,12 @@ const required = [
 
 await Promise.all(required.map((path) => access(path)));
 
-const [coreSource, appSource, stylesSource, careersSource] = await Promise.all([
+const [coreSource, appSource, stylesSource, careersSource, indexSource] = await Promise.all([
   readFile("data/core.json", "utf8"),
   readFile("app.js", "utf8"),
   readFile("styles.css", "utf8"),
   readFile("data/careers.json", "utf8"),
+  readFile("index.html", "utf8"),
 ]);
 const data = JSON.parse(coreSource);
 const careers = JSON.parse(careersSource);
@@ -150,6 +151,9 @@ if (
   !appSource.includes(
     "How Does a Player's Play Style Evolve Over Their Career?",
   ) ||
+  !indexSource.includes("<span>Career Trends</span>") ||
+  !appSource.includes('career: "Career Trends"') ||
+  indexSource.includes("<span>Career paths</span>") ||
   !appSource.includes(
     "Understanding the Evolution of a Player's Archetype",
   ) ||

@@ -34,7 +34,7 @@ const ROUTE_LABELS = {
   overview: "Overview",
   glossary: "Style glossary",
   season: "Season level trends",
-  career: "Career paths",
+  career: "Career Trends",
   playoffs: "Playoff pressure",
 };
 
