@@ -1648,12 +1648,9 @@ h3 {
 
 .player-identity {
   display: grid;
-  grid-template:
-    "portrait copy" auto
-    "portrait logos" 1fr
-    / minmax(88px, 112px) minmax(0, 1fr);
+  grid-template-columns: minmax(88px, 112px) minmax(0, 1fr) 48px;
+  grid-template-areas: "portrait copy logos";
   column-gap: clamp(14px, 2vw, 20px);
-  row-gap: 10px;
   align-items: start;
   margin-bottom: 20px;
 }
@@ -1731,11 +1728,11 @@ h3 {
   position: static;
   z-index: auto;
   grid-area: logos;
-  align-self: end;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 48px;
+  align-self: start;
   align-items: center;
-  justify-content: flex-start;
+  justify-self: end;
   gap: 7px;
 }
 
@@ -3275,6 +3272,20 @@ h3 {
     padding-inline: 16px;
   }
 
+  .player-identity {
+    grid-template-columns: minmax(76px, 92px) minmax(0, 1fr) 44px;
+    column-gap: 12px;
+  }
+
+  .team-logo-list {
+    grid-template-columns: 44px;
+  }
+
+  .player-identity .team-logo-frame {
+    width: 44px;
+    height: 44px;
+  }
+
   h1,
   .page-head h1 {
     font-size: 40px;
@@ -3509,6 +3520,14 @@ h3 {
 }
 
 @media (max-width: 420px) {
+  .player-identity {
+    grid-template-columns: minmax(76px, 92px) minmax(0, 1fr);
+    grid-template-areas:
+      "portrait logos"
+      "copy copy";
+    row-gap: 14px;
+  }
+
   .metric-grid {
     grid-template-columns: 1fr;
   }

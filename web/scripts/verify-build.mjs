@@ -41,12 +41,18 @@ if (
   !/\.team-logo-list\s*\{[\s\S]*?position:\s*static;[\s\S]*?grid-area:\s*logos;[\s\S]*?\}/.test(
     stylesSource,
   ) ||
+  !/\.player-identity\s*\{[\s\S]*?grid-template-areas:\s*"portrait copy logos";[\s\S]*?\}/.test(
+    stylesSource,
+  ) ||
+  !/\.team-logo-list\s*\{[\s\S]*?align-self:\s*start;[\s\S]*?justify-self:\s*end;[\s\S]*?\}/.test(
+    stylesSource,
+  ) ||
   !/\.team-logo-frame\s*\{[\s\S]*?width:\s*48px;[\s\S]*?height:\s*48px;[\s\S]*?\}/.test(
     stylesSource,
   )
 ) {
   throw new Error(
-    "Player profile cards are missing their corrected headshot, detached team logo, or games-played treatment.",
+    "Player profile cards are missing their corrected headshot, top-right team logo, or games-played treatment.",
   );
 }
 if (
