@@ -2710,7 +2710,6 @@ function careerPlayerStatistics(rows) {
           <p class="career-card-eyebrow">Career statistics summary</p>
           <h2 id="career-card-summary-title">Career totals in dataset</h2>
         </div>
-        <span class="career-card-note">Model-eligible seasons</span>
       </header>
       <div class="career-card-stat-groups">
         <section class="career-card-stat-group" aria-labelledby="career-card-reg-title">

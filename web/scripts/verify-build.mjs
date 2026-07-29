@@ -169,7 +169,7 @@ if (
   !appSource.includes("function careerPlayerStatistics(rows)") ||
   !appSource.includes("Career statistics summary") ||
   !appSource.includes("Career totals in dataset") ||
-  !appSource.includes("Model-eligible seasons") ||
+  appSource.includes("Model-eligible seasons") ||
   !appSource.includes("Most frequent style") ||
   !appSource.includes("Style changes") ||
   !appSource.includes("careerPlayerStatistics(rows)") ||
