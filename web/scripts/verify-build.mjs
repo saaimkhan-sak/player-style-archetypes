@@ -62,6 +62,25 @@ if (
     "Season reads are missing safe, color-coded archetype mentions.",
   );
 }
+if (
+  !appSource.includes("<h2>Team Roster Construction</h2>") ||
+  !appSource.includes(
+    "A depth-chart view of the selected team using the 12 forwards or 8 defensemen with the most regular-season ice time.",
+  ) ||
+  !appSource.includes(
+    "Whether the team identity is concentrated in stars or spread through depth.",
+  ) ||
+  !appSource.includes("function rosterPlayerHeadshot(player, season)") ||
+  !appSource.includes("function rosterTeamLogo(team, season)") ||
+  !appSource.includes("hydratePlayerAssets(teamViewElement)") ||
+  !stylesSource.includes(".roster-unit-grid") ||
+  !stylesSource.includes(".roster-player-photo-image") ||
+  !stylesSource.includes(".roster-team-logo-image")
+) {
+  throw new Error(
+    "Team roster construction is missing its Streamlit content or visual assets.",
+  );
+}
 
 const seasonPayloads = await Promise.all(
   data.meta.seasons.map(async ({ key }) => ({
@@ -79,6 +98,57 @@ for (const { key, payload } of seasonPayloads) {
     const groupProfileNames = payload[group].profiles.map(
       (profile) => profile.name,
     );
+    const constructions = payload[group]?.teamConstructions;
+    const expectedRosterSize = group === "forwards" ? 12 : 8;
+    const unitSize = group === "forwards" ? 3 : 2;
+    if (!constructions || Object.keys(constructions).length < 20) {
+      throw new Error(
+        `${key} ${group} is missing team roster construction data.`,
+      );
+    }
+    for (const [team, construction] of Object.entries(constructions)) {
+      const units = construction.units || [];
+      const rosterSize = units.reduce(
+        (total, unit) => total + (unit.players?.length || 0),
+        0,
+      );
+      if (
+        units.length < 3 ||
+        units.length > 4 ||
+        rosterSize < unitSize * 3 ||
+        rosterSize > expectedRosterSize ||
+        units.some(
+          (unit) =>
+            !unit.players?.length ||
+            unit.players.length > unitSize ||
+            unit.players.some(
+              (player) =>
+                !player.id ||
+                !player.name ||
+                !player.profile,
+            ),
+        ) ||
+        !construction.dominant?.profile ||
+        !construction.mix?.length ||
+        !construction.gaps?.length
+      ) {
+        throw new Error(
+          `${key} ${group} ${team} has an incomplete roster construction.`,
+        );
+      }
+      if (
+        construction.usesMoneyPuck &&
+        !units.some(
+          (unit) =>
+            unit.fromCombination &&
+            Number.isFinite(Number(unit.xgPct)),
+        )
+      ) {
+        throw new Error(
+          `${key} ${group} ${team} is missing MoneyPuck unit metadata.`,
+        );
+      }
+    }
     if (
       !read?.headline ||
       read.paragraphs?.length < 2 ||
@@ -127,6 +197,24 @@ if (
 ) {
   throw new Error(
     "Every season read must contain two unique editorial paragraphs.",
+  );
+}
+
+const latest = seasonPayloads.find(({ key }) => key === "20252026");
+const ana = latest?.payload?.forwards?.teamConstructions?.ANA;
+if (
+  !ana ||
+  ana.dominant.profile !== "High-Touch Risk/Reward Scorer" ||
+  ana.dominant.overall !== 61.1 ||
+  ana.dominant.top !== 67.5 ||
+  ana.dominant.bottom !== 50.6 ||
+  ana.units?.[0]?.players?.map((player) => player.name).join("|") !==
+    "Chris Kreider|Leo Carlsson|Troy Terry" ||
+  ana.units?.[0]?.minutes !== 469.5 ||
+  ana.units?.[0]?.xgPct !== 0.591
+) {
+  throw new Error(
+    "The Streamlit-parity ANA roster construction fixture changed unexpectedly.",
   );
 }
 

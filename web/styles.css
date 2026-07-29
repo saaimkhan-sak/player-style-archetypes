@@ -1918,6 +1918,461 @@ h3 {
   text-align: right;
 }
 
+.roster-intro {
+  margin-bottom: 24px;
+}
+
+.roster-intro h2 {
+  margin-bottom: 22px;
+  color: var(--navy-950);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(28px, 3vw, 38px);
+}
+
+.roster-intro-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(28px, 5vw, 64px);
+}
+
+.roster-intro-grid h3 {
+  margin-bottom: 10px;
+  font-size: 16px;
+}
+
+.roster-intro-grid ul {
+  margin: 0;
+  padding-left: 19px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.roster-intro-grid li + li {
+  margin-top: 5px;
+}
+
+.roster-team-control {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+}
+
+.roster-team-control .field {
+  width: min(100%, 220px);
+}
+
+.team-construction {
+  display: grid;
+  gap: 26px;
+}
+
+.roster-team-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 118px;
+  padding: 20px 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at 9% 50%, rgba(33, 182, 168, 0.1), transparent 12rem),
+    var(--paper-strong);
+}
+
+.roster-team-header h2 {
+  margin: 0 0 4px;
+  color: var(--navy-950);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(34px, 4vw, 48px);
+  line-height: 1;
+}
+
+.roster-team-header p:last-child {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.roster-team-logo {
+  position: relative;
+  display: grid;
+  width: 78px;
+  height: 78px;
+  flex: 0 0 78px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(11, 117, 109, 0.2);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.roster-team-logo-code {
+  color: var(--aqua-dark);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.roster-team-logo-image {
+  position: absolute;
+  inset: 8px;
+  width: calc(100% - 16px);
+  height: calc(100% - 16px);
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.roster-team-logo.is-loaded .roster-team-logo-image {
+  opacity: 1;
+}
+
+.roster-team-logo.is-loaded .roster-team-logo-code {
+  visibility: hidden;
+}
+
+.roster-ring-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.roster-ring-card {
+  display: grid;
+  min-width: 0;
+  min-height: 236px;
+  place-items: center;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 253, 249, 0.78);
+  text-align: center;
+}
+
+.roster-ring {
+  display: grid;
+  width: 152px;
+  height: 152px;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--ring) calc(var(--ring-value) * 1%),
+    var(--ice-strong) 0
+  );
+}
+
+.roster-ring-core {
+  display: grid;
+  width: 108px;
+  height: 108px;
+  align-content: center;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--paper-strong);
+}
+
+.roster-ring-core strong {
+  color: var(--navy-950);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 32px;
+  line-height: 1;
+}
+
+.roster-ring-core span {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 760;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.roster-ring-card > p {
+  max-width: 260px;
+  margin: 12px 0 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 670;
+  line-height: 1.35;
+}
+
+.roster-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2.4fr) minmax(190px, 1fr);
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--line);
+}
+
+.roster-summary-grid article {
+  min-width: 0;
+  padding: 18px 20px;
+  background: var(--paper-strong);
+}
+
+.roster-summary-grid span {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 760;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.roster-summary-grid strong {
+  color: var(--navy-950);
+  font-size: clamp(19px, 2.1vw, 27px);
+  line-height: 1.2;
+}
+
+.roster-units-section,
+.roster-analysis-section {
+  min-width: 0;
+}
+
+.roster-section-heading {
+  margin-bottom: 14px;
+}
+
+.roster-section-heading h3 {
+  font-size: 22px;
+}
+
+.roster-section-heading p {
+  max-width: 720px;
+}
+
+.roster-unit-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.roster-unit-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--unit-profile);
+  border-radius: var(--radius-md);
+  background: var(--paper-strong);
+}
+
+.roster-unit-head {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--unit-profile) 7%, var(--paper-strong));
+}
+
+.roster-unit-head > strong {
+  color: var(--navy-950);
+  font-size: 14px;
+}
+
+.roster-unit-meta {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 720;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.roster-status-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.roster-status-chip.is-high,
+.roster-value.is-high {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.roster-status-chip.is-mid,
+.roster-value.is-mid {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.roster-status-chip.is-low,
+.roster-value.is-low {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.roster-status-chip.is-neutral {
+  background: var(--ice);
+  color: var(--muted);
+}
+
+.roster-unit-players {
+  display: grid;
+}
+
+.roster-skater {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 11px 12px;
+}
+
+.roster-skater + .roster-skater {
+  border-top: 1px solid rgba(206, 219, 216, 0.72);
+}
+
+.roster-player-photo {
+  position: relative;
+  display: grid;
+  width: 54px;
+  height: 66px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--profile) 30%, var(--line));
+  border-radius: 11px;
+  background:
+    radial-gradient(circle at 50% 25%, #fff, transparent 48%),
+    var(--ice);
+}
+
+.roster-player-initials {
+  color: color-mix(in srgb, var(--profile) 55%, var(--muted));
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  font-weight: 760;
+}
+
+.roster-player-photo-image {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.roster-player-photo.is-loaded .roster-player-photo-image {
+  opacity: 1;
+}
+
+.roster-player-photo.is-loaded .roster-player-initials {
+  visibility: hidden;
+}
+
+.roster-skater-copy {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.roster-skater-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+}
+
+.roster-skater-name > strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--navy-950);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roster-skater-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.roster-profile-label {
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 7px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--profile) 15%, var(--paper-strong));
+  box-shadow: inset 0 -2px 0 var(--profile);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 720;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+}
+
+.roster-footnote {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.roster-table-wrap {
+  border-radius: var(--radius-md);
+}
+
+.roster-analysis-table {
+  min-width: 760px;
+}
+
+.roster-depth-table {
+  min-width: 1120px;
+}
+
+.roster-gap-table {
+  min-width: 1080px;
+}
+
+.roster-analysis-table .profile-chip,
+.roster-depth-table .profile-chip,
+.roster-gap-table .profile-chip {
+  max-width: 300px;
+  font-size: 12px;
+}
+
+.roster-value {
+  font-weight: 800;
+}
+
+.roster-gap-section {
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.roster-gap-note {
+  display: inline-flex;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--coral-soft);
+  color: #81351f;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .loading-state {
   display: grid;
   min-height: 100vh;
@@ -1954,6 +2409,12 @@ h3 {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1280px) {
+  .roster-unit-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -2095,6 +2556,25 @@ h3 {
     grid-template-columns: 1fr;
   }
 
+  .roster-intro-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .roster-ring {
+    width: 132px;
+    height: 132px;
+  }
+
+  .roster-ring-core {
+    width: 94px;
+    height: 94px;
+  }
+
+  .roster-ring-core strong {
+    font-size: 28px;
+  }
+
   .season-read-panel {
     grid-template-columns: 1fr;
   }
@@ -2138,6 +2618,45 @@ h3 {
   .season-page .page-head h1 {
     font-size: clamp(32px, 10vw, 38px);
     line-height: 1.04;
+  }
+
+  .roster-team-control {
+    justify-content: stretch;
+  }
+
+  .roster-team-control .field {
+    width: 100%;
+  }
+
+  .roster-team-header {
+    min-height: 0;
+    align-items: flex-start;
+    padding: 18px;
+  }
+
+  .roster-team-logo {
+    width: 64px;
+    height: 64px;
+    flex-basis: 64px;
+    border-radius: 18px;
+  }
+
+  .roster-ring-grid,
+  .roster-summary-grid,
+  .roster-unit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .roster-ring-card {
+    min-height: 0;
+  }
+
+  .roster-summary-grid {
+    gap: 1px;
+  }
+
+  .roster-skater-name > strong {
+    white-space: normal;
   }
 
   .equation-model {

@@ -15,6 +15,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 
@@ -1236,6 +1237,460 @@ def player_record(
     }
 
 
+def surname_key(name: Any) -> str:
+    parts = str(name or "").replace(".", "").replace("'", "").split()
+    return parts[-1].lower() if parts else ""
+
+
+def team_codes_value(value: Any) -> list[str]:
+    return [
+        team.strip()
+        for team in str(value or "").split("/")
+        if team.strip()
+    ]
+
+
+def weighted_probability(
+    frame: pd.DataFrame,
+    column: str,
+) -> float:
+    if frame.empty:
+        return 0.0
+    weights = (
+        pd.to_numeric(frame["reg_toi_total"], errors="coerce")
+        .fillna(0.0)
+        .to_numpy(dtype=float)
+        + 1e-9
+    )
+    values = (
+        pd.to_numeric(frame[column], errors="coerce")
+        .fillna(0.0)
+        .to_numpy(dtype=float)
+    )
+    return float(np.average(values, weights=weights))
+
+
+def team_constructions(
+    season: str,
+    group: str,
+    frame: pd.DataFrame,
+    names: dict[int, str],
+    line_data: pd.DataFrame,
+) -> dict[str, dict[str, Any]]:
+    probability_columns = sorted(
+        [
+            column
+            for column in frame.columns
+            if isinstance(column, str)
+            and column.startswith("p")
+            and column[1:].isdigit()
+        ],
+        key=lambda column: int(column[1:]),
+    )
+    if not probability_columns:
+        return {}
+
+    clusters = [int(column[1:]) for column in probability_columns]
+    teams = sorted(
+        {
+            team
+            for value in frame["teams_played"].dropna()
+            for team in team_codes_value(value)
+        }
+    )
+    team_frames = {
+        team: frame[
+            frame["teams_played"]
+            .fillna("")
+            .map(lambda value, code=team: code in team_codes_value(value))
+        ].copy()
+        for team in teams
+    }
+
+    # League-context metrics use every model-eligible player associated with
+    # the team, matching the Streamlit tab rather than the selected depth chart.
+    metric_rows: list[dict[str, Any]] = []
+    for team, team_frame in team_frames.items():
+        team_frame["reg_toi_total"] = (
+            pd.to_numeric(
+                team_frame["reg_avg_toi_min"],
+                errors="coerce",
+            ).fillna(0.0)
+            * pd.to_numeric(
+                team_frame["reg_games"],
+                errors="coerce",
+            ).fillna(0.0)
+        )
+        weights = team_frame["reg_toi_total"].to_numpy(dtype=float) + 1e-9
+        weight_total = float(weights.sum())
+        for cluster, column in zip(clusters, probability_columns):
+            probabilities = (
+                pd.to_numeric(team_frame[column], errors="coerce")
+                .fillna(0.0)
+                .to_numpy(dtype=float)
+            )
+            share = (
+                float(np.average(probabilities, weights=weights))
+                if len(probabilities)
+                else 0.0
+            )
+            strong = probabilities >= 0.60
+            coverage = (
+                float(weights[strong].sum() / weight_total)
+                if weight_total > 0
+                else 0.0
+            )
+            contributions = weights * probabilities
+            contribution_total = float(contributions.sum())
+            concentration = (
+                float(np.sort(contributions)[-2:].sum() / contribution_total)
+                if contribution_total > 0
+                else 1.0
+            )
+            metric_rows.append(
+                {
+                    "team": team,
+                    "cluster": cluster,
+                    "share": share,
+                    "coverage": coverage,
+                    "concentration": concentration,
+                }
+            )
+
+    metrics = pd.DataFrame(metric_rows)
+    if not metrics.empty:
+        baseline = metrics.groupby("cluster", as_index=False).agg(
+            mean_share=("share", "mean"),
+            std_share=("share", "std"),
+        )
+        metrics = metrics.merge(baseline, on="cluster", how="left")
+        metrics["coverage_rank"] = metrics.groupby("cluster")[
+            "coverage"
+        ].rank(pct=True)
+        metrics["concentration_rank"] = metrics.groupby("cluster")[
+            "concentration"
+        ].rank(pct=True)
+        valid_std = metrics["std_share"].replace({0: np.nan})
+        metrics["z"] = (
+            (metrics["share"] - metrics["mean_share"]) / valid_std
+        ).fillna(0.0)
+        metrics["risk"] = (
+            -metrics["z"]
+            + np.maximum(0, 0.35 - metrics["coverage_rank"]) * 2.0
+            + np.maximum(0, metrics["concentration_rank"] - 0.75) * 1.5
+        )
+
+    slot_size = 3 if group == "forwards" else 2
+    roster_size = 12 if group == "forwards" else 8
+    top_size = 6 if group == "forwards" else 4
+    unit_label = "Line" if group == "forwards" else "Pair"
+    top_label = "Top 6" if group == "forwards" else "Top 4"
+    bottom_label = "Bottom 6" if group == "forwards" else "Bottom 4"
+    combination_position = "line" if group == "forwards" else "pairing"
+    relevant_lines = pd.DataFrame()
+    if not line_data.empty:
+        relevant_lines = line_data[
+            (line_data["season_key"].astype(str) == str(season))
+            & (
+                line_data["position"].astype(str)
+                == combination_position
+            )
+        ].copy()
+
+    output: dict[str, dict[str, Any]] = {}
+    for team, team_frame in team_frames.items():
+        if team_frame.empty:
+            continue
+        base_roster = team_frame.copy()
+        base_roster["reg_toi_total"] = (
+            pd.to_numeric(
+                base_roster["reg_avg_toi_min"],
+                errors="coerce",
+            ).fillna(0.0)
+            * pd.to_numeric(
+                base_roster["reg_games"],
+                errors="coerce",
+            ).fillna(0.0)
+        )
+        base_roster = base_roster.sort_values(
+            ["reg_toi_total", "confidence"],
+            ascending=False,
+        ).reset_index(drop=True)
+        base_roster["last_key"] = base_roster["full_name"].map(
+            surname_key
+        )
+
+        combo_frame = pd.DataFrame()
+        if not relevant_lines.empty:
+            combo_frame = relevant_lines[
+                relevant_lines["playerTeam"].astype(str) == str(team)
+            ].sort_values("toi_min", ascending=False)
+
+        used_last: set[str] = set()
+        roster_rows: list[pd.Series] = []
+        unit_cards: dict[int, dict[str, Any]] = {}
+        if not combo_frame.empty:
+            for _, combo in combo_frame.iterrows():
+                combo_names = [
+                    player.strip()
+                    for player in str(combo["name"]).split("-")
+                    if player.strip()
+                ]
+                if len(combo_names) != slot_size:
+                    continue
+                keys = [surname_key(player) for player in combo_names]
+                if any(key in used_last for key in keys):
+                    continue
+                matched: list[pd.Series] = []
+                matched_ids: set[int] = set()
+                for key in keys:
+                    candidates = base_roster[
+                        (base_roster["last_key"] == key)
+                        & (~base_roster["last_key"].isin(used_last))
+                        & (~base_roster["player_id"].isin(matched_ids))
+                    ]
+                    if candidates.empty:
+                        break
+                    player = candidates.iloc[0].copy()
+                    matched.append(player)
+                    matched_ids.add(int(player["player_id"]))
+                if len(matched) != slot_size:
+                    continue
+                unit = len(unit_cards) + 1
+                for player in matched:
+                    player["Unit"] = unit
+                    roster_rows.append(player)
+                    used_last.add(str(player["last_key"]))
+                unit_cards[unit] = {
+                    "minutes": clean(combo.get("toi_min"), 1),
+                    "xgPct": clean(combo.get("xg_pct"), 4),
+                }
+                if len(unit_cards) == roster_size // slot_size:
+                    break
+
+        if len(roster_rows) < roster_size:
+            remaining = base_roster[
+                ~base_roster["last_key"].isin(used_last)
+            ]
+            for _, player in remaining.iterrows():
+                player = player.copy()
+                player["Unit"] = len(roster_rows) // slot_size + 1
+                roster_rows.append(player)
+                used_last.add(str(player["last_key"]))
+                if len(roster_rows) == roster_size:
+                    break
+
+        if not roster_rows:
+            continue
+        roster = (
+            pd.DataFrame(roster_rows)
+            .head(roster_size)
+            .reset_index(drop=True)
+        )
+        roster["Depth"] = roster.index + 1
+        roster["Unit"] = roster["Unit"].astype(int)
+        roster["Archetype"] = roster["top_cluster"].map(
+            lambda cluster: names.get(
+                int(cluster),
+                f"Archetype {int(cluster)}",
+            )
+        )
+
+        shares = {
+            cluster: weighted_probability(roster, column)
+            for cluster, column in zip(clusters, probability_columns)
+        }
+        dominant_cluster = max(shares, key=shares.get)
+        dominant_name = names.get(
+            dominant_cluster,
+            f"Archetype {dominant_cluster}",
+        )
+        top_half = roster.head(top_size)
+        bottom_half = roster.iloc[top_size:roster_size]
+        top_share = weighted_probability(
+            top_half,
+            f"p{dominant_cluster}",
+        )
+        bottom_share = weighted_probability(
+            bottom_half,
+            f"p{dominant_cluster}",
+        )
+
+        grouped_mix: dict[str, dict[str, float]] = defaultdict(
+            lambda: {
+                "overall": 0.0,
+                "top": 0.0,
+                "bottom": 0.0,
+            }
+        )
+        for cluster, column in zip(clusters, probability_columns):
+            profile_name = names.get(cluster, f"Archetype {cluster}")
+            grouped_mix[profile_name]["overall"] += shares[cluster] * 100
+            grouped_mix[profile_name]["top"] += (
+                weighted_probability(top_half, column) * 100
+            )
+            grouped_mix[profile_name]["bottom"] += (
+                weighted_probability(bottom_half, column) * 100
+            )
+        mix = sorted(
+            [
+                {
+                    "profile": profile_name,
+                    "overall": clean(values["overall"], 1),
+                    "top": clean(values["top"], 1),
+                    "bottom": clean(values["bottom"], 1),
+                }
+                for profile_name, values in grouped_mix.items()
+            ],
+            key=lambda row: float(row["overall"] or 0),
+            reverse=True,
+        )
+
+        units: list[dict[str, Any]] = []
+        for unit, unit_frame in roster.groupby("Unit", sort=True):
+            profile_counts = unit_frame["Archetype"].value_counts()
+            largest_count = int(profile_counts.max())
+            unit_profile = sorted(
+                [
+                    str(profile_name)
+                    for profile_name, count in profile_counts.items()
+                    if int(count) == largest_count
+                ]
+            )[0]
+            combination = unit_cards.get(int(unit))
+            players = []
+            for _, player in unit_frame.iterrows():
+                players.append(
+                    {
+                        "id": int(player["player_id"]),
+                        "name": str(player["full_name"]),
+                        "team": team,
+                        "position": str(player.get("position", "")),
+                        "games": clean(player.get("reg_games"), 0),
+                        "atoi": clean(
+                            player.get("reg_avg_toi_min"),
+                            3,
+                        ),
+                        "goals": clean(player.get("reg_goals"), 0),
+                        "assists": clean(
+                            player.get("reg_assists"),
+                            0,
+                        ),
+                        "points": clean(player.get("reg_points"), 0),
+                        "profile": str(player["Archetype"]),
+                        "confidence": clean(
+                            player.get("confidence"),
+                            4,
+                        ),
+                        "depth": int(player["Depth"]),
+                    }
+                )
+            units.append(
+                {
+                    "number": int(unit),
+                    "profile": unit_profile,
+                    "minutes": (
+                        combination["minutes"]
+                        if combination
+                        else clean(
+                            float(
+                                pd.to_numeric(
+                                    unit_frame["reg_toi_total"],
+                                    errors="coerce",
+                                ).fillna(0.0).sum()
+                            ),
+                            1,
+                        )
+                    ),
+                    "xgPct": (
+                        combination["xgPct"]
+                        if combination
+                        else None
+                    ),
+                    "fromCombination": bool(combination),
+                    "players": players,
+                }
+            )
+
+        gaps: list[dict[str, Any]] = []
+        if not metrics.empty:
+            team_gaps = metrics[
+                metrics["team"] == team
+            ].sort_values("risk", ascending=False)
+            for _, row in team_gaps.iterrows():
+                z_score = float(row["z"])
+                coverage_rank = float(row["coverage_rank"])
+                concentration_rank = float(row["concentration_rank"])
+                note = ""
+                if z_score < -0.75 or (
+                    z_score < -0.5 and coverage_rank < 0.35
+                ):
+                    note = "Underrepresented"
+                elif (
+                    concentration_rank > 0.75
+                    and coverage_rank < 0.5
+                ):
+                    note = "Thin coverage"
+                cluster = int(row["cluster"])
+                gaps.append(
+                    {
+                        "profile": names.get(
+                            cluster,
+                            f"Archetype {cluster}",
+                        ),
+                        "teamShare": clean(
+                            float(row["share"]) * 100,
+                            1,
+                        ),
+                        "leagueAverage": clean(
+                            float(row["mean_share"]) * 100,
+                            1,
+                        ),
+                        "zScore": clean(z_score, 2),
+                        "strongCoverage": clean(
+                            float(row["coverage"]) * 100,
+                            1,
+                        ),
+                        "topTwoReliance": clean(
+                            float(row["concentration"]) * 100,
+                            1,
+                        ),
+                        "note": note,
+                    }
+                )
+
+        output[team] = {
+            "team": team,
+            "unitLabel": unit_label,
+            "topLabel": top_label,
+            "bottomLabel": bottom_label,
+            "source": (
+                "MoneyPuck 5v5 line/pairing minutes"
+                if unit_cards
+                else "regular-season player TOI fallback"
+            ),
+            "usesMoneyPuck": bool(unit_cards),
+            "hasFallbackUnits": any(
+                not bool(unit["fromCombination"])
+                for unit in units
+            ),
+            "dominant": {
+                "profile": dominant_name,
+                "overall": clean(shares[dominant_cluster] * 100, 1),
+                "top": clean(top_share * 100, 1),
+                "bottom": clean(bottom_share * 100, 1),
+                "gap": clean(
+                    abs(top_share - bottom_share) * 100,
+                    1,
+                ),
+            },
+            "units": units,
+            "mix": mix,
+            "gaps": gaps,
+        }
+    return output
+
+
 def playoff_records(
     seasons: list[str],
     maps: dict[str, dict[str, dict[int, str]]],
@@ -1306,6 +1761,12 @@ def playoff_records(
 def main() -> None:
     seasons = available_seasons()
     maps = profile_maps(seasons)
+    line_path = DATA_DIR / "line_combinations.parquet"
+    line_data = (
+        pd.read_parquet(line_path)
+        if line_path.exists()
+        else pd.DataFrame()
+    )
     all_frames: dict[str, list[pd.DataFrame]] = {
         "forwards": [],
         "defense": [],
@@ -1372,6 +1833,13 @@ def main() -> None:
                     4,
                 ),
                 "mixedCount": int((frame["confidence"] < 0.8).sum()),
+                "teamConstructions": team_constructions(
+                    season,
+                    group,
+                    frame,
+                    names,
+                    line_data,
+                ),
             }
             trend_row[group] = clean(
                 float(frame["confidence"].mean()) * 100,

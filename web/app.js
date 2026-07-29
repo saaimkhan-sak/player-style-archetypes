@@ -1,5 +1,5 @@
 const DATA_ROOT = "/data";
-const DATA_VERSION = "20260729-editorial-reads-v2";
+const DATA_VERSION = "20260729-team-rosters-v3";
 
 const appState = {
   core: null,
@@ -98,25 +98,31 @@ function teamLogoSources(team, season) {
   );
 }
 
+function playerHeadshotSources(player, season) {
+  if (!player) return [];
+  const teams = teamCodes(player.team);
+  const seasonKey = /^\d{8}$/.test(String(season)) ? String(season) : "latest";
+  const playerId = String(player.id || "").replace(/\D/g, "");
+  if (!playerId) return [];
+  return [
+    ...teams.map(
+      (team) =>
+        `https://assets.nhle.com/mugs/nhl/${seasonKey}/${team}/${playerId}.png`,
+    ),
+    `https://assets.nhle.com/mugs/nhl/${seasonKey}/${playerId}.png`,
+    ...teams.map(
+      (team) =>
+        `https://assets.nhle.com/mugs/nhl/latest/${team}/${playerId}.png`,
+    ),
+    `https://assets.nhle.com/mugs/nhl/latest/${playerId}.png`,
+  ];
+}
+
 function playerVisual(player, season) {
   if (!player) return "";
   const teams = teamCodes(player.team);
   const seasonKey = /^\d{8}$/.test(String(season)) ? String(season) : "latest";
-  const playerId = String(player.id || "").replace(/\D/g, "");
-  const headshotSources = playerId
-    ? [
-        ...teams.map(
-          (team) =>
-            `https://assets.nhle.com/mugs/nhl/${seasonKey}/${team}/${playerId}.png`,
-        ),
-        `https://assets.nhle.com/mugs/nhl/${seasonKey}/${playerId}.png`,
-        ...teams.map(
-          (team) =>
-            `https://assets.nhle.com/mugs/nhl/latest/${team}/${playerId}.png`,
-        ),
-        `https://assets.nhle.com/mugs/nhl/latest/${playerId}.png`,
-      ]
-    : [];
+  const headshotSources = playerHeadshotSources(player, seasonKey);
   return `
     <div class="player-visual">
       <div class="player-headshot-frame" data-asset-frame>
@@ -164,6 +170,47 @@ function playerVisual(player, season) {
           : ""
       }
     </div>
+  `;
+}
+
+function rosterPlayerHeadshot(player, season) {
+  const sources = playerHeadshotSources(player, season);
+  return `
+    <span class="roster-player-photo" data-asset-frame aria-hidden="true">
+      <span class="roster-player-initials">${escapeHTML(playerInitials(player.name))}</span>
+      ${
+        sources.length
+          ? `<img
+              class="roster-player-photo-image"
+              data-asset-sources="${assetSources(sources)}"
+              alt=""
+              loading="lazy"
+              decoding="async"
+            />`
+          : ""
+      }
+    </span>
+  `;
+}
+
+function rosterTeamLogo(team, season) {
+  const sources = teamLogoSources(team, season);
+  return `
+    <span
+      class="roster-team-logo"
+      data-asset-frame
+      role="img"
+      aria-label="${escapeHTML(team)} team logo"
+    >
+      <span class="roster-team-logo-code" aria-hidden="true">${escapeHTML(team)}</span>
+      <img
+        class="roster-team-logo-image"
+        data-asset-sources="${assetSources(sources)}"
+        alt=""
+        loading="lazy"
+        decoding="async"
+      />
+    </span>
   `;
 }
 
@@ -254,6 +301,35 @@ function number(value, digits = 0) {
 
 function percent(value, digits = 0) {
   return `${number(Number(value || 0) * 100, digits)}%`;
+}
+
+function minuteClock(value) {
+  const totalSeconds = Math.max(0, Math.round(Number(value || 0) * 60));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function rosterValueBand(value) {
+  const numeric = Number(value || 0);
+  if (numeric >= 45) return "is-high";
+  if (numeric >= 25) return "is-mid";
+  return "is-low";
+}
+
+function confidenceBand(value) {
+  const numeric = Number(value || 0);
+  if (numeric >= 0.9) return "is-high";
+  if (numeric >= 0.8) return "is-mid";
+  return "is-low";
+}
+
+function xgBand(value) {
+  if (value === null || value === undefined) return "is-neutral";
+  const numeric = Number(value || 0);
+  if (numeric >= 0.55) return "is-high";
+  if (numeric >= 0.48) return "is-mid";
+  return "is-low";
 }
 
 function mean(values) {
@@ -1599,47 +1675,333 @@ function renderSeasonPlayers(groupData) {
   `;
 }
 
-function renderSeasonTeams(groupData) {
-  const teams = [...new Set(
-    groupData.players.flatMap((player) => player.team.split("/").filter(Boolean)),
-  )].sort();
-  const team = teams[0] || "";
+function rosterConcentrationRing(label, value, subtitle, profile) {
+  const bounded = Math.max(0, Math.min(100, Number(value || 0)));
   return `
-    <div class="glossary-toolbar">
-      <div class="field">
-        <label for="team-select">Team</label>
-        <select id="team-select">
-          ${teams.map((value) => `<option value="${escapeHTML(value)}">${escapeHTML(value)}</option>`).join("")}
-        </select>
+    <article class="roster-ring-card">
+      <div
+        class="roster-ring"
+        style="--ring:${profileColor(profile)};--ring-value:${bounded}"
+        role="img"
+        aria-label="${escapeHTML(label)}: ${number(bounded)} percent ${escapeHTML(profile)}"
+      >
+        <div class="roster-ring-core">
+          <strong>${number(bounded)}%</strong>
+          <span>${escapeHTML(label)}</span>
+        </div>
       </div>
-      <span class="result-count">Style coverage across the selected roster.</span>
-    </div>
-    <div id="team-view">${teamView(groupData.players, team)}</div>
+      <p>${escapeHTML(subtitle)}</p>
+    </article>
   `;
 }
 
-function teamView(players, team) {
-  const roster = players
-    .filter((player) => player.team.split("/").includes(team))
-    .sort((a, b) => b.points - a.points);
-  const counts = Counter(roster.map((player) => player.profile));
-  const profiles = [...counts.entries()]
-    .map(([name, count]) => ({
-      name,
-      count,
-      share: roster.length ? (count / roster.length) * 100 : 0,
-    }))
-    .sort((a, b) => b.count - a.count);
+function rosterUnitCard(unit, construction, season) {
+  const xgText =
+    unit.xgPct === null || unit.xgPct === undefined
+      ? "xG n/a*"
+      : `${percent(unit.xgPct)} xG`;
   return `
-    <div class="two-column">
-      <div>
-        ${renderPlayerTable(roster, null, false)}
+    <article
+      class="roster-unit-card"
+      style="--unit-profile:${profileColor(unit.profile)}"
+    >
+      <header class="roster-unit-head">
+        <strong>${escapeHTML(construction.unitLabel)} ${number(unit.number)}</strong>
+        <span class="roster-unit-meta">
+          ${number(unit.minutes)} min ·
+          <span class="roster-status-chip ${xgBand(unit.xgPct)}">${escapeHTML(xgText)}</span>
+        </span>
+      </header>
+      <div class="roster-unit-players">
+        ${unit.players
+          .map(
+            (player) => `
+              <article
+                class="roster-skater"
+                style="--profile:${profileColor(player.profile)}"
+              >
+                ${rosterPlayerHeadshot(player, season)}
+                <div class="roster-skater-copy">
+                  <div class="roster-skater-name">
+                    <strong>${escapeHTML(player.name)}</strong>
+                    <span class="roster-status-chip ${confidenceBand(player.confidence)}">
+                      ${number(Number(player.confidence || 0) * 100, 1)}%
+                    </span>
+                  </div>
+                  <p>
+                    ${escapeHTML(player.position)} · ${number(player.games)} GP ·
+                    ${minuteClock(player.atoi)} ATOI · ${number(player.goals)}G,
+                    ${number(player.assists)}A, ${number(player.points)}P
+                  </p>
+                  <span class="roster-profile-label">${escapeHTML(player.profile)}</span>
+                </div>
+              </article>
+            `,
+          )
+          .join("")}
       </div>
-      <div class="chart-panel">
-        <div class="chart-title-row"><div><h3>${escapeHTML(team)} style mix</h3><p>${roster.length} players in this group.</p></div></div>
-        ${profileBars(profiles, 8)}
+    </article>
+  `;
+}
+
+function rosterMixTable(construction) {
+  return `
+    <div class="table-wrap roster-table-wrap">
+      <table class="data-table roster-analysis-table">
+        <thead>
+          <tr>
+            <th>Archetype</th>
+            <th class="numeric">Overall (%)</th>
+            <th class="numeric">${escapeHTML(construction.topLabel)} (%)</th>
+            <th class="numeric">${escapeHTML(construction.bottomLabel)} (%)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${construction.mix
+            .map(
+              (row) => `
+                <tr>
+                  <td>${profileChip(row.profile)}</td>
+                  <td class="numeric roster-value ${rosterValueBand(row.overall)}">${number(row.overall, 1)}</td>
+                  <td class="numeric roster-value ${rosterValueBand(row.top)}">${number(row.top, 1)}</td>
+                  <td class="numeric roster-value ${rosterValueBand(row.bottom)}">${number(row.bottom, 1)}</td>
+                </tr>
+              `,
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function rosterDepthTable(construction) {
+  const players = construction.units.flatMap((unit) =>
+    unit.players.map((player) => ({
+      ...player,
+      unit: unit.number,
+    })),
+  );
+  return `
+    <div class="table-wrap roster-table-wrap">
+      <table class="data-table roster-depth-table">
+        <thead>
+          <tr>
+            <th>${escapeHTML(construction.unitLabel)}</th>
+            <th>Depth</th>
+            <th>Player</th>
+            <th>Pos</th>
+            <th>Archetype</th>
+            <th class="numeric">REG GP</th>
+            <th class="numeric">REG ATOI</th>
+            <th class="numeric">REG P</th>
+            <th class="numeric">REG G</th>
+            <th class="numeric">REG A</th>
+            <th class="numeric">Confidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${players
+            .map(
+              (player) => `
+                <tr>
+                  <td>${number(player.unit)}</td>
+                  <td>${number(player.depth)}</td>
+                  <td><strong>${escapeHTML(player.name)}</strong></td>
+                  <td>${escapeHTML(player.position)}</td>
+                  <td>${profileChip(player.profile)}</td>
+                  <td class="numeric">${number(player.games)}</td>
+                  <td class="numeric">${minuteClock(player.atoi)}</td>
+                  <td class="numeric">${number(player.points)}</td>
+                  <td class="numeric">${number(player.goals)}</td>
+                  <td class="numeric">${number(player.assists)}</td>
+                  <td class="numeric">${number(Number(player.confidence || 0) * 100, 1)}%</td>
+                </tr>
+              `,
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function rosterGapTable(construction) {
+  return `
+    <div class="table-wrap roster-table-wrap">
+      <table class="data-table roster-gap-table">
+        <thead>
+          <tr>
+            <th>Archetype</th>
+            <th class="numeric">Team share (%)</th>
+            <th class="numeric">League avg (%)</th>
+            <th class="numeric">Z-score</th>
+            <th class="numeric">Strong coverage (%)</th>
+            <th class="numeric">Reliance on top 2 (%)</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${construction.gaps
+            .map(
+              (row) => `
+                <tr>
+                  <td>${profileChip(row.profile)}</td>
+                  <td class="numeric">${number(row.teamShare, 1)}</td>
+                  <td class="numeric">${number(row.leagueAverage, 1)}</td>
+                  <td class="numeric">${number(row.zScore, 2)}</td>
+                  <td class="numeric">${number(row.strongCoverage, 1)}</td>
+                  <td class="numeric">${number(row.topTwoReliance, 1)}</td>
+                  <td>${row.note ? `<span class="roster-gap-note">${escapeHTML(row.note)}</span>` : "—"}</td>
+                </tr>
+              `,
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function teamView(construction, season, group) {
+  if (!construction) {
+    return '<div class="empty-state">No roster construction data is available for that team.</div>';
+  }
+  const dominant = construction.dominant;
+  const rosterCount = construction.units.reduce(
+    (total, unit) => total + unit.players.length,
+    0,
+  );
+  const groupLabel = group === "forwards" ? "Forwards" : "Defense";
+  const sourceCaption = `Units are selected from ${construction.source}.`;
+  return `
+    <section class="team-construction">
+      <header class="roster-team-header">
+        ${rosterTeamLogo(construction.team, season)}
+        <div>
+          <p class="eyebrow">Team roster construction</p>
+          <h2>${escapeHTML(construction.team)}</h2>
+          <p>${escapeHTML(groupLabel)} · ${number(rosterCount)}-player depth view</p>
+        </div>
+      </header>
+
+      <section class="roster-ring-grid" aria-label="Style concentration">
+        ${rosterConcentrationRing(
+          "Overall",
+          dominant.overall,
+          dominant.profile,
+          dominant.profile,
+        )}
+        ${rosterConcentrationRing(
+          construction.topLabel,
+          dominant.top,
+          `${dominant.profile} concentration`,
+          dominant.profile,
+        )}
+        ${rosterConcentrationRing(
+          construction.bottomLabel,
+          dominant.bottom,
+          `${dominant.profile} concentration`,
+          dominant.profile,
+        )}
+      </section>
+
+      <section class="roster-summary-grid">
+        <article>
+          <span>Dominant profile</span>
+          <strong>${escapeHTML(dominant.profile)}</strong>
+        </article>
+        <article>
+          <span>Top/bottom gap</span>
+          <strong>${number(dominant.gap)} pts</strong>
+        </article>
+      </section>
+
+      <section class="roster-units-section">
+        <div class="section-heading roster-section-heading">
+          <div>
+            <h3>${escapeHTML(construction.team)} ${escapeHTML(construction.unitLabel.toLowerCase())} construction</h3>
+            <p>${escapeHTML(sourceCaption)}</p>
+          </div>
+        </div>
+        <div class="roster-unit-grid">
+          ${construction.units
+            .map((unit) => rosterUnitCard(unit, construction, season))
+            .join("")}
+        </div>
+        ${
+          construction.hasFallbackUnits
+            ? '<p class="roster-footnote">* xG data is unavailable for fallback units; their minutes are the sum of regular-season player TOI.</p>'
+            : ""
+        }
+      </section>
+
+      <section class="roster-analysis-section">
+        <div class="section-heading roster-section-heading">
+          <div><h3>Roster profile mix</h3></div>
+        </div>
+        ${rosterMixTable(construction)}
+      </section>
+
+      <section class="roster-analysis-section">
+        <div class="section-heading roster-section-heading">
+          <div><h3>Depth chart table</h3></div>
+        </div>
+        ${rosterDepthTable(construction)}
+      </section>
+
+      <section class="roster-analysis-section roster-gap-section">
+        <div class="section-heading roster-section-heading">
+          <div>
+            <h3>League-context roster gaps</h3>
+            <p>Gap score compares this team's profile mix to the rest of the league using the same selected group.</p>
+          </div>
+        </div>
+        ${rosterGapTable(construction)}
+      </section>
+    </section>
+  `;
+}
+
+function renderSeasonTeams(groupData, selectedTeam = "") {
+  const constructions = groupData.teamConstructions || {};
+  const teams = Object.keys(constructions).sort();
+  const team = teams.includes(selectedTeam) ? selectedTeam : teams[0] || "";
+  return `
+    <section class="roster-intro info-panel">
+      <h2>Team Roster Construction</h2>
+      <div class="roster-intro-grid">
+        <div>
+          <h3>What you’re looking at</h3>
+          <ul>
+            <li>A depth-chart view of the selected team using the 12 forwards or 8 defensemen with the most regular-season ice time.</li>
+            <li>Style concentration rings showing the dominant archetype overall and how much of it lives in the top half vs bottom half of the roster.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>What you can learn</h3>
+          <ul>
+            <li>Whether the team identity is concentrated in stars or spread through depth.</li>
+            <li>Which lines/pairs carry each profile.</li>
+            <li>Where the roster construction is balanced or thin.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+    <div class="roster-team-control">
+      <div class="field">
+        <label for="team-select">Team</label>
+        <select id="team-select">
+          ${teams
+            .map(
+              (value) =>
+                `<option value="${escapeHTML(value)}"${value === team ? " selected" : ""}>${escapeHTML(value)}</option>`,
+            )
+            .join("")}
+        </select>
       </div>
     </div>
+    <div id="team-view">${teamView(constructions[team], appState.season, appState.group)}</div>
   `;
 }
 
@@ -1756,7 +2118,7 @@ async function renderSeason() {
       [
         ["snapshot", "Snapshot"],
         ["players", "Players"],
-        ["teams", "Teams"],
+        ["teams", "Team roster construction"],
         ["needs", "Need finder"],
       ],
       appState.seasonTab,
@@ -1779,10 +2141,13 @@ async function renderSeason() {
     } else if (appState.seasonTab === "teams") {
       panel.innerHTML = renderSeasonTeams(groupData);
       document.querySelector("#team-select")?.addEventListener("change", (event) => {
-        document.querySelector("#team-view").innerHTML = teamView(
-          groupData.players,
-          event.target.value,
+        const teamViewElement = document.querySelector("#team-view");
+        teamViewElement.innerHTML = teamView(
+          groupData.teamConstructions?.[event.target.value],
+          appState.season,
+          appState.group,
         );
+        hydratePlayerAssets(teamViewElement);
       });
     } else {
       panel.innerHTML = renderNeedFinder(groupData);
