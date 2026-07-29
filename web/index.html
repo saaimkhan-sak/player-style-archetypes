@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Explore NHL player styles by season, team, career, and playoff performance."
+    />
+    <meta name="theme-color" content="#0b2430" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="NHL Player Style Lab" />
+    <meta
+      property="og:description"
+      content="See how NHL players play, not just what they score."
+    />
+    <title>NHL Player Style Lab</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <div class="site-shell">
+      <aside class="sidebar" aria-label="Primary navigation">
+        <a class="brand" href="#overview" aria-label="NHL Player Style Lab home">
+          <span class="brand-mark" aria-hidden="true">
+            <span></span>
+          </span>
+          <span class="brand-copy">
+            <strong>Player Style</strong>
+            <small>NHL LAB</small>
+          </span>
+        </a>
+
+        <nav class="nav-list">
+          <a class="nav-link" href="#overview" data-route="overview">
+            <span class="nav-index">01</span>
+            <span>Overview</span>
+          </a>
+          <a class="nav-link" href="#glossary" data-route="glossary">
+            <span class="nav-index">02</span>
+            <span>Style glossary</span>
+          </a>
+          <a class="nav-link" href="#season" data-route="season">
+            <span class="nav-index">03</span>
+            <span>Season lab</span>
+          </a>
+          <a class="nav-link" href="#career" data-route="career">
+            <span class="nav-index">04</span>
+            <span>Career paths</span>
+          </a>
+          <a class="nav-link" href="#playoffs" data-route="playoffs">
+            <span class="nav-index">05</span>
+            <span>Playoff pressure</span>
+          </a>
+        </nav>
+
+        <div class="sidebar-meta">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="coverage-label">Loading data</span>
+        </div>
+      </aside>
+
+      <div class="mobile-bar">
+        <a class="mobile-brand" href="#overview">Player Style Lab</a>
+        <span id="mobile-section">Overview</span>
+      </div>
+
+      <main id="main-content" tabindex="-1">
+        <div class="loading-state" role="status" aria-live="polite">
+          <span class="loading-mark" aria-hidden="true"></span>
+          <p>Loading the style model…</p>
+        </div>
+      </main>
+    </div>
+    <noscript>This site needs JavaScript to explore the model.</noscript>
+  </body>
+</html>
