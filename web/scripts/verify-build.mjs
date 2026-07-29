@@ -32,11 +32,21 @@ if (
   !appSource.includes("https://assets.nhle.com/mugs/nhl/") ||
   !appSource.includes("https://assets.nhle.com/logos/nhl/svg/") ||
   !appSource.includes("<span>Games played</span>") ||
-  !stylesSource.includes(".player-headshot-frame") ||
-  !stylesSource.includes(".team-logo-frame")
+  !/\.player-headshot\s*\{[\s\S]*?object-fit:\s*cover;[\s\S]*?\}/.test(
+    stylesSource,
+  ) ||
+  !stylesSource.includes(
+    ".player-headshot-frame.is-loaded .player-headshot-initials",
+  ) ||
+  !/\.team-logo-list\s*\{[\s\S]*?position:\s*static;[\s\S]*?grid-area:\s*logos;[\s\S]*?\}/.test(
+    stylesSource,
+  ) ||
+  !/\.team-logo-frame\s*\{[\s\S]*?width:\s*48px;[\s\S]*?height:\s*48px;[\s\S]*?\}/.test(
+    stylesSource,
+  )
 ) {
   throw new Error(
-    "Player profile cards are missing their headshot, team logo, or games-played treatment.",
+    "Player profile cards are missing their corrected headshot, detached team logo, or games-played treatment.",
   );
 }
 if (
