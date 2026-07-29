@@ -419,6 +419,16 @@ def main() -> None:
         group: len(frames_by_key[(group, latest_season)])
         for group in ("forwards", "defense")
     }
+    average_model_confidence = clean(
+        float(
+            pd.concat(
+                [*all_frames["forwards"], *all_frames["defense"]],
+                ignore_index=True,
+            )["confidence"].mean()
+        )
+        * 100,
+        1,
+    )
 
     core_payload = {
         "meta": {
@@ -438,6 +448,7 @@ def main() -> None:
             },
             "latestSeasonPlayerCount": sum(latest_season_breakdown.values()),
             "latestSeasonBreakdown": latest_season_breakdown,
+            "averageModelConfidence": average_model_confidence,
             "switchRates": {
                 group: switch_rate(all_frames[group])
                 for group in ("forwards", "defense")

@@ -334,6 +334,8 @@ function setupHeroRink(canvas) {
     board: styles.getPropertyValue("--navy-900").trim(),
     ice: styles.getPropertyValue("--paper-strong").trim(),
     red: styles.getPropertyValue("--coral").trim(),
+    aqua: styles.getPropertyValue("--aqua").trim(),
+    gold: styles.getPropertyValue("--gold").trim(),
     blue: "#3974bb",
     crease: "rgba(33, 182, 168, 0.22)",
   };
@@ -419,21 +421,25 @@ function setupHeroRink(canvas) {
       for (const circleSide of [-1, 1]) {
         for (const offsetY of [-3.79, 3.79]) {
           context.beginPath();
-          context.moveTo(x(69 + circleSide * 15), y(spotY + offsetY - 1));
-          context.lineTo(x(69 + circleSide * 15), y(spotY + offsetY + 1));
+          context.moveTo(x(69 + circleSide * 15), y(spotY + offsetY));
+          context.lineTo(
+            x(69 + circleSide * 17.25),
+            y(spotY + offsetY),
+          );
           context.stroke();
         }
       }
 
       for (const sideX of [-1, 1]) {
         for (const sideY of [-1, 1]) {
-          const nearX = 69 + sideX * 2;
-          const farX = 69 + sideX * 6;
-          const markY = spotY + sideY * 0.75;
+          const innerX = 69 + sideX * 2;
+          const outerX = 69 + sideX * 6;
+          const innerY = spotY + sideY * 2;
+          const outerY = spotY + sideY * 5;
           context.beginPath();
-          context.moveTo(x(nearX), y(markY));
-          context.lineTo(x(farX), y(markY));
-          context.lineTo(x(farX), y(markY + sideY * 3));
+          context.moveTo(x(innerX), y(innerY));
+          context.lineTo(x(outerX), y(innerY));
+          context.lineTo(x(outerX), y(outerY));
           context.stroke();
         }
       }
@@ -488,6 +494,81 @@ function setupHeroRink(canvas) {
     context.lineTo(x(89), y(3));
     context.stroke();
 
+    function drawPlayArrow(start, controlOne, controlTwo, end, color) {
+      context.save();
+      context.beginPath();
+      context.moveTo(x(start[0]), y(start[1]));
+      context.bezierCurveTo(
+        x(controlOne[0]),
+        y(controlOne[1]),
+        x(controlTwo[0]),
+        y(controlTwo[1]),
+        x(end[0]),
+        y(end[1]),
+      );
+      context.strokeStyle = color;
+      context.globalAlpha = 0.78;
+      context.lineWidth = Math.max(1.5, lineWidth(7 / 12));
+      context.lineCap = "round";
+      context.stroke();
+
+      const angle = Math.atan2(
+        y(end[1]) - y(controlTwo[1]),
+        x(end[0]) - x(controlTwo[0]),
+      );
+      const arrowSize = Math.max(5, 2.5 * scale);
+      context.beginPath();
+      context.moveTo(x(end[0]), y(end[1]));
+      context.lineTo(
+        x(end[0]) - Math.cos(angle - Math.PI / 6) * arrowSize,
+        y(end[1]) - Math.sin(angle - Math.PI / 6) * arrowSize,
+      );
+      context.lineTo(
+        x(end[0]) - Math.cos(angle + Math.PI / 6) * arrowSize,
+        y(end[1]) - Math.sin(angle + Math.PI / 6) * arrowSize,
+      );
+      context.closePath();
+      context.fillStyle = color;
+      context.fill();
+      context.restore();
+    }
+
+    function drawPlayMarker(type, markerX, markerY, color) {
+      const markerSize = 2.35 * scale;
+      context.save();
+      context.strokeStyle = color;
+      context.lineWidth = Math.max(1.8, lineWidth(3 / 4));
+      context.lineCap = "round";
+      if (type === "o") {
+        context.beginPath();
+        context.arc(x(markerX), y(markerY), markerSize, 0, Math.PI * 2);
+        context.stroke();
+      } else {
+        context.beginPath();
+        context.moveTo(x(markerX) - markerSize, y(markerY) - markerSize);
+        context.lineTo(x(markerX) + markerSize, y(markerY) + markerSize);
+        context.moveTo(x(markerX) + markerSize, y(markerY) - markerSize);
+        context.lineTo(x(markerX) - markerSize, y(markerY) + markerSize);
+        context.stroke();
+      }
+      context.restore();
+    }
+
+    drawPlayArrow([44, -21], [50, -31], [59, -29], [63, -17], colors.aqua);
+    drawPlayArrow([56, 7], [64, -1], [72, -3], [78, 0], colors.gold);
+    drawPlayArrow([51, 21], [59, 13], [68, 17], [74, 23], colors.aqua);
+
+    [
+      ["o", 42, -22, colors.board],
+      ["o", 55, 8, colors.board],
+      ["o", 77, 25, colors.board],
+      ["x", 49, 23, colors.red],
+      ["x", 65, -15, colors.red],
+      ["x", 81, 2, colors.red],
+    ].forEach(([type, markerX, markerY, color]) => {
+      drawPlayMarker(type, markerX, markerY, color);
+    });
+
     context.restore();
     context.strokeStyle = colors.board;
     context.lineWidth = Math.max(2, lineWidth(8 / 12));
@@ -505,15 +586,13 @@ function renderOverview() {
   const oldest = meta.seasons.at(-1).label;
   const latest = meta.seasons[0].label;
   const styleBreakdown = meta.namedStyleBreakdown;
-  const latestBreakdown = meta.latestSeasonBreakdown;
 
   main.innerHTML = `
     <article class="page">
       <section class="hero">
         <div class="hero-copy">
           <p class="eyebrow">NHL PLAYER STYLE MODEL · <span class="season-token">${escapeHTML(oldest)} to ${escapeHTML(latest)}</span></p>
-          <h1>See how players play, <span class="hero-accent">not just what they score.</span></h1>
-          <p class="lede">Explore role, identity, and change across seasons, teams, careers, and playoff runs.</p>
+          <h1>See <em>how</em> players play, <span class="hero-accent"><em>beyond</em> the stats</span></h1>
           <div class="hero-actions">
             <a class="button button-primary" href="#season">Explore a season</a>
             <a class="button" href="#glossary">Browse styles</a>
@@ -524,12 +603,8 @@ function renderOverview() {
             <canvas
               id="hero-rink"
               role="img"
-              aria-label="Regulation NHL half-rink drawn to scale with a 100 by 85 foot surface, 28 foot corner radius, official lines, faceoff markings, goal crease, net, and goalkeeper restricted area"
+              aria-label="Regulation NHL half-rink with official markings, tactical X and O player positions, and curved movement arrows"
             ></canvas>
-          </div>
-          <div class="rink-caption">
-            <span>NHL regulation proportions</span>
-            <span>100′ × 85′ half-rink</span>
           </div>
           <div class="rink-facts" aria-label="${number(meta.playerCount)} players across ${meta.seasonCount} seasons">
             <span><strong>${number(meta.playerCount)}</strong> players</span>
@@ -546,92 +621,289 @@ function renderOverview() {
             <span><small>to</small> ${escapeHTML(latest)}</span>
           </span>
         </div>
-        ${metric("Players analyzed", number(meta.playerCount), "unique NHL players")}
-        ${metric("Named styles", number(meta.namedStyleCount), `${styleBreakdown.forwards} forward · ${styleBreakdown.defense} defense`)}
-        ${metric(`${latest} profiles`, number(meta.latestSeasonPlayerCount), `${latestBreakdown.forwards} forwards · ${latestBreakdown.defense} defense`)}
+        ${metric("Players analyzed", number(meta.playerCount), "NHL players")}
+        ${metric("Different styles", number(meta.namedStyleCount), `${styleBreakdown.forwards} forward · ${styleBreakdown.defense} defense`)}
+        ${metric("Avg. Model Confidence", `${number(meta.averageModelConfidence, 1)}%`, "across all seasons")}
       </section>
 
-      <section class="philosophy-section">
-        <div class="philosophy-copy">
-          <h2>Why this project exists</h2>
-          <p>Hockey describes players by identity: finisher, playmaker, shutdown defenseman, role specialist. Those labels shape roster decisions, but they are often based on reputation. This project tests whether identity can be derived consistently from how a player is used and what they produce.</p>
-          <p class="philosophy-source">Built from public NHL Gamecenter and MoneyPuck data from 2008–09 onward.</p>
-        </div>
-        <div class="philosophy-questions" aria-label="Questions this project is designed to answer">
-          <p><span>01</span>Which player styles exist in a season?</p>
-          <p><span>02</span>What does a roster have—and what is missing?</p>
-          <p><span>03</span>How does a player’s style change over a career?</p>
-        </div>
-      </section>
+      <div class="overview-longform">
+        <section class="story-intro">
+          <p class="story-opening">In hockey, we often talk about a player's "identity" - enforcer or finisher or playmaker. It's one of hockey's most treasured features because a well-established identity is what often separates an NHL/AHL tweener from an NHL regular.</p>
+          <p class="story-question">But, is identity truly a data-independent property or can we generate a data-driven approach to assigning identity?</p>
+          <p>To answer the question above, I had to find a way to tackle the following:</p>
+          <div class="question-grid">
+            <p>What types of players exist in a given season?</p>
+            <p>How is a roster constructed stylistically — and what’s missing?</p>
+            <p>How does a player’s style evolve over the course of a career?</p>
+          </div>
+          <p>Everything here is generated from public NHL Gamecenter data combined with MoneyPuck player-level advanced metrics. The advanced-data era begins in 2008-09, which is the earliest season covered by the MoneyPuck files in this project.</p>
+          <p>Use the left navigation to explore Play Style Glossary, Season Level Trends, Career Trends, and Playoff Trends.</p>
+        </section>
 
-      <section class="analysis-grid">
-        <div class="chart-panel">
-          <div class="chart-title-row">
+        <section class="story-section" id="data-snapshot">
+          <div class="story-heading">
+            <h2>Big-Picture Snapshot of the Data</h2>
+          </div>
+          <div class="snapshot-grid">
             <div>
-              <h3>Model confidence by season</h3>
-              <p>Average probability assigned to each player’s top style.</p>
+              <span>Seasons analyzed</span>
+              <strong>${number(meta.seasonCount)}</strong>
             </div>
+            <div>
+              <span>Total NHL players</span>
+              <strong>${number(meta.playerCount)}</strong>
+            </div>
+            <div>
+              <span>Forward profiles</span>
+              <strong>${number(meta.profileDefinitions.forwards)}</strong>
+            </div>
+            <div>
+              <span>Defense profiles</span>
+              <strong>${number(meta.profileDefinitions.defense)}</strong>
+            </div>
+          </div>
+          <div class="definition-callout">
+            <h3>What “style profile definitions” means:</h3>
+            <p>Each season’s model learns K archetypes, then names them from the traits that are unusually high or low for that cluster. Some are clean roles like offense-driving, shot-blocking, or puck-pressure profiles; others are blended profiles whose names describe the strongest trait combination instead of using generic numbered labels.</p>
+          </div>
+          <div class="switch-grid">
+            <div>
+              <span>Forwards Median Switch Rate</span>
+              <strong>${number(meta.switchRates.forwards, 2)}</strong>
+            </div>
+            <div>
+              <span>Defense Median Switch Rate</span>
+              <strong>${number(meta.switchRates.defense, 2)}</strong>
+            </div>
+          </div>
+          <div class="definition-callout">
+            <h3>Interpreting median switch rate:</h3>
+            <p>Forwards median switch rate = 0.86 means the “typical” forward (among players with ≥3 seasons in the dataset) changes their top archetype in about 86% of year-to-year transitions.</p>
+            <p>Defense median switch rate = 0.90 means the “typical” defenseman changes archetype in about 90% of transitions.</p>
+          </div>
+        </section>
+
+        <section class="story-section" id="model-confidence">
+          <div class="story-heading">
+            <h2>How Confident was the Model Season by Season?</h2>
+          </div>
+          <div class="chart-panel overview-confidence-chart">
             <div class="legend" aria-label="Chart legend">
               <span><i style="--legend-color:var(--aqua)"></i>Forwards</span>
               <span><i style="--legend-color:var(--coral)"></i>Defense</span>
             </div>
+            <div class="canvas-wrap">
+              <canvas id="confidence-chart" role="img" aria-label="Average model confidence for forwards and defense by season"></canvas>
+            </div>
           </div>
-          <div class="canvas-wrap">
-            <canvas id="confidence-chart" role="img" aria-label="Average model confidence for forwards and defense by season"></canvas>
-          </div>
-        </div>
-        <div class="info-panel confidence-guide">
-          <h3>How to read it</h3>
-          <div>
-            <strong>Higher confidence</strong>
-            <p>One style clearly leads the player’s probability mix.</p>
-          </div>
-          <div>
-            <strong>Lower confidence</strong>
-            <p>The player fits several styles more evenly.</p>
-          </div>
-          <div>
-            <strong>Not a performance grade</strong>
-            <p>Confidence measures how distinct the style is, not how good the player is.</p>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section>
-        <div class="section-heading">
-          <div>
-            <h2>Understanding the model</h2>
+        <section class="story-section methods-section" id="methods">
+          <div class="story-heading">
+            <h2>Methods</h2>
           </div>
-          <p>Each player receives a ranked probability mix for that season.</p>
-        </div>
-        <div class="method-grid">
-          <article class="method-step" style="--step-color:var(--aqua)">
-            <span>01</span>
-            <h3>Normalize</h3>
-            <p>Per-60 rates and usage shares make players comparable.</p>
-          </article>
-          <article class="method-step" style="--step-color:var(--coral)">
-            <span>02</span>
-            <h3>Scale</h3>
-            <p>Robust scaling limits the influence of statistical outliers.</p>
-          </article>
-          <article class="method-step" style="--step-color:var(--gold)">
-            <span>03</span>
-            <h3>Reduce</h3>
-            <p>NMF groups correlated statistics into style components.</p>
-          </article>
-          <article class="method-step" style="--step-color:#5f8dd3">
-            <span>04</span>
-            <h3>Assign</h3>
-            <p>A mixture model returns each player’s ranked style probabilities.</p>
-          </article>
-        </div>
-      </section>
+          <p class="section-intro">At a high level, I’m learning a “style fingerprint” for each player-season using public data, then clustering those fingerprints into archetypes.</p>
 
-      <footer class="page-footer">
-        <span>Sources: NHL Gamecenter + MoneyPuck</span>
-        <span>Advanced-data era begins in 2008–09</span>
-      </footer>
+          <div class="data-used">
+            <h3>Data used</h3>
+            <p>From NHL game endpoints I aggregate per player:</p>
+            <ul>
+              <li>regular season vs playoff statistics</li>
+              <li>time on ice and special-teams usage</li>
+              <li>boxscore counting stats (goals/assists/points/shots/hits/blocks/PIM/takeaways/giveaways, etc.)</li>
+            </ul>
+            <p>From MoneyPuck player game files I add advanced regular-season signals:</p>
+            <ul>
+              <li>expected goals, shot quality, high-danger chances, and rebound chances</li>
+              <li>on-ice expected goals for/against and shot-attempt impact</li>
+              <li>situation splits for 5-on-5, power play, and penalty kill</li>
+              <li>shift starts, play-continuation metrics, penalties drawn, and faceoff context</li>
+            </ul>
+            <p>Because those MoneyPuck files start in 2008, the site focuses on seasons from 2008-09 forward.</p>
+          </div>
+
+          <div class="method-stack">
+            <article class="method-detail">
+              <span>01</span>
+              <div>
+                <h3>Step 1 — Normalize for ice time (so players are comparable)</h3>
+                <p>Players have different ice time, so I convert raw counts into per-60 rates:</p>
+                <div class="formula" aria-label="Shots per 60 equals shots divided by time on ice in seconds divided by 3600">
+                  <span>Shots/60</span>
+                  <b>=</b>
+                  <span>Shots ÷ (TOI<sub>seconds</sub> / 3600)</span>
+                </div>
+                <p>Special-teams usage is represented as share of total TOI:</p>
+                <div class="formula formula-pair">
+                  <span>PP Share = PP TOI ÷ Total TOI</span>
+                  <span>PK Share = PK TOI ÷ Total TOI</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="method-detail">
+              <span>02</span>
+              <div>
+                <h3>Step 2 — Put all features on the same scale</h3>
+                <p>Some stats have heavy tails. To keep a few extreme values from dominating, I use a robust scaling transformation:</p>
+                <div class="formula" aria-label="x star equals x minus median of x divided by the interquartile range of x">
+                  <span>x<sup>*</sup></span>
+                  <b>=</b>
+                  <span>(x − median(x)) ÷ IQR(x)</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="method-detail">
+              <span>03</span>
+              <div>
+                <h3>Step 3 — Compress into a smaller “style fingerprint”</h3>
+                <p>To summarize correlated features, I use Non-negative Matrix Factorization (NMF):</p>
+                <div class="formula" aria-label="X approximately equals W H">
+                  <span>X</span>
+                  <b>≈</b>
+                  <span>WH</span>
+                </div>
+                <p>Think of each row of W as a compact “style fingerprint” describing how a player produces their results.</p>
+              </div>
+            </article>
+
+            <article class="method-detail">
+              <span>04</span>
+              <div>
+                <h3>Step 4 — Learn archetypes with a probabilistic clustering model</h3>
+                <p>I fit a Gaussian Mixture Model (GMM) to the fingerprints:</p>
+                <div class="formula formula-wide" aria-label="p of z equals the sum from k equals 1 to K of pi k times a normal distribution">
+                  <span>p(z)</span>
+                  <b>=</b>
+                  <span>Σ<sub>k=1</sub><sup>K</sup> π<sub>k</sub> N(z | μ<sub>k</sub>, Σ<sub>k</sub>)</span>
+                </div>
+                <p>For each player-season, the model outputs archetype probabilities using this formula:</p>
+                <div class="formula formula-wide">
+                  <span>p<sub>ik</sub></span>
+                  <b>=</b>
+                  <span>P(Archetype = k | z<sub>i</sub>)</span>
+                </div>
+                <p>Because this is soft clustering, a player can be “70% Playmaking Scorer, 20% Two-Way Creator, 10% Role Specialist” rather than being forced into a single bucket.</p>
+                <p>I summarize how “mixed” a player is using:</p>
+                <div class="formula formula-wide">
+                  <span>Mixedness</span>
+                  <b>=</b>
+                  <span>1 − max<sub>k</sub>(p<sub>ik</sub>)</span>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="story-section" id="references">
+          <div class="story-heading">
+            <h2>References</h2>
+          </div>
+          <p class="section-intro">This is a list of peer-reviewed papers, conference papers, and academic theses that I learned and took inspiration from while working on this project:</p>
+          <ol class="reference-list">
+            <li>
+              <p>Gupta, P. (2025). Categorizing Playing Styles of Ice Hockey Players using Gaussian Mixture Models (GMM) and Non-negative Matrix Factorization (NMF).</p>
+              <a href="https://liu.diva-portal.org/smash/record.jsf?aq2=%5B%5B%5D%5D&amp;c=23&amp;af=%5B%5D&amp;searchType=LIST_LATEST&amp;sortOrder2=title_sort_asc&amp;query=&amp;language=no&amp;pid=diva2%3A2004537&amp;aq=%5B%5B%5D%5D&amp;sf=all&amp;aqe=%5B%5D&amp;sortOrder=author_sort_asc&amp;onlyFullText=false&amp;noOfRows=50&amp;dswid=-733" target="_blank" rel="noreferrer">https://liu.diva-portal.org/smash/record.jsf?aq2=%5B%5B%5D%5D&amp;c=23&amp;af=%5B%5D&amp;searchType=LIST_LATEST&amp;sortOrder2=title_sort_asc&amp;query=&amp;language=no&amp;pid=diva2%3A2004537&amp;aq=%5B%5B%5D%5D&amp;sf=all&amp;aqe=%5B%5D&amp;sortOrder=author_sort_asc&amp;onlyFullText=false&amp;noOfRows=50&amp;dswid=-733</a>
+            </li>
+            <li>
+              <p>Rosendahl, A. (2024). Player Type Classification in Ice Hockey Using Soft Clustering.</p>
+              <a href="https://www.diva-portal.org/smash/record.jsf?pid=diva2%3A1886390&amp;dswid=-2788" target="_blank" rel="noreferrer">https://www.diva-portal.org/smash/record.jsf?pid=diva2%3A1886390</a>
+            </li>
+            <li>
+              <p>Gupta, P. et al. (2025). A Gaussian Mixture Model Approach for Characterizing Playing Styles of Ice Hockey Players.</p>
+              <a href="https://www.ida.liu.se/research/sportsanalytics/LINHAC/LINHAC25/papers/linhac25-paper7.pdf" target="_blank" rel="noreferrer">https://www.ida.liu.se/research/sportsanalytics/LINHAC/LINHAC25/papers/linhac25-paper7.pdf</a>
+            </li>
+            <li>
+              <p>Schulte, O., Zhao, Z., Javan, M., Desaulniers, P. (2017). Apples-to-Apples: Clustering and Ranking NHL Players Using Location Information and Scoring Impact.</p>
+              <a href="https://www.cs.sfu.ca/~oschulte/files/pubs/sloan-fix.pdf" target="_blank" rel="noreferrer">https://www.cs.sfu.ca/~oschulte/files/pubs/sloan-fix.pdf</a>
+            </li>
+            <li>
+              <p>Macdonald, B. (2012). Adjusted Plus-Minus for NHL Players using Ridge Regression with Goals, Shots, Fenwick, and Corsi.</p>
+              <a href="https://ideas.repec.org/a/bpj/jqsprt/v8y2012i3n8.html" target="_blank" rel="noreferrer">https://ideas.repec.org/a/bpj/jqsprt/v8y2012i3n8.html</a>
+            </li>
+          </ol>
+
+          <div class="reference-subsection">
+            <h3>Key open-source / reference links</h3>
+            <ul class="link-list">
+              <li>Zmalski — Unofficial NHL API Reference (api-web.nhle.com + stats/rest): <a href="https://github.com/Zmalski/NHL-API-Reference" target="_blank" rel="noreferrer">https://github.com/Zmalski/NHL-API-Reference</a></li>
+              <li>Streamlit (app framework): <a href="https://streamlit.io" target="_blank" rel="noreferrer">https://streamlit.io</a></li>
+              <li>st-aggrid (tables): <a href="https://github.com/PablocFonseca/streamlit-aggrid" target="_blank" rel="noreferrer">https://github.com/PablocFonseca/streamlit-aggrid</a></li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="story-section" id="private-data">
+          <div class="story-heading">
+            <h2>What I'd do next with private tracking data</h2>
+          </div>
+          <p class="section-intro">The public NHL + MoneyPuck data can tell you a lot, but NHL teams have access to even richer behind-the-scenes streams. Here are the most natural extensions of this project and exactly what data I’d use if I had access to it.</p>
+
+          <div class="extension-grid">
+            <article>
+              <span>01</span>
+              <h3>1) Full-resolution puck &amp; player tracking</h3>
+              <p>The NHL’s puck-and-player tracking system includes infrared cameras and emitters in pucks and sweaters that generates raw positional samples many times per second. While we do have Public NHL EDGE data, that data is curated and insulated from inspection by public. From conversations with NHL front office staff, teams have access to much more complete tracking data behind the scenes.</p>
+              <h4>What I would look at + calculate:</h4>
+              <ul>
+                <li>skating acceleration bursts, high-speed entries, &amp; transition routes</li>
+                <li>gap control and spacing (especially for defense)</li>
+                <li>repeated sprint profiles &amp; fatigue signatures over shifts</li>
+                <li>puck movement networks + “puck tempo” (how quickly the puck moves to dangerous space)</li>
+              </ul>
+            </article>
+
+            <article>
+              <span>02</span>
+              <h3>2) Proprietary event data + video-linked analytics (i.e. Sportlogiq)</h3>
+              <p>Vendors track far more than public play-by-play: pass types, forecheck pressure, retrievals, controlled exits/entries, lane creation, etc.</p>
+              <h4>What I would look at + calculate:</h4>
+              <ul>
+                <li>true “puck pressure” and “play-driving” features from micro-events</li>
+                <li>archetypes based on process (how plays are created) not just outcomes which is what I currently have here.</li>
+              </ul>
+            </article>
+
+            <article>
+              <span>03</span>
+              <h3>3) Practice wearables &amp; sports science (i.e. Catapult)</h3>
+              <p>Teams often collect practice load data from wearable sensors (IMUs) and sometimes heart-rate/physiology data.</p>
+              <p>This data enables biomechanics-style insights (exertion vs. outcome asymmetry, fatigue, &amp; return-to-play baselines).</p>
+              <h4>What I would look at + calculate:</h4>
+              <ul>
+                <li>workload-adjusted archetypes (how style changes under load)</li>
+                <li>injury-risk / recovery-sensitive style shifts</li>
+                <li>post-injury style drift detection</li>
+              </ul>
+            </article>
+
+            <article>
+              <span>04</span>
+              <h3>4) Internal roster/contract/cap tools</h3>
+              <p>Teams also have internal access to cap/contract information and transaction tools that the public can't access.</p>
+              <h4>What I would look at + calculate:</h4>
+              <ul>
+                <li>link archetype needs to cap-efficient roster construction</li>
+                <li>simulate “archetype coverage per dollar” as a roster optimization view</li>
+              </ul>
+            </article>
+          </div>
+
+          <div class="reference-subsection">
+            <h3>Sources for the “behind the scenes” data streams:</h3>
+            <ul class="link-list">
+              <li>NHL EDGE and tracking system overview: <a href="https://www.nhl.com/news/nhl-edge-launches-website-for-puck-and-player-tracking-data" target="_blank" rel="noreferrer">https://www.nhl.com/news/nhl-edge-launches-website-for-puck-and-player-tracking-data</a></li>
+              <li>Wearable practice tech + examples (Catapult etc): <a href="https://www.dailyfaceoff.com/news/nhlpa-reminds-players-of-their-right-to-control-or-destroy-wearable-tech-data" target="_blank" rel="noreferrer">https://www.dailyfaceoff.com/news/nhlpa-reminds-players-of-their-right-to-control-or-destroy-wearable-tech-data</a></li>
+              <li>Catapult hockey wearables overview: <a href="https://www.catapult.com/sports/ice-hockey" target="_blank" rel="noreferrer">https://www.catapult.com/sports/ice-hockey</a></li>
+              <li>Example of wearable tracking described publicly: <a href="https://www.si.com/edge/2015/02/20/tech-talk-catapult-tracking-nhl-data-injury-reduction" target="_blank" rel="noreferrer">https://www.si.com/edge/2015/02/20/tech-talk-catapult-tracking-nhl-data-injury-reduction</a></li>
+              <li>Sportlogiq hockey platform: <a href="https://www.sportlogiq.com/hockey/" target="_blank" rel="noreferrer">https://www.sportlogiq.com/hockey/</a></li>
+              <li>NHL cap/contract iPad app (team-side tooling): <a href="https://apnews.com/article/49b2f0421df504555bbc940bb861e4a2" target="_blank" rel="noreferrer">https://apnews.com/article/49b2f0421df504555bbc940bb861e4a2</a></li>
+            </ul>
+          </div>
+        </section>
+        <p class="data-disclaimer">I try to keep the data as up-to-date as possible but there's always a chance that things may be out of date.</p>
+      </div>
     </article>
   `;
 
