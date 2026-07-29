@@ -132,6 +132,7 @@ def build_glossary(
     maps: dict[str, dict[str, dict[int, str]]],
     all_frames: dict[str, list[pd.DataFrame]],
 ) -> dict[str, list[dict[str, Any]]]:
+    minimum_examples = 4
     season_groups = [
         ("20212022", "20252026"),
         ("20172018", "20202021"),
@@ -162,6 +163,7 @@ def build_glossary(
         ] = defaultdict(lambda: defaultdict(dict))
         for frame in all_frames[group]:
             season = str(frame["season"].iloc[0])
+            season_map = maps[group][season]
             season_group = next(
                 (
                     index
@@ -172,37 +174,97 @@ def build_glossary(
             )
             if season_group is None:
                 continue
+            clusters_by_name: dict[str, list[int]] = defaultdict(list)
+            for cluster, name in season_map.items():
+                if f"p{cluster}" in frame.columns:
+                    clusters_by_name[name].append(cluster)
+
             for _, row in frame.iterrows():
-                cluster = int(row["top_cluster"])
-                name = maps[group][season].get(cluster)
-                if not name:
-                    continue
                 player_id = int(row["player_id"])
                 games_value = row.get("reg_games", 0)
                 games = float(games_value) if pd.notna(games_value) else 0.0
-                candidate = candidates[name][season_group].setdefault(
-                    player_id,
-                    {
-                        "id": player_id,
-                        "name": str(row["full_name"]),
-                        "games": 0.0,
-                    },
-                )
-                candidate["games"] += games
+                if games <= 0:
+                    continue
+                assigned_name = season_map.get(int(row["top_cluster"]))
+                probability_weight = max(games, 1.0)
+
+                for name, clusters in clusters_by_name.items():
+                    probabilities = [
+                        float(row[f"p{cluster}"])
+                        for cluster in clusters
+                        if pd.notna(row[f"p{cluster}"])
+                    ]
+                    if not probabilities:
+                        continue
+                    probability = max(probabilities)
+                    candidate = candidates[name][season_group].setdefault(
+                        player_id,
+                        {
+                            "id": player_id,
+                            "name": str(row["full_name"]),
+                            "games": 0.0,
+                            "assignedGames": 0.0,
+                            "probabilityTotal": 0.0,
+                            "probabilityWeight": 0.0,
+                            "maxProbability": 0.0,
+                            "seasonGroup": season_group,
+                        },
+                    )
+                    candidate["games"] += games
+                    candidate["probabilityTotal"] += (
+                        probability * probability_weight
+                    )
+                    candidate["probabilityWeight"] += probability_weight
+                    candidate["maxProbability"] = max(
+                        float(candidate["maxProbability"]),
+                        probability,
+                    )
+                    if assigned_name == name:
+                        candidate["assignedGames"] += games
 
         examples: dict[str, list[dict[str, Any]]] = defaultdict(list)
-        for name, grouped_candidates in candidates.items():
+        for name in variants:
+            grouped_candidates = candidates.get(name, {})
             used_ids: set[int] = set()
+
+            def average_probability(player: dict[str, Any]) -> float:
+                weight = float(player["probabilityWeight"])
+                return (
+                    float(player["probabilityTotal"]) / weight
+                    if weight
+                    else 0.0
+                )
+
+            selected: list[dict[str, Any]] = []
+
+            def add_example(player: dict[str, Any]) -> None:
+                player_id = int(player["id"])
+                if player_id in used_ids:
+                    return
+                used_ids.add(player_id)
+                selected.append(player)
+
+            # Preserve the four-era structure whenever a style has a distinct
+            # top-assigned player in that era.
             for season_group in range(len(season_groups)):
                 ranked = sorted(
-                    grouped_candidates.get(season_group, {}).values(),
+                    (
+                        player
+                        for player in grouped_candidates.get(
+                            season_group,
+                            {},
+                        ).values()
+                        if float(player["assignedGames"]) > 0
+                    ),
                     key=lambda player: (
+                        -float(player["assignedGames"]),
+                        -average_probability(player),
                         -float(player["games"]),
                         str(player["name"]),
                         int(player["id"]),
                     ),
                 )
-                selected = next(
+                selected_player = next(
                     (
                         player
                         for player in ranked
@@ -210,17 +272,84 @@ def build_glossary(
                     ),
                     None,
                 )
-                if selected is None:
-                    continue
-                player_id = int(selected["id"])
-                used_ids.add(player_id)
-                examples[name].append(
-                    {
-                        "id": player_id,
-                        "name": str(selected["name"]),
-                        "games": clean(selected["games"], 0),
-                    }
+                if selected_player is not None:
+                    add_example(selected_player)
+
+            # A style may only exist in one or two eras. Use additional
+            # top-assigned players from those eras before considering close
+            # probability matches.
+            assigned_fallbacks = sorted(
+                (
+                    player
+                    for period in grouped_candidates.values()
+                    for player in period.values()
+                    if float(player["assignedGames"]) > 0
+                    and int(player["id"]) not in used_ids
+                ),
+                key=lambda player: (
+                    int(player["seasonGroup"]),
+                    -float(player["assignedGames"]),
+                    -average_probability(player),
+                    -float(player["games"]),
+                    str(player["name"]),
+                    int(player["id"]),
+                ),
+            )
+            for player in assigned_fallbacks:
+                if len(selected) >= minimum_examples:
+                    break
+                add_example(player)
+
+            # Very small or short-lived clusters can have fewer than four
+            # assigned players. Fill those final slots with the strongest
+            # probability-weighted matches from seasons where the style
+            # existed.
+            probability_fallbacks = sorted(
+                (
+                    player
+                    for period in grouped_candidates.values()
+                    for player in period.values()
+                    if int(player["id"]) not in used_ids
+                ),
+                key=lambda player: (
+                    -(average_probability(player) * float(player["games"])),
+                    -average_probability(player),
+                    -float(player["maxProbability"]),
+                    int(player["seasonGroup"]),
+                    -float(player["games"]),
+                    str(player["name"]),
+                    int(player["id"]),
+                ),
+            )
+            for player in probability_fallbacks:
+                if len(selected) >= minimum_examples:
+                    break
+                add_example(player)
+
+            if len(selected) < minimum_examples:
+                raise RuntimeError(
+                    f"{group} style {name!r} has only "
+                    f"{len(selected)} unique glossary examples"
                 )
+
+            selected.sort(
+                key=lambda player: (
+                    int(player["seasonGroup"]),
+                    -float(player["assignedGames"]),
+                    -average_probability(player),
+                    -float(player["games"]),
+                    str(player["name"]),
+                    int(player["id"]),
+                )
+            )
+            examples[name] = [
+                {
+                    "id": int(player["id"]),
+                    "name": str(player["name"]),
+                    "games": clean(player["games"], 0),
+                }
+                for player in selected[:minimum_examples]
+            ]
 
         rows: list[dict[str, Any]] = []
         for name in sorted(variants):
