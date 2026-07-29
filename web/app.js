@@ -1,5 +1,9 @@
 const DATA_ROOT = "/data";
-const DATA_VERSION = "20260729-team-rosters-v3";
+const DATA_VERSION = "20260729-need-finder-v4";
+const NEED_GAME_VALUES = [
+  0, 5, 10, 15, 20, 25, 30, 35, 40,
+  45, 50, 55, 60, 65, 70, 75, 80, 82,
+];
 
 const appState = {
   core: null,
@@ -330,6 +334,29 @@ function xgBand(value) {
   if (numeric >= 0.55) return "is-high";
   if (numeric >= 0.48) return "is-mid";
   return "is-low";
+}
+
+function needSimilarityBand(value) {
+  const numeric = Number(value || 0);
+  if (numeric >= 95) return "is-elite";
+  if (numeric >= 90) return "is-strong";
+  if (numeric >= 80) return "is-good";
+  if (numeric >= 70) return "is-watch";
+  if (numeric >= 55) return "is-light";
+  return "is-low";
+}
+
+function needConfidenceBand(value) {
+  const numeric = Number(value || 0) * 100;
+  if (numeric > 90) return "is-high";
+  if (numeric >= 80) return "is-mid";
+  return "is-low";
+}
+
+function signedNumber(value) {
+  const numeric = Number(value || 0);
+  if (numeric > 0) return `+${number(numeric)}`;
+  return number(numeric);
 }
 
 function mean(values) {
@@ -2011,71 +2038,292 @@ function Counter(values) {
   return counts;
 }
 
-function renderNeedFinder(groupData) {
-  const profiles = groupData.profiles.map((profile) => profile.name);
-  const teams = [...new Set(
-    groupData.players.flatMap((player) => player.team.split("/").filter(Boolean)),
-  )].sort();
-  const target = profiles[0] || "";
+function needFinderTargets(groupData) {
+  const configured = groupData.needFinder?.targets || [];
+  if (configured.length) return configured;
+  return groupData.profiles.map((profile, cluster) => ({
+    profile: profile.name,
+    cluster,
+  }));
+}
+
+function needTeamMarks(player, season) {
+  const teams = teamCodes(player.team);
+  if (!teams.length) return "";
   return `
-    <div class="controls" style="margin-bottom:24px">
-      <div class="field">
-        <label for="need-profile">Target style</label>
-        <select id="need-profile">${profiles.map((name) => `<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`).join("")}</select>
-      </div>
-      <div class="field">
-        <label for="need-team">Exclude team</label>
-        <select id="need-team"><option value="">None</option>${teams.map((team) => `<option value="${escapeHTML(team)}">${escapeHTML(team)}</option>`).join("")}</select>
-      </div>
-      <div class="field">
-        <label for="need-games">Minimum games · <span id="need-games-value">20</span></label>
-        <input id="need-games" type="range" min="0" max="82" value="20" step="5" />
-      </div>
-    </div>
-    <div id="need-results">${needResults(groupData.players, target, "", 20)}</div>
+    <span class="need-team-list" role="list" aria-label="${teams.length === 1 ? "Team" : "Teams"}">
+      ${teams
+        .map(
+          (team) => `
+            <span
+              class="need-team-mark"
+              data-asset-frame
+              role="listitem"
+              aria-label="${escapeHTML(team)}"
+              title="${escapeHTML(team)}"
+            >
+              <span class="need-team-code" aria-hidden="true">${escapeHTML(team)}</span>
+              <img
+                class="need-team-logo"
+                data-asset-sources="${assetSources(teamLogoSources(team, season))}"
+                alt=""
+                loading="lazy"
+                decoding="async"
+              />
+            </span>
+          `,
+        )
+        .join("")}
+      <span class="need-team-text">${escapeHTML(player.team)}</span>
+    </span>
   `;
 }
 
-function needResults(players, target, excludedTeam, minGames) {
-  const matches = players
+function needStat(label, value) {
+  return `
+    <div class="need-stat">
+      <dt>${escapeHTML(label)}</dt>
+      <dd>${escapeHTML(value)}</dd>
+    </div>
+  `;
+}
+
+function playerTargetSimilarity(player, cluster, targetProfile) {
+  const direct = Number(player.targetScores?.[cluster]);
+  if (Number.isFinite(direct)) return direct;
+  const fallback = player.probabilities.find(
+    (item) => item.profile === targetProfile,
+  );
+  return Number(((fallback?.value || 0) * 100).toFixed(1));
+}
+
+function needGamesValue(control) {
+  const index = Math.max(
+    0,
+    Math.min(NEED_GAME_VALUES.length - 1, Number(control?.value || 0)),
+  );
+  return NEED_GAME_VALUES[index];
+}
+
+function needPlayerCard(player, rank, targetSimilarity, details) {
+  const similarityBand = needSimilarityBand(targetSimilarity);
+  const confidenceClass = needConfidenceBand(player.confidence);
+  const careerHref = `#career?player=${encodeURIComponent(player.id)}&amp;group=${escapeHTML(appState.group)}`;
+  const styleDetails = details?.[String(player.cluster)] || {
+    name: player.profile,
+    summary: "",
+    higher: "None",
+    lower: "None",
+  };
+  const progress = Math.max(0, Math.min(100, targetSimilarity));
+  return `
+    <details class="need-player-card" style="--profile:${profileColor(player.profile)}">
+      <summary class="need-player-summary">
+        <span class="need-rank" aria-label="Rank ${rank}">${String(rank).padStart(2, "0")}</span>
+        ${rosterPlayerHeadshot(player, appState.season)}
+        <span class="need-player-identity">
+          <strong>${escapeHTML(player.name)}</strong>
+          <span>${escapeHTML(player.position)}</span>
+          ${needTeamMarks(player, appState.season)}
+        </span>
+        <span class="need-similarity ${similarityBand}">
+          <span class="need-summary-label">Target similarity</span>
+          <strong>${number(targetSimilarity, 1)}%</strong>
+          <span
+            class="need-similarity-track"
+            role="progressbar"
+            aria-label="${escapeHTML(player.name)} target similarity"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="${escapeHTML(targetSimilarity)}"
+          >
+            <span style="width:${progress}%"></span>
+          </span>
+        </span>
+        <span class="need-current-style">
+          <span class="need-summary-label">Archetype</span>
+          ${profileChip(player.profile)}
+          <span class="need-confidence ${confidenceClass}">
+            ${number(Number(player.confidence || 0) * 100, 1)}% confidence
+          </span>
+        </span>
+        <span class="need-quick-stats" aria-label="Regular-season summary">
+          <span><small>GP</small><strong>${number(player.games)}</strong></span>
+          <span><small>PTS</small><strong>${number(player.points)}</strong></span>
+          <span><small>ATOI</small><strong>${escapeHTML(player.regAtoi || minuteClock(player.toi))}</strong></span>
+        </span>
+        <span class="need-disclosure" aria-hidden="true"></span>
+      </summary>
+      <div class="need-player-detail">
+        <section class="need-style-detail">
+          <p class="eyebrow">Archetype details</p>
+          <h4>${escapeHTML(styleDetails.name || player.profile)}</h4>
+          ${styleDetails.summary ? `<p>${escapeHTML(styleDetails.summary)}</p>` : ""}
+          <dl class="need-trait-list">
+            <div>
+              <dt>Higher traits</dt>
+              <dd>${escapeHTML(styleDetails.higher || "None")}</dd>
+            </div>
+            <div>
+              <dt>Lower traits</dt>
+              <dd>${escapeHTML(styleDetails.lower || "None")}</dd>
+            </div>
+          </dl>
+          <a class="need-career-link" href="${careerHref}">Open player profile</a>
+        </section>
+        <section class="need-season-stats">
+          <h4>Regular season</h4>
+          <dl class="need-stat-grid">
+            ${needStat("GP", number(player.games))}
+            ${needStat("ATOI", player.regAtoi || minuteClock(player.toi))}
+            ${needStat("P", number(player.points))}
+            ${needStat("G", number(player.goals))}
+            ${needStat("A", number(player.assists))}
+            ${needStat("SOG", number(player.shots))}
+            ${needStat("+/-", signedNumber(player.plusMinus))}
+            ${needStat("PIM", number(player.pim))}
+          </dl>
+        </section>
+        <section class="need-season-stats">
+          <h4>Playoffs</h4>
+          <dl class="need-stat-grid">
+            ${needStat("GP", number(player.playoffGames))}
+            ${needStat("ATOI", player.playoffAtoi || minuteClock(player.playoffToi))}
+            ${needStat("P", number(player.playoffPoints))}
+            ${needStat("G", number(player.playoffGoals))}
+            ${needStat("A", number(player.playoffAssists))}
+            ${needStat("SOG", number(player.playoffShots))}
+            ${needStat("+/-", signedNumber(player.playoffPlusMinus))}
+            ${needStat("PIM", number(player.playoffPim))}
+          </dl>
+        </section>
+      </div>
+    </details>
+  `;
+}
+
+function renderNeedFinder(groupData) {
+  const targets = needFinderTargets(groupData);
+  const teams = [...new Set(
+    groupData.players.flatMap((player) => player.team.split("/").filter(Boolean)),
+  )].sort();
+  const target = targets[0] || { profile: "", cluster: 0 };
+  return `
+    <section class="need-finder-intro">
+      <div class="need-finder-title">
+        <h2>Need Finder (find players who match a target archetype)</h2>
+      </div>
+      <div class="need-finder-guide">
+        <div>
+          <h3>What you’re looking at</h3>
+          <ul>
+            <li>A ranked list of players who best match a selected style profile.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>How to use it</h3>
+          <ul>
+            <li>Pick the archetype you want to add to a roster.</li>
+            <li>Optionally exclude your own team.</li>
+            <li>Increase minimum regular-season games to avoid tiny samples.</li>
+            <li>“Target similarity (%)” is the model’s estimated probability that the player belongs to that archetype.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+    <section class="need-finder-controls" aria-label="Need finder filters">
+      <div class="field">
+        <label for="need-team">Exclude team (optional)</label>
+        <select id="need-team"><option value="">(none)</option>${teams.map((team) => `<option value="${escapeHTML(team)}">${escapeHTML(team)}</option>`).join("")}</select>
+      </div>
+      <div class="field">
+        <label for="need-profile">Target archetype</label>
+        <select id="need-profile">${targets
+          .map(
+            (item) =>
+              `<option value="${escapeHTML(item.cluster)}">${escapeHTML(item.profile)}</option>`,
+          )
+          .join("")}</select>
+      </div>
+      <div class="field need-games-field">
+        <div class="need-range-label">
+          <label for="need-games">Min REG games</label>
+          <output id="need-games-value" for="need-games">20</output>
+        </div>
+        <input
+          id="need-games"
+          type="range"
+          min="0"
+          max="${NEED_GAME_VALUES.length - 1}"
+          value="${NEED_GAME_VALUES.indexOf(20)}"
+          step="1"
+          aria-valuemin="0"
+          aria-valuemax="82"
+          aria-valuenow="20"
+          aria-valuetext="20 regular-season games"
+        />
+        <div class="need-range-ends" aria-hidden="true"><span>0</span><span>82</span></div>
+      </div>
+    </section>
+    <div id="need-results" aria-live="polite">${needResults(groupData, target.cluster, target.profile, "", 20)}</div>
+  `;
+}
+
+function needResults(groupData, targetCluster, targetProfile, excludedTeam, minGames) {
+  const eligible = groupData.players
     .map((player) => ({
       ...player,
-      targetFit:
-        player.probabilities.find((item) => item.profile === target)?.value || 0,
+      targetSimilarity: playerTargetSimilarity(
+        player,
+        targetCluster,
+        targetProfile,
+      ),
     }))
     .filter(
       (player) =>
         player.games >= minGames &&
-        !player.team.split("/").includes(excludedTeam) &&
-        player.targetFit > 0,
+        (!excludedTeam || !String(player.team || "").includes(excludedTeam)),
     )
-    .sort((a, b) => b.targetFit - a.targetFit)
-    .slice(0, 30);
+    .sort(
+      (a, b) =>
+        b.targetSimilarity - a.targetSimilarity ||
+        Number(b.points || 0) - Number(a.points || 0) ||
+        Number(a.needOrder || 0) - Number(b.needOrder || 0),
+    );
+  const matches = eligible.slice(0, 80);
   if (!matches.length) {
-    return `<div class="empty-state">No players match those filters.</div>`;
+    return `<div class="empty-state">No players meet those filters.</div>`;
   }
   return `
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead><tr><th>Player</th><th>Team</th><th>Top style</th><th class="numeric">Target fit</th><th class="numeric">GP</th><th class="numeric">PTS</th></tr></thead>
-        <tbody>
-          ${matches
-            .map(
-              (player) => `
-                <tr>
-                  <td><strong>${escapeHTML(player.name)}</strong><br><span class="result-count">${escapeHTML(player.position)}</span></td>
-                  <td>${escapeHTML(player.team)}</td>
-                  <td>${profileChip(player.profile)}</td>
-                  <td class="numeric">${percent(player.targetFit)}</td>
-                  <td class="numeric">${number(player.games)}</td>
-                  <td class="numeric">${number(player.points)}</td>
-                </tr>
-              `,
-            )
-            .join("")}
-        </tbody>
-      </table>
-    </div>
+    <section class="need-results-board">
+      <header class="need-results-header">
+        <div>
+          <p class="eyebrow">Ranked matches</p>
+          <h3>${escapeHTML(targetProfile)}</h3>
+          <p>Ordered by target similarity, then regular-season points.</p>
+        </div>
+        <div class="need-results-count">
+          <strong>${number(matches.length)}</strong>
+          <span>of ${number(eligible.length)} eligible players shown</span>
+        </div>
+      </header>
+      <ol class="need-result-list">
+        ${matches
+          .map(
+            (player, index) => `
+              <li>
+                ${needPlayerCard(
+                  player,
+                  index + 1,
+                  player.targetSimilarity,
+                  groupData.needFinder?.details,
+                )}
+              </li>
+            `,
+          )
+          .join("")}
+      </ol>
+    </section>
   `;
 }
 
@@ -2119,7 +2367,7 @@ async function renderSeason() {
         ["snapshot", "Snapshot"],
         ["players", "Players"],
         ["teams", "Team roster construction"],
-        ["needs", "Need finder"],
+        ["needs", "Need Finder"],
       ],
       appState.seasonTab,
       "season",
@@ -2189,16 +2437,33 @@ function bindNeedFinder(groupData) {
   const team = document.querySelector("#need-team");
   const games = document.querySelector("#need-games");
   const results = document.querySelector("#need-results");
+  const output = document.querySelector("#need-games-value");
+  const targets = needFinderTargets(groupData);
   const draw = () => {
-    document.querySelector("#need-games-value").textContent = games.value;
-    results.innerHTML = needResults(
-      groupData.players,
-      profile.value,
-      team.value,
-      Number(games.value),
+    if (!profile || !team || !games || !results) return;
+    const targetCluster = Number(profile.value);
+    const target = targets.find(
+      (item) => Number(item.cluster) === targetCluster,
     );
+    const minGames = needGamesValue(games);
+    if (output) output.textContent = minGames;
+    games.setAttribute("aria-valuenow", String(minGames));
+    games.setAttribute(
+      "aria-valuetext",
+      `${minGames} regular-season games`,
+    );
+    results.innerHTML = needResults(
+      groupData,
+      targetCluster,
+      target?.profile || profile.options[profile.selectedIndex]?.text || "",
+      team.value,
+      minGames,
+    );
+    hydratePlayerAssets(results);
   };
-  [profile, team, games].forEach((control) => control?.addEventListener("input", draw));
+  profile?.addEventListener("change", draw);
+  team?.addEventListener("change", draw);
+  games?.addEventListener("input", draw);
 }
 
 function careerPlayers(records, group) {

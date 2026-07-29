@@ -81,6 +81,35 @@ if (
     "Team roster construction is missing its Streamlit content or visual assets.",
   );
 }
+if (
+  !appSource.includes(
+    "<h2>Need Finder (find players who match a target archetype)</h2>",
+  ) ||
+  !appSource.includes(
+    "A ranked list of players who best match a selected style profile.",
+  ) ||
+  !appSource.includes(
+    "“Target similarity (%)” is the model’s estimated probability that the player belongs to that archetype.",
+  ) ||
+  !appSource.includes("<label for=\"need-team\">Exclude team (optional)</label>") ||
+  !appSource.includes("<option value=\"\">(none)</option>") ||
+  !appSource.includes("<label for=\"need-profile\">Target archetype</label>") ||
+  !appSource.includes("<label for=\"need-games\">Min REG games</label>") ||
+  !appSource.includes("const NEED_GAME_VALUES = [") ||
+  !appSource.includes("80, 82,") ||
+  !appSource.includes("aria-valuemax=\"82\"") ||
+  !appSource.includes("const minGames = needGamesValue(games)") ||
+  !appSource.includes("const matches = eligible.slice(0, 80)") ||
+  !appSource.includes("Number(b.points || 0) - Number(a.points || 0)") ||
+  !appSource.includes("hydratePlayerAssets(results)") ||
+  !stylesSource.includes(".need-finder-intro") ||
+  !stylesSource.includes(".need-player-detail") ||
+  !stylesSource.includes(".need-similarity-track")
+) {
+  throw new Error(
+    "Need Finder is missing its Streamlit content, exact ranking logic, or responsive scouting presentation.",
+  );
+}
 
 const seasonPayloads = await Promise.all(
   data.meta.seasons.map(async ({ key }) => ({
@@ -98,6 +127,58 @@ for (const { key, payload } of seasonPayloads) {
     const groupProfileNames = payload[group].profiles.map(
       (profile) => profile.name,
     );
+    const needFinder = payload[group]?.needFinder;
+    const needTargets = needFinder?.targets || [];
+    const targetProfiles = needTargets.map((target) => target.profile);
+    const maxTargetCluster = Math.max(
+      ...needTargets.map((target) => Number(target.cluster)),
+    );
+    if (
+      !needTargets.length ||
+      new Set(targetProfiles).size !== targetProfiles.length ||
+      !needFinder?.details ||
+      needTargets.some(
+        (target) =>
+          !target.profile ||
+          !Number.isInteger(Number(target.cluster)) ||
+          !needFinder.details[String(target.cluster)],
+      )
+    ) {
+      throw new Error(
+        `${key} ${group} is missing Need Finder target metadata.`,
+      );
+    }
+    for (const player of payload[group].players) {
+      const requiredPlayerFields = [
+        "regAtoi",
+        "playoffGames",
+        "playoffAtoi",
+        "playoffPoints",
+        "playoffGoals",
+        "playoffAssists",
+        "playoffShots",
+        "playoffPlusMinus",
+        "playoffPim",
+        "needOrder",
+      ];
+      if (
+        !Array.isArray(player.targetScores) ||
+        player.targetScores.length <= maxTargetCluster ||
+        player.targetScores.some(
+          (score) =>
+            !Number.isFinite(Number(score)) ||
+            Number(score) < 0 ||
+            Number(score) > 100,
+        ) ||
+        requiredPlayerFields.some((field) => !(field in player)) ||
+        !/^\d{2,}:\d{2}$/.test(player.regAtoi) ||
+        !/^\d{2,}:\d{2}$/.test(player.playoffAtoi)
+      ) {
+        throw new Error(
+          `${key} ${group} has incomplete Need Finder player data.`,
+        );
+      }
+    }
     const constructions = payload[group]?.teamConstructions;
     const expectedRosterSize = group === "forwards" ? 12 : 8;
     const unitSize = group === "forwards" ? 3 : 2;
@@ -215,6 +296,40 @@ if (
 ) {
   throw new Error(
     "The Streamlit-parity ANA roster construction fixture changed unexpectedly.",
+  );
+}
+const latestForwards = latest?.payload?.forwards;
+const latestNeedTarget = latestForwards?.needFinder?.targets?.[0];
+const latestNeedMatches = latestForwards?.players
+  ?.filter((player) => Number(player.games) >= 20)
+  .map((player) => ({
+    ...player,
+    similarity: Number(
+      player.targetScores?.[Number(latestNeedTarget?.cluster)] || 0,
+    ),
+  }))
+  .sort(
+    (left, right) =>
+      right.similarity - left.similarity ||
+      Number(right.points || 0) - Number(left.points || 0) ||
+      Number(left.needOrder || 0) - Number(right.needOrder || 0),
+  )
+  .slice(0, 80);
+if (
+  latestNeedTarget?.profile !== "Two-Way Shot-Share Driver" ||
+  latestNeedTarget?.cluster !== 0 ||
+  latestNeedMatches?.length !== 80 ||
+  latestNeedMatches
+    .slice(0, 5)
+    .map((player) => player.name)
+    .join("|") !==
+    "Wyatt Johnston|Steven Stamkos|Adam Fantilli|Will Smith|Matty Beniers" ||
+  latestNeedMatches.slice(0, 5).some(
+    (player) => player.similarity !== 100,
+  )
+) {
+  throw new Error(
+    "The Streamlit-parity Need Finder fixture changed unexpectedly.",
   );
 }
 

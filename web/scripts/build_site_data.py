@@ -62,6 +62,19 @@ def one_decimal(value: float) -> str:
     return f"{rounded:.1f}"
 
 
+def minute_clock(value: Any) -> str:
+    numeric = 0.0
+    try:
+        if not pd.isna(value):
+            numeric = float(value)
+    except (TypeError, ValueError):
+        numeric = 0.0
+    total_seconds = int(round(numeric * 60))
+    minutes = total_seconds // 60
+    seconds = total_seconds % 60
+    return f"{minutes:02d}:{seconds:02d}"
+
+
 def season_label(key: str) -> str:
     key = str(key)
     return f"{key[:4]}–{key[6:]}" if len(key) == 8 else key
@@ -112,6 +125,81 @@ def profile_maps(seasons: list[str]) -> dict[str, dict[str, dict[int, str]]]:
                 season_map[cluster] = canonical_profile_name(name)
             maps[group][season] = season_map
     return maps
+
+
+def format_trait_detail(
+    tokens: list[tuple[str, float]],
+    max_items: int,
+) -> str:
+    pieces = []
+    for feature, z_score in tokens[:max_items]:
+        direction = "higher" if z_score >= 0 else "lower"
+        pieces.append(
+            f"{readable_trait_label(feature)} "
+            f"({direction}, {z_score:+.1f}σ)"
+        )
+    return "; ".join(pieces) or "None"
+
+
+def need_finder_metadata(
+    season: str,
+    group: str,
+    names: dict[int, str],
+) -> dict[str, Any]:
+    path = REPORTS_DIR / f"archetype_traits_{group}_{season}.csv"
+    traits = pd.read_csv(path) if path.exists() else pd.DataFrame()
+    details: dict[str, dict[str, Any]] = {}
+    target_order: list[str] = []
+    target_clusters: dict[str, int] = {}
+
+    if not traits.empty:
+        for _, row in traits.sort_values("cluster").iterrows():
+            cluster = int(row["cluster"])
+            high = parse_trait_string(row.get("top_traits", ""))
+            low = parse_trait_string(row.get("low_traits", ""))
+            generated_name, summary = build_archetype_name_summary(
+                cluster,
+                high,
+                low,
+                group=group,
+            )
+            name = names.get(
+                cluster,
+                canonical_profile_name(generated_name),
+            )
+            details[str(cluster)] = {
+                "name": name,
+                "summary": summary,
+                "higher": format_trait_detail(high, 5),
+                "lower": format_trait_detail(low, 4),
+            }
+            if name not in target_clusters:
+                target_order.append(name)
+            # Streamlit's {display_name: k} target map keeps the last raw
+            # cluster when multiple learned clusters share a display name.
+            target_clusters[name] = cluster
+    else:
+        for cluster, name in sorted(names.items()):
+            details[str(cluster)] = {
+                "name": name,
+                "summary": "",
+                "higher": "None",
+                "lower": "None",
+            }
+            if name not in target_clusters:
+                target_order.append(name)
+            target_clusters[name] = cluster
+
+    return {
+        "targets": [
+            {
+                "profile": name,
+                "cluster": target_clusters[name],
+            }
+            for name in target_order
+        ],
+        "details": details,
+    }
 
 
 def describe_profile(name: str, high: list[tuple[str, float]], low: list[tuple[str, float]]) -> str:
@@ -1215,6 +1303,12 @@ def player_record(
         key=lambda item: item["value"],
         reverse=True,
     )[:3]
+    target_scores = [
+        clean(float(row[column]) * 100, 1)
+        if clean(row[column]) is not None
+        else 0.0
+        for column in probability_columns
+    ]
     return {
         "id": int(row["player_id"]),
         "name": str(row["full_name"]),
@@ -1226,14 +1320,24 @@ def player_record(
         "points": clean(row.get("reg_points"), 0),
         "shots": clean(row.get("reg_shots"), 0),
         "toi": clean(row.get("reg_avg_toi_min"), 1),
+        "regAtoi": minute_clock(row.get("reg_avg_toi_min")),
         "plusMinus": clean(row.get("reg_plus_minus"), 0),
         "pim": clean(row.get("reg_pim"), 0),
         "playoffGames": clean(row.get("po_games"), 0),
+        "playoffToi": clean(row.get("po_avg_toi_min"), 3),
+        "playoffAtoi": minute_clock(row.get("po_avg_toi_min")),
         "playoffPoints": clean(row.get("po_points"), 0),
+        "playoffGoals": clean(row.get("po_goals"), 0),
+        "playoffAssists": clean(row.get("po_assists"), 0),
+        "playoffShots": clean(row.get("po_shots"), 0),
+        "playoffPlusMinus": clean(row.get("po_plus_minus"), 0),
+        "playoffPim": clean(row.get("po_pim"), 0),
         "cluster": int(row["top_cluster"]),
         "profile": names.get(int(row["top_cluster"]), "Unlabeled profile"),
         "confidence": clean(float(row["confidence"]), 4),
         "probabilities": probabilities,
+        "targetScores": target_scores,
+        "needOrder": int(row.get("_need_order", 0)),
     }
 
 
@@ -1788,6 +1892,7 @@ def main() -> None:
             frame = pd.read_parquet(
                 DATA_DIR / f"players_{group}_{season}.parquet"
             ).copy()
+            frame["_need_order"] = np.arange(len(frame))
             frame["season"] = season
             frames_by_key[(group, season)] = frame
             all_frames[group].append(frame)
@@ -1833,6 +1938,11 @@ def main() -> None:
                     4,
                 ),
                 "mixedCount": int((frame["confidence"] < 0.8).sum()),
+                "needFinder": need_finder_metadata(
+                    season,
+                    group,
+                    names,
+                ),
                 "teamConstructions": team_constructions(
                     season,
                     group,
