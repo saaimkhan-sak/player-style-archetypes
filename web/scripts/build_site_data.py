@@ -1837,6 +1837,20 @@ def playoff_records(
     maps: dict[str, dict[str, dict[int, str]]],
     frames_by_key: dict[tuple[str, str], pd.DataFrame],
 ) -> list[dict[str, Any]]:
+    def numeric(value: Any) -> float:
+        try:
+            return 0.0 if pd.isna(value) else float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def rate(numerator: Any, denominator: float) -> float:
+        numeric_denominator = numeric(denominator)
+        return (
+            numeric(numerator) / numeric_denominator
+            if numeric_denominator
+            else 0.0
+        )
+
     records: list[dict[str, Any]] = []
     for group in ("forwards", "defense"):
         for season in seasons:
@@ -1859,8 +1873,39 @@ def playoff_records(
                     player = player.iloc[0]
                 reg_cluster = int(row["reg_top_cluster"])
                 playoff_cluster = int(row["po_top_cluster"])
-                reg_games = float(player.get("reg_games", 0) or 0)
-                playoff_games = float(player.get("po_games", 0) or 0)
+                reg_games = numeric(player.get("reg_games", 0))
+                playoff_games = numeric(player.get("po_games", 0))
+                reg_ppg = rate(player.get("reg_points", 0), reg_games)
+                playoff_ppg = rate(player.get("po_points", 0), playoff_games)
+                reg_shots_per_game = rate(
+                    player.get("reg_shots", 0),
+                    reg_games,
+                )
+                playoff_shots_per_game = rate(
+                    player.get("po_shots", 0),
+                    playoff_games,
+                )
+                reg_pim_per_game = rate(
+                    player.get("reg_pim", 0),
+                    reg_games,
+                )
+                playoff_pim_per_game = rate(
+                    player.get("po_pim", 0),
+                    playoff_games,
+                )
+                reg_plus_minus_per_game = rate(
+                    player.get("reg_plus_minus", 0),
+                    reg_games,
+                )
+                playoff_plus_minus_per_game = rate(
+                    player.get("po_plus_minus", 0),
+                    playoff_games,
+                )
+                reg_toi = numeric(player.get("reg_avg_toi_min", 0))
+                playoff_toi = numeric(player.get("po_avg_toi_min", 0))
+                probability_distance = numeric(
+                    row.get("probability_distance", 0)
+                )
                 records.append(
                     {
                         "season": season,
@@ -1878,24 +1923,133 @@ def playoff_records(
                         ),
                         "regConfidence": clean(row.get("reg_confidence"), 4),
                         "playoffConfidence": clean(row.get("po_confidence"), 4),
-                        "distance": clean(row.get("probability_distance"), 4),
+                        "distance": clean(probability_distance, 4),
+                        "shiftBand": (
+                            "Held steady"
+                            if probability_distance <= 0.25
+                            else (
+                                "Moderate shift"
+                                if probability_distance <= 0.75
+                                else "Major shift"
+                            )
+                        ),
                         "changed": bool(row.get("archetype_changed", False)),
-                        "regPpg": clean(
-                            float(player.get("reg_points", 0) or 0) / reg_games
-                            if reg_games
-                            else 0,
-                            3,
+                        "regPpg": clean(reg_ppg, 4),
+                        "playoffPpg": clean(playoff_ppg, 4),
+                        "ppgChange": clean(playoff_ppg - reg_ppg, 8),
+                        "regToi": clean(reg_toi, 2),
+                        "playoffToi": clean(playoff_toi, 2),
+                        "toiChange": clean(playoff_toi - reg_toi, 8),
+                        "shotRateChange": clean(
+                            playoff_shots_per_game - reg_shots_per_game,
+                            8,
                         ),
-                        "playoffPpg": clean(
-                            float(player.get("po_points", 0) or 0) / playoff_games
-                            if playoff_games
-                            else 0,
-                            3,
+                        "pimRateChange": clean(
+                            playoff_pim_per_game - reg_pim_per_game,
+                            8,
                         ),
-                        "regToi": clean(player.get("reg_avg_toi_min"), 2),
-                        "playoffToi": clean(player.get("po_avg_toi_min"), 2),
+                        "plusMinusRateChange": clean(
+                            playoff_plus_minus_per_game
+                            - reg_plus_minus_per_game,
+                            8,
+                        ),
                     }
                 )
+
+    shift_fields = [
+        "ppgChange",
+        "shotRateChange",
+        "toiChange",
+        "pimRateChange",
+        "plusMinusRateChange",
+    ]
+    population: dict[str, list[float]] = {
+        field: [] for field in shift_fields
+    }
+    for players in frames_by_key.values():
+        for _, player in players.iterrows():
+            reg_games = numeric(player.get("reg_games", 0))
+            playoff_games = numeric(player.get("po_games", 0))
+            reg_ppg = rate(player.get("reg_points", 0), reg_games)
+            playoff_ppg = rate(player.get("po_points", 0), playoff_games)
+            reg_shots_per_game = rate(
+                player.get("reg_shots", 0),
+                reg_games,
+            )
+            playoff_shots_per_game = rate(
+                player.get("po_shots", 0),
+                playoff_games,
+            )
+            reg_pim_per_game = rate(
+                player.get("reg_pim", 0),
+                reg_games,
+            )
+            playoff_pim_per_game = rate(
+                player.get("po_pim", 0),
+                playoff_games,
+            )
+            reg_plus_minus_per_game = rate(
+                player.get("reg_plus_minus", 0),
+                reg_games,
+            )
+            playoff_plus_minus_per_game = rate(
+                player.get("po_plus_minus", 0),
+                playoff_games,
+            )
+            has_both_splits = reg_games > 0 and playoff_games > 0
+            population["ppgChange"].append(
+                playoff_ppg - reg_ppg if has_both_splits else 0.0
+            )
+            population["shotRateChange"].append(
+                playoff_shots_per_game - reg_shots_per_game
+                if has_both_splits
+                else 0.0
+            )
+            population["toiChange"].append(
+                numeric(player.get("po_avg_toi_min", 0))
+                - numeric(player.get("reg_avg_toi_min", 0))
+            )
+            population["pimRateChange"].append(
+                playoff_pim_per_game - reg_pim_per_game
+                if has_both_splits
+                else 0.0
+            )
+            population["plusMinusRateChange"].append(
+                playoff_plus_minus_per_game
+                - reg_plus_minus_per_game
+                if has_both_splits
+                else 0.0
+            )
+
+    centers: dict[str, float] = {}
+    spreads: dict[str, float] = {}
+    for field in shift_fields:
+        values = np.array(population[field], dtype=float)
+        centers[field] = float(values.mean())
+        spreads[field] = float(values.std(ddof=0))
+
+    for record in records:
+        stat_shift = math.sqrt(
+            sum(
+                (
+                    (
+                        float(record.get(field, 0) or 0)
+                        - centers[field]
+                    )
+                    / spreads[field]
+                )
+                ** 2
+                for field in shift_fields
+                if math.isfinite(spreads[field])
+                and spreads[field] != 0
+            )
+        )
+        record["statShift"] = clean(stat_shift, 4)
+        record["statBand"] = (
+            "Held steady"
+            if stat_shift <= 2
+            else ("Moderate shift" if stat_shift <= 3.5 else "Major shift")
+        )
     return records
 
 

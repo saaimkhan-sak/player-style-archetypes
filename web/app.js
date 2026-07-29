@@ -1,5 +1,5 @@
 const DATA_ROOT = "/data";
-const DATA_VERSION = "20260729-career-paths-v1";
+const DATA_VERSION = "20260729-playoff-trends-v1";
 const NEED_GAME_VALUES = [
   0, 5, 10, 15, 20, 25, 30, 35, 40,
   45, 50, 55, 60, 65, 70, 75, 80, 82,
@@ -22,7 +22,7 @@ const appState = {
   playoffs: null,
   playoffSeason: null,
   playoffGroup: "forwards",
-  playoffTab: "shifts",
+  playoffTab: "season",
   playoffMinReg: 20,
   playoffMinPo: 4,
   playoffQuery: "",
@@ -35,7 +35,7 @@ const ROUTE_LABELS = {
   glossary: "Style glossary",
   season: "Season level trends",
   career: "Career Trends",
-  playoffs: "Playoff pressure",
+  playoffs: "Playoff Trends",
 };
 
 const PROFILE_COLORS = [
@@ -353,10 +353,10 @@ function needConfidenceBand(value) {
   return "is-low";
 }
 
-function signedNumber(value) {
+function signedNumber(value, digits = 0) {
   const numeric = Number(value || 0);
-  if (numeric > 0) return `+${number(numeric)}`;
-  return number(numeric);
+  if (numeric > 0) return `+${number(numeric, digits)}`;
+  return number(numeric, digits);
 }
 
 function mean(values) {
@@ -364,6 +364,18 @@ function mean(values) {
   return valid.length
     ? valid.reduce((sum, value) => sum + Number(value), 0) / valid.length
     : 0;
+}
+
+function median(values) {
+  const valid = values
+    .map(Number)
+    .filter(Number.isFinite)
+    .sort((left, right) => left - right);
+  if (!valid.length) return 0;
+  const middle = Math.floor(valid.length / 2);
+  return valid.length % 2
+    ? valid[middle]
+    : (valid[middle - 1] + valid[middle]) / 2;
 }
 
 async function getJSON(path) {
@@ -3246,18 +3258,31 @@ ${careerSeasonLabel(
   setupCareerTimeline(rows);
 }
 
-function playoffFiltered() {
+function playoffBaseRows() {
   return appState.playoffs.filter(
     (row) =>
-      row.season === appState.playoffSeason &&
       row.group === appState.playoffGroup &&
       row.regGames >= appState.playoffMinReg &&
       row.playoffGames >= appState.playoffMinPo,
   );
 }
 
+function playoffSeasonRows(base) {
+  return base.filter((row) => row.season === appState.playoffSeason);
+}
+
+function playoffSeasonLabel(season) {
+  return careerSeasonLabel(season);
+}
+
 function playoffControls() {
-  const available = [...new Set(appState.playoffs.map((row) => row.season))]
+  const available = [
+    ...new Set(
+      appState.playoffs
+        .filter((row) => row.playoffGames > 0)
+        .map((row) => row.season),
+    ),
+  ]
     .sort()
     .reverse();
   return `
@@ -3265,35 +3290,269 @@ function playoffControls() {
       <label for="playoff-season">Season</label>
       <select id="playoff-season">
         ${available
-          .map((season) => {
-            const label =
-              appState.core.meta.seasons.find((item) => item.key === season)?.label ||
-              season;
-            return `<option value="${season}" ${season === appState.playoffSeason ? "selected" : ""}>${escapeHTML(label)}</option>`;
-          })
+          .map(
+            (season) => `
+              <option
+                value="${season}"
+                ${season === appState.playoffSeason ? "selected" : ""}
+              >${escapeHTML(playoffSeasonLabel(season))}</option>
+            `,
+          )
           .join("")}
       </select>
     </div>
-    ${groupControl(appState.playoffGroup, "playoff-group")}
+    <div class="field">
+      <span class="field-label">Group</span>
+      <div class="segmented" data-group-control="playoff-group">
+        <button type="button" data-value="forwards" aria-pressed="${appState.playoffGroup === "forwards"}">Forwards</button>
+        <button type="button" data-value="defense" aria-pressed="${appState.playoffGroup === "defense"}">Defense</button>
+      </div>
+    </div>
   `;
 }
 
-function playoffShiftTable(rows) {
-  const sorted = [...rows].sort((a, b) => b.distance - a.distance).slice(0, 35);
+function playoffExplainer() {
   return `
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead><tr><th>Player</th><th>Regular season</th><th>Playoffs</th><th class="numeric">Shift</th><th class="numeric">PO GP</th></tr></thead>
+    <details class="methodology-expander playoff-methodology">
+      <summary>
+        <span>📊 How is the model shift score calculated? (click to expand)</span>
+        <span class="methodology-toggle" aria-hidden="true"></span>
+      </summary>
+      <div class="methodology-body">
+        <section class="methodology-section">
+          <h2>The short version</h2>
+          <p>
+            I took each player's playoff statistics, ran them through the exact
+            same machine-learning model used to assign regular-season archetypes,
+            and measured how far the player's playoff "style fingerprint" is from
+            their regular-season one. A bigger number = a bigger identity shift.
+          </p>
+        </section>
+        <section class="methodology-section">
+          <h2>Step 1 — Where the data comes from</h2>
+          <p>
+            <strong>Regular season:</strong> The archetype model was trained on
+            <a href="https://moneypuck.com" target="_blank" rel="noreferrer">MoneyPuck</a>
+            player-level advanced metrics — a well-regarded public data source that
+            tracks things like expected goals (xGoals), shot quality, and on-ice
+            possession at the individual player level, game by game.
+          </p>
+          <p>
+            <strong>Playoffs:</strong> MoneyPuck publishes playoff statistics on
+            the same site, but only as a season summary (not game by game). I saved
+            the playoff statistics pages for all 18 seasons from 2008-09 through
+            2025-26 and extracted the data directly from each page's HTML. To
+            capture special-teams context, I collected four separate views for
+            each season:
+          </p>
+          <ul>
+            <li><strong>All situations combined</strong></li>
+            <li><strong>5-on-5 (even strength)</strong> — the most important slice, where most of the game is played</li>
+            <li><strong>5-on-4 (power play)</strong> — when a team has the man advantage</li>
+            <li><strong>4-on-5 (penalty kill)</strong> — when a team is shorthanded</li>
+          </ul>
+        </section>
+        <section class="methodology-section">
+          <h2>Step 2 — What I calculated from the playoff data</h2>
+          <p>
+            For each player and each situation, I computed the same types of rate
+            statistics the regular-season model uses:
+          </p>
+          <div class="playoff-method-table-wrap">
+            <table class="playoff-method-table">
+              <thead>
+                <tr><th>Metric</th><th>What it measures</th><th>Why it matters</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><strong>Expected Goals per 60 min (5v5)</strong></td><td>How many goals a player's shots <em>should</em> produce per hour of ice time, based on shot location and type</td><td>Separates lucky goal-scorers from genuine shot-quality creators</td></tr>
+                <tr><td><strong>Shot attempts per 60 min (5v5)</strong></td><td>How frequently a player gets involved in shooting plays</td><td>Captures offensive pressure regardless of whether shots go in</td></tr>
+                <tr><td><strong>High-danger shot share</strong></td><td>What fraction of a player's shots come from the most dangerous areas (in tight, directly in front)</td><td>Identifies net-front finishers vs perimeter shooters</td></tr>
+                <tr><td><strong>On-ice xGoals For/Against per 60 (5v5)</strong></td><td>How good/bad the team was at creating and allowing expected goals <em>while this player was on the ice</em></td><td>Measures two-way impact and deployment quality</td></tr>
+                <tr><td><strong>Rebounds created per 60 (5v5)</strong></td><td>How often a player's shots lead to rebound opportunities</td><td>Distinguishes power-play net-front threats from perimeter options</td></tr>
+                <tr><td><strong>xGoals from rebounds per 60 (5v5)</strong></td><td>Expected goal value generated specifically from rebound shots</td><td>Captures a specific scoring style</td></tr>
+                <tr><td><strong>Shot blocking per 60 (5v5 + 4v5)</strong></td><td>How often a player blocks opposing shots</td><td>Key defensive archetype signal</td></tr>
+                <tr><td><strong>Hits, takeaways, giveaways per 60 (5v5)</strong></td><td>Physical and puck-battle contributions</td><td>Separates checking-line forwards from skill players</td></tr>
+                <tr><td><strong>Penalties drawn per 60 (5v5)</strong></td><td>How often a player draws penalties</td><td>Identifies cycle forwards who generate PP time</td></tr>
+                <tr><td><strong>Zone start distribution</strong></td><td>What share of a player's shifts start in the offensive, neutral, or defensive zone</td><td>Captures deployment role — sheltered offensive player vs defensive specialist</td></tr>
+                <tr><td><strong>Faceoff win % (5v5)</strong></td><td>How often a center wins faceoffs</td><td>Key center archetype signal</td></tr>
+                <tr><td><strong>Power play xGoals (5v4)</strong></td><td>Expected goals on the power play</td><td>Identifies PP specialists</td></tr>
+                <tr><td><strong>Penalty kill opponent xGoals (4v5)</strong></td><td>Expected goals allowed while shorthanded</td><td>Identifies PK specialists</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            For situations where MoneyPuck's summary view doesn't publish a metric
+            (specifically: play-continuation rates and after-shift xGoals in
+            non-5v5 situations), I substituted the league-average value from the
+            regular-season model — meaning those signals are neutral rather than
+            actively misleading.
+          </p>
+        </section>
+        <section class="methodology-section">
+          <h2>Step 3 — Running it through the model</h2>
+          <p>
+            <strong>NMF compression:</strong> Non-negative Matrix Factorization
+            squashes all those metrics into a compact "style fingerprint" — a short
+            list of numbers that describe <em>how</em> a player plays rather than
+            <em>how much</em> they produce. Think of it as distilling a player's
+            full stat line into a few key style dimensions.
+          </p>
+          <p>
+            <strong>GMM classification:</strong> A Gaussian Mixture Model then takes
+            that fingerprint and outputs a <em>probability distribution</em> across
+            archetypes. For example, a player might be classified as:
+          </p>
+          <ul>
+            <li>Regular season: 72% Playmaking Scorer, 18% Two-Way Creator, 10% Other</li>
+            <li>Playoffs: 41% Playmaking Scorer, 44% Two-Way Creator, 15% Other</li>
+          </ul>
+          <p>
+            The regular-season model was not re-trained on playoff data — I used
+            the same fitted model to project each player into archetype space based
+            on their playoff numbers.
+          </p>
+        </section>
+        <section class="methodology-section">
+          <h2>Step 4 — The model shift score</h2>
+          <p>
+            The <strong>model shift score</strong> is the Euclidean distance between
+            those two probability distributions:
+          </p>
+          <blockquote>
+            <em>How much did the probability mass move across archetypes from regular season to playoffs?</em>
+          </blockquote>
+          <ul>
+            <li><strong>Score near 0</strong> → The model sees essentially the same player in both contexts. The style fingerprint barely changed.</li>
+            <li><strong>Score around 0.25–0.75</strong> → Moderate shift. The player looks meaningfully different — perhaps leaning into a different role or responding to matchup adjustments.</li>
+            <li><strong>Score above 0.75</strong> → Major shift. The playoff version of this player would likely be classified into a different archetype than the regular-season version.</li>
+          </ul>
+        </section>
+        <section class="methodology-section">
+          <h2>What about the "stat shift score"?</h2>
+          <p>
+            The table also shows a simpler <strong>stat shift score</strong> that was
+            used before the advanced data was available. It compares raw boxscore
+            metrics (points per game, shots per game, ice time, penalty minutes,
+            plus/minus) between regular season and playoffs using z-scores, then
+            combines them. It is less informative than the model shift score because:
+          </p>
+          <ol>
+            <li>Scoring rates <em>universally</em> decline in the playoffs due to tighter play and better goaltending — so a drop in P/GP doesn't necessarily mean a player changed their style</li>
+            <li>It doesn't capture shot quality, on-ice possession, or zone-start context</li>
+          </ol>
+          <p>
+            The model shift score addresses both of these problems. Use the stat
+            shift as a sanity check, but trust the model shift as the primary signal.
+          </p>
+        </section>
+        <section class="methodology-section">
+          <h2>Limitations</h2>
+          <ul>
+            <li>Playoff sample sizes are smaller than regular-season totals, adding noise — especially for players eliminated in round one</li>
+            <li>The model was trained on regular-season distributions, which are slightly wider than playoff distributions (extreme performers are more common in the regular season). This means the model is working slightly "out of sample" when applied to playoffs</li>
+            <li>A handful of metrics (play-continuation rates, after-shift xGoals) couldn't be recovered from the summary data and are imputed as league average</li>
+          </ul>
+        </section>
+      </div>
+    </details>
+  `;
+}
+
+function playoffPrimarySignal() {
+  return `
+    <aside class="playoff-primary-signal">
+      <strong>Primary signal: Model shift score</strong>
+      <p>
+        — measures how far a player's playoff style fingerprint moves in archetype
+        space, based on xGoals, shot quality, on-ice possession, and zone starts at
+        even strength, power play, and penalty kill.
+        <strong>Higher = bigger identity shift.</strong> The scatter plot shape
+        encodes shift band; point size encodes playoff games played.
+      </p>
+    </aside>
+  `;
+}
+
+function playoffBandPill(band) {
+  const label = band || "Not projected";
+  const className = {
+    "Held steady": "is-steady",
+    "Moderate shift": "is-moderate",
+    "Major shift": "is-major",
+  }[label] || "is-unavailable";
+  return `<span class="playoff-band ${className}">${escapeHTML(label)}</span>`;
+}
+
+function playoffScorePill(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return '<span class="playoff-score is-unavailable">—</span>';
+  }
+  const className =
+    numeric >= 0.75
+      ? "is-major"
+      : numeric >= 0.25
+        ? "is-moderate"
+        : "is-steady";
+  return `
+    <span class="playoff-score ${className}">
+      ${number(numeric, 3)}
+    </span>
+  `;
+}
+
+function playoffShiftTable(rows, limit = 30) {
+  const sorted = [...rows]
+    .sort((left, right) => Number(right.distance) - Number(left.distance))
+    .slice(0, limit);
+  return `
+    <div class="playoff-table-wrap" tabindex="0" aria-label="Playoff profile changes table; scroll horizontally for all columns">
+      <table class="playoff-table">
+        <thead>
+          <tr>
+            <th>Season</th>
+            <th>Player</th>
+            <th>Team(s)</th>
+            <th>Pos</th>
+            <th class="playoff-archetype-column">REG archetype</th>
+            <th class="playoff-archetype-column">Projected PO archetype</th>
+            <th class="numeric">REG GP</th>
+            <th class="numeric">PO GP</th>
+            <th class="numeric">REG P/GP</th>
+            <th class="numeric">PO P/GP</th>
+            <th class="numeric">P/GP change</th>
+            <th class="numeric">TOI change</th>
+            <th class="numeric">Model shift ↑</th>
+            <th>Model shift band</th>
+            <th class="numeric">Stat shift</th>
+            <th>Stat shift band</th>
+            <th>REG ATOI</th>
+            <th>PO ATOI</th>
+          </tr>
+        </thead>
         <tbody>
           ${sorted
             .map(
               (row) => `
                 <tr>
-                  <td><strong>${escapeHTML(row.name)}</strong><br><span class="result-count">${escapeHTML(row.team)} · ${escapeHTML(row.position)}</span></td>
-                  <td>${profileChip(row.regProfile)}</td>
-                  <td>${profileChip(row.playoffProfile)}</td>
-                  <td class="numeric">${number(row.distance, 2)}</td>
+                  <td>${escapeHTML(playoffSeasonLabel(row.season))}</td>
+                  <td><strong>${escapeHTML(row.name)}</strong></td>
+                  <td>${escapeHTML(row.team || "—")}</td>
+                  <td>${escapeHTML(row.position || "—")}</td>
+                  <td class="playoff-archetype-column">${profileChip(row.regProfile)}</td>
+                  <td class="playoff-archetype-column">${profileChip(row.playoffProfile)}</td>
+                  <td class="numeric">${number(row.regGames)}</td>
                   <td class="numeric">${number(row.playoffGames)}</td>
+                  <td class="numeric">${number(row.regPpg, 3)}</td>
+                  <td class="numeric">${number(row.playoffPpg, 3)}</td>
+                  <td class="numeric">${signedNumber(row.ppgChange, 2)}</td>
+                  <td class="numeric">${signedNumber(row.toiChange, 1)}</td>
+                  <td class="numeric">${playoffScorePill(row.distance)}</td>
+                  <td>${playoffBandPill(row.shiftBand)}</td>
+                  <td class="numeric">${number(row.statShift, 2)}</td>
+                  <td>${playoffBandPill(row.statBand)}</td>
+                  <td>${minuteClock(row.regToi)}</td>
+                  <td>${minuteClock(row.playoffToi)}</td>
                 </tr>
               `,
             )
@@ -3304,242 +3563,664 @@ function playoffShiftTable(rows) {
   `;
 }
 
-function playoffShiftView(rows) {
-  const changed = rows.filter((row) => row.changed).length;
-  const changeRate = rows.length ? changed / rows.length : 0;
+function playoffScatter(rows) {
+  const xValues = rows.map((row) => Number(row.ppgChange || 0));
+  const yValues = rows.map((row) => Number(row.toiChange || 0));
+  const xMin = Math.min(0, ...xValues);
+  const xMax = Math.max(0, ...xValues);
+  const yMin = Math.min(0, ...yValues);
+  const yMax = Math.max(0, ...yValues);
+  const xPadding = Math.max((xMax - xMin) * 0.08, 0.05);
+  const yPadding = Math.max((yMax - yMin) * 0.08, 0.4);
+  const boundedXMin = xMin - xPadding;
+  const boundedXMax = xMax + xPadding;
+  const boundedYMin = yMin - yPadding;
+  const boundedYMax = yMax + yPadding;
+  const xRange = Math.max(boundedXMax - boundedXMin, 0.01);
+  const yRange = Math.max(boundedYMax - boundedYMin, 0.01);
+  const xPosition = (value) =>
+    ((Number(value || 0) - boundedXMin) / xRange) * 100;
+  const yPosition = (value) =>
+    ((Number(value || 0) - boundedYMin) / yRange) * 100;
+  const profiles = [...new Set(rows.map((row) => row.regProfile))];
   return `
-    <section class="metric-grid">
-      ${metric("Qualified players", number(rows.length))}
-      ${metric("Top-style changes", percent(changeRate))}
-      ${metric("Average shift", number(mean(rows.map((row) => row.distance)), 2))}
-      ${metric("Playoff scoring", number(mean(rows.map((row) => row.playoffPpg)), 2), "points per game")}
-    </section>
-    <div class="section-heading">
-      <div><p class="eyebrow">Largest movement</p><h2>Who changed most?</h2></div>
-      <p>Shift compares the full regular-season and playoff probability mixes.</p>
-    </div>
-    ${rows.length ? playoffShiftTable(rows) : '<div class="empty-state">No players match these filters.</div>'}
-  `;
-}
-
-function playoffTransitions(rows) {
-  const transitions = Counter(
-    rows
-      .filter((row) => row.changed)
-      .map((row) => `${row.regProfile}|||${row.playoffProfile}`),
-  );
-  const sorted = [...transitions.entries()].sort((a, b) => b[1] - a[1]).slice(0, 18);
-  return `
-    <div class="section-heading">
-      <div><p class="eyebrow">Style movement</p><h2>Common playoff transitions</h2></div>
-      <p>Only players whose leading profile changed are shown.</p>
-    </div>
-    <div class="transition-list">
-      ${sorted.length
-        ? sorted
-            .map(([key, count]) => {
-              const [from, to] = key.split("|||");
+    <section class="playoff-scatter-card" aria-labelledby="playoff-scatter-title">
+      <header>
+        <div>
+          <p class="eyebrow">Scatter plot</p>
+          <h3 id="playoff-scatter-title">Scoring and ice-time change</h3>
+        </div>
+        <p>
+          Each dot is one player. X-axis = scoring rate change (playoff P/GP
+          minus regular-season P/GP). Y-axis = ice-time change (playoff ATOI
+          minus regular-season ATOI). <strong>Dot shape</strong> encodes the
+          model shift band (how much the archetype fingerprint moved);
+          <strong>dot size</strong> encodes playoff games played;
+          <strong>color</strong> encodes regular-season archetype.
+        </p>
+      </header>
+      <div class="playoff-scatter-stage">
+        <span class="playoff-scatter-y-label">Playoff ATOI − Regular-season ATOI (min)</span>
+        <div class="playoff-scatter-plot">
+          <span class="playoff-scatter-zero-x" style="left:${xPosition(0)}%"></span>
+          <span class="playoff-scatter-zero-y" style="bottom:${yPosition(0)}%"></span>
+          ${rows
+            .map((row) => {
+              const size = Math.min(
+                30,
+                10 + Math.sqrt(Number(row.playoffGames || 0)) * 3,
+              );
+              const tooltip = `${row.name} · ${row.team || "—"} · REG: ${row.regProfile} · PO: ${row.playoffProfile} · Model shift ${number(row.distance, 3)} · P/GP ${signedNumber(row.ppgChange, 2)} · ATOI ${signedNumber(row.toiChange, 1)} min · ${number(row.playoffGames)} PO GP`;
+              const shape = {
+                "Held steady": "is-circle",
+                "Moderate shift": "is-square",
+                "Major shift": "is-triangle",
+              }[row.shiftBand] || "is-cross";
               return `
-                <div class="transition-row">
-                  ${profileChip(from)}
-                  <span class="transition-arrow">→</span>
-                  ${profileChip(to)}
-                  <span class="transition-count">${count} player${count === 1 ? "" : "s"}</span>
-                </div>
+                <button
+                  class="playoff-scatter-point ${shape}"
+                  type="button"
+                  style="left:${xPosition(row.ppgChange)}%;bottom:${yPosition(row.toiChange)}%;--point-size:${size}px;--profile:${profileColor(row.regProfile)}"
+                  data-tooltip="${escapeHTML(tooltip)}"
+                  aria-label="${escapeHTML(tooltip)}"
+                ></button>
               `;
             })
-            .join("")
-        : '<div class="empty-state">No style transitions match these filters.</div>'}
+            .join("")}
+        </div>
+        <span class="playoff-scatter-x-label">Playoff P/GP − Regular-season P/GP</span>
+      </div>
+      <div class="playoff-scatter-key">
+        <div class="playoff-shape-key" aria-label="Model shift band shapes">
+          <span><i class="is-circle"></i>Held steady</span>
+          <span><i class="is-square"></i>Moderate shift</span>
+          <span><i class="is-triangle"></i>Major shift</span>
+        </div>
+        <div class="playoff-profile-key" aria-label="Regular-season archetypes">
+          ${profiles
+            .map(
+              (profile) => `
+                <span>
+                  <i style="--profile:${profileColor(profile)}"></i>
+                  ${escapeHTML(profile)}
+                </span>
+              `,
+            )
+            .join("")}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function playoffSeasonView(rows) {
+  if (!rows.length) {
+    return '<div class="empty-state">No players match the current filters.</div>';
+  }
+  const changed = rows.filter((row) => row.changed).length;
+  return `
+    <section class="playoff-section-head">
+      <p class="eyebrow">Season View</p>
+      <h2>${escapeHTML(playoffSeasonLabel(appState.playoffSeason))} Playoff Shifts</h2>
+    </section>
+    <section class="metric-grid playoff-metric-grid">
+      ${metric("Players", number(rows.length))}
+      ${metric("Median model shift", number(median(rows.map((row) => row.distance)), 2))}
+      ${metric("Archetype changes", number(changed))}
+      ${metric("% changed archetype", percent(rows.length ? changed / rows.length : 0))}
+    </section>
+    ${playoffScatter(rows)}
+    <section class="playoff-profile-changes">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Model shift score</p>
+          <h2>Biggest Playoff Profile Changes (sorted by model shift score)</h2>
+        </div>
+      </div>
+      ${playoffShiftTable(rows)}
+    </section>
+  `;
+}
+
+function playoffArchetypeRows(base) {
+  const groups = new Map();
+  base.forEach((row) => {
+    const key = `${row.season}|||${row.regProfile}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  });
+  return [...groups.entries()]
+    .map(([key, rows]) => {
+      const [season, profile] = key.split("|||");
+      const changed = rows.filter((row) => row.changed).length;
+      return {
+        season,
+        profile,
+        players: new Set(rows.map((row) => row.id)).size,
+        medianModelShift: median(rows.map((row) => row.distance)),
+        changeRate: rows.length ? changed / rows.length : 0,
+        medianStatShift: median(rows.map((row) => row.statShift)),
+        medianPpgChange: median(rows.map((row) => row.ppgChange)),
+        medianToiChange: median(rows.map((row) => row.toiChange)),
+      };
+    })
+    .filter((row) => row.players >= 3);
+}
+
+function playoffArchetypeMatrix(rows) {
+  const seasons = [...new Set(rows.map((row) => row.season))].sort();
+  const profiles = [...new Set(rows.map((row) => row.profile))].sort(
+    (left, right) =>
+      median(
+        rows
+          .filter((row) => row.profile === right)
+          .map((row) => row.medianModelShift),
+      ) -
+        median(
+          rows
+            .filter((row) => row.profile === left)
+            .map((row) => row.medianModelShift),
+        ) ||
+      left.localeCompare(right),
+  );
+  const cells = new Map(
+    rows.map((row) => [`${row.profile}|||${row.season}`, row]),
+  );
+  return `
+    <div class="playoff-matrix-scroll" tabindex="0" aria-label="Archetype shift matrix; scroll horizontally for all seasons">
+      <div
+        class="playoff-matrix"
+        style="--season-count:${seasons.length};--matrix-width:${Math.max(860, 270 + seasons.length * 68)}px"
+      >
+        <span class="playoff-matrix-corner">REG archetype</span>
+        ${seasons
+          .map(
+            (season) => `
+              <span class="playoff-matrix-season">${escapeHTML(careerCompactSeasonLabel(season))}</span>
+            `,
+          )
+          .join("")}
+        ${profiles
+          .map(
+            (profile) => `
+              <strong class="playoff-matrix-profile">${escapeHTML(profile)}</strong>
+              ${seasons
+                .map((season) => {
+                  const row = cells.get(`${profile}|||${season}`);
+                  if (!row) {
+                    return '<span class="playoff-matrix-cell is-empty"></span>';
+                  }
+                  const size = 10 + row.changeRate * 28;
+                  const alpha = Math.max(
+                    0.14,
+                    Math.min(1, row.medianModelShift),
+                  );
+                  const label = `${playoffSeasonLabel(season)} · ${profile} · ${row.players} players · Median model shift ${number(row.medianModelShift, 3)} · Archetype change rate ${percent(row.changeRate)}`;
+                  return `
+                    <span
+                      class="playoff-matrix-cell"
+                      title="${escapeHTML(label)}"
+                    >
+                      <i
+                        style="--dot-size:${size}px;--dot-alpha:${alpha}"
+                        role="img"
+                        aria-label="${escapeHTML(label)}"
+                      ></i>
+                    </span>
+                  `;
+                })
+                .join("")}
+            `,
+          )
+          .join("")}
+      </div>
     </div>
   `;
 }
 
-function playoffPlayerView(rows) {
-  const players = [...new Map(
-    appState.playoffs
-      .filter((row) => row.group === appState.playoffGroup)
-      .map((row) => [row.id, { id: row.id, name: row.name }]),
-  ).values()].sort((a, b) => a.name.localeCompare(b.name));
-  if (!appState.playoffPlayerId || !players.some((player) => player.id === appState.playoffPlayerId)) {
-    appState.playoffPlayerId = rows[0]?.id || players[0]?.id;
+function playoffArchetypeTable(rows) {
+  const sorted = [...rows].sort(
+    (left, right) =>
+      right.season.localeCompare(left.season) ||
+      right.medianModelShift - left.medianModelShift,
+  );
+  return `
+    <div class="playoff-table-wrap" tabindex="0" aria-label="Archetype playoff shift table; scroll horizontally for all columns">
+      <table class="playoff-table">
+        <thead>
+          <tr>
+            <th>Season</th>
+            <th class="playoff-archetype-column">REG archetype</th>
+            <th class="numeric">Players</th>
+            <th class="numeric">Median model shift</th>
+            <th class="numeric">Archetype change rate</th>
+            <th class="numeric">Median stat shift</th>
+            <th class="numeric">Median P/GP change</th>
+            <th class="numeric">Median TOI change</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${sorted
+            .map(
+              (row) => `
+                <tr>
+                  <td>${escapeHTML(playoffSeasonLabel(row.season))}</td>
+                  <td class="playoff-archetype-column">${profileChip(row.profile)}</td>
+                  <td class="numeric">${number(row.players)}</td>
+                  <td class="numeric">${number(row.medianModelShift, 3)}</td>
+                  <td class="numeric">${percent(row.changeRate)}</td>
+                  <td class="numeric">${number(row.medianStatShift, 2)}</td>
+                  <td class="numeric">${signedNumber(row.medianPpgChange, 2)}</td>
+                  <td class="numeric">${signedNumber(row.medianToiChange, 1)}</td>
+                </tr>
+              `,
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function playoffArchetypesView(base) {
+  const rows = playoffArchetypeRows(base);
+  if (!rows.length) {
+    return '<div class="empty-state">No archetypes match the current filters.</div>';
   }
-  const history = appState.playoffs
-    .filter(
-      (row) =>
-        row.group === appState.playoffGroup &&
-        row.id === appState.playoffPlayerId &&
-        row.playoffGames >= 1,
-    )
-    .sort((a, b) => a.season.localeCompare(b.season));
-  const selected = players.find((player) => player.id === appState.playoffPlayerId);
+  return `
+    <section class="playoff-section-head">
+      <p class="eyebrow">Archetypes</p>
+      <h2>Regular-Season Archetypes Under Playoff Pressure</h2>
+      <p>
+        For each regular-season archetype and season, the chart shows how much
+        that group's play style shifted in the playoffs — and how many players
+        actually got re-classified into a different archetype. Hover over any
+        circle for full detail.
+      </p>
+    </section>
+    <aside class="playoff-how-to-read">
+      <strong>How to read this:</strong>
+      <span><i class="playoff-color-swatch"></i><strong>Color</strong> (light→dark orange-red) = median model shift score — darker means players looked more different in the playoffs.</span>
+      <span><i class="playoff-size-swatch"></i><strong>Size</strong> = archetype change rate — bigger dot means a higher share of players got classified into a <em>different</em> archetype in the playoffs vs regular season.</span>
+    </aside>
+    ${playoffArchetypeMatrix(rows)}
+    ${playoffArchetypeTable(rows)}
+  `;
+}
+
+function playoffEligiblePlayers(base) {
+  const latest = new Map();
+  [...base]
+    .sort((left, right) => left.season.localeCompare(right.season))
+    .forEach((row) => latest.set(row.id, row));
+  return [...latest.values()]
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      position: row.position,
+      team: row.team,
+      season: row.season,
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function playoffDeltaChart(history, regField, playoffField, title, digits) {
+  const values = history.flatMap((row) => [
+    Number(row[regField] || 0),
+    Number(row[playoffField] || 0),
+  ]);
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const padding = Math.max((maxValue - minValue) * 0.08, 0.05);
+  const lower = minValue - padding;
+  const range = Math.max(maxValue + padding - lower, 0.01);
+  const position = (value) =>
+    ((Number(value || 0) - lower) / range) * 100;
+  return `
+    <section class="playoff-delta-card">
+      <header>
+        <h3>${escapeHTML(title)}</h3>
+        <span><i class="is-regular"></i>Regular Season</span>
+        <span><i class="is-playoffs"></i>Playoffs</span>
+      </header>
+      <div class="playoff-delta-list">
+        ${history
+          .map((row) => {
+            const regPosition = position(row[regField]);
+            const poPosition = position(row[playoffField]);
+            const start = Math.min(regPosition, poPosition);
+            const width = Math.abs(poPosition - regPosition);
+            return `
+              <div class="playoff-delta-row">
+                <span>${escapeHTML(playoffSeasonLabel(row.season))}</span>
+                <div class="playoff-delta-track">
+                  <i class="playoff-delta-line" style="left:${start}%;width:${width}%"></i>
+                  <i class="playoff-delta-point is-regular" style="left:${regPosition}%"></i>
+                  <i class="playoff-delta-point is-playoffs" style="left:${poPosition}%"></i>
+                </div>
+                <span>${number(row[regField], digits)} → ${number(row[playoffField], digits)}</span>
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function playoffCareerTranslation(history) {
+  const maxShift = Math.max(1, ...history.map((row) => Number(row.distance || 0)));
+  return `
+    <div class="playoff-career-comparison">
+      <section class="playoff-translation-card">
+        <h3>Archetype Translation</h3>
+        <div class="playoff-translation-head">
+          <span>Season</span><span>Regular Season</span><span>Playoffs</span>
+        </div>
+        ${history
+          .map(
+            (row) => `
+              <div class="playoff-translation-row">
+                <strong>${escapeHTML(playoffSeasonLabel(row.season))}</strong>
+                ${profileChip(row.regProfile)}
+                ${profileChip(row.playoffProfile)}
+              </div>
+            `,
+          )
+          .join("")}
+      </section>
+      <section class="playoff-shift-card">
+        <h3>How Much the Playoff Profile Moved</h3>
+        <div class="playoff-shift-bars">
+          ${history
+            .map(
+              (row) => `
+                <div class="playoff-shift-row">
+                  <span>${escapeHTML(playoffSeasonLabel(row.season))}</span>
+                  <div class="playoff-shift-track">
+                    <i style="width:${(Number(row.distance || 0) / maxShift) * 100}%"></i>
+                  </div>
+                  <strong>${number(row.distance, 3)}</strong>
+                </div>
+              `,
+            )
+            .join("")}
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function playoffPlayerView(base) {
+  const players = playoffEligiblePlayers(base);
+  if (
+    !appState.playoffPlayerId ||
+    !players.some((player) => player.id === appState.playoffPlayerId)
+  ) {
+    appState.playoffPlayerId = players[0]?.id;
+  }
+  const history = base
+    .filter((row) => row.id === appState.playoffPlayerId)
+    .sort((left, right) => left.season.localeCompare(right.season));
+  const selected = players.find(
+    (player) => player.id === appState.playoffPlayerId,
+  );
   const latest = history.at(-1);
   const selectedWithTeam = selected
     ? {
         ...selected,
-        team: latest?.team || "",
-        position: latest?.position || "",
+        team: latest?.team || selected.team,
+        position: latest?.position || selected.position,
       }
     : null;
+  if (!players.length || !history.length) {
+    return '<div class="empty-state">No matching playoff players under the current filters.</div>';
+  }
   return `
-    <div class="two-column" style="margin-bottom:28px">
-      <div>
+    <section class="playoff-section-head">
+      <p class="eyebrow">Player Career</p>
+      <h2>Player Career Playoff Pattern</h2>
+    </section>
+    <div class="playoff-player-picker">
+      <div class="playoff-player-controls">
         <div class="field">
-          <label for="playoff-player-search">Find a player</label>
-          <input class="search-input" id="playoff-player-search" type="search" value="${escapeHTML(appState.playoffQuery)}" placeholder="Search playoff players" />
+          <label for="playoff-player-search">Search player</label>
+          <input
+            class="search-input"
+            id="playoff-player-search"
+            type="search"
+            value="${escapeHTML(appState.playoffQuery)}"
+            autocomplete="off"
+            aria-controls="playoff-player-matches"
+          />
         </div>
-        <div class="search-results" id="playoff-player-results"></div>
-      </div>
-      <div class="detail-panel">
-        ${
-          selectedWithTeam
-            ? playerIdentity(
-                selectedWithTeam,
-                latest?.season,
-                "Selected player",
-                `${history.length} playoff season${history.length === 1 ? "" : "s"} in the dataset`,
+        <div class="field">
+          <label for="playoff-player-matches">Player</label>
+          <select id="playoff-player-matches" size="6">
+            ${players
+              .map(
+                (player) => `
+                  <option
+                    value="${player.id}"
+                    ${player.id === appState.playoffPlayerId ? "selected" : ""}
+                  >${escapeHTML(`${player.name} - ${player.position}`)}</option>
+                `,
               )
-            : '<div class="detail-name">No player</div>'
-        }
+              .join("")}
+          </select>
+        </div>
+        <p class="playoff-player-match-status" aria-live="polite"></p>
+        <p class="playoff-player-no-matches" hidden>No matching playoff players under the current filters.</p>
+      </div>
+      <div class="detail-panel playoff-selected-player">
+        ${playerIdentity(
+          selectedWithTeam,
+          latest?.season,
+          "Selected player",
+          `${history.length} playoff season${history.length === 1 ? "" : "s"} in the dataset`,
+        )}
       </div>
     </div>
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead><tr><th>Season</th><th>Regular season</th><th>Playoffs</th><th class="numeric">REG P/GP</th><th class="numeric">PO P/GP</th><th class="numeric">Shift</th></tr></thead>
-        <tbody>
-          ${history
-            .map(
-              (row) => `
-                <tr>
-                  <td>${escapeHTML(appState.core.meta.seasons.find((item) => item.key === row.season)?.label || row.season)}</td>
-                  <td>${profileChip(row.regProfile)}</td>
-                  <td>${profileChip(row.playoffProfile)}</td>
-                  <td class="numeric">${number(row.regPpg, 2)}</td>
-                  <td class="numeric">${number(row.playoffPpg, 2)}</td>
-                  <td class="numeric">${number(row.distance, 2)}</td>
-                </tr>
-              `,
-            )
-            .join("")}
-        </tbody>
-      </table>
+    <section class="metric-grid playoff-metric-grid">
+      ${metric("Playoff seasons", number(history.length))}
+      ${metric("Median model shift", number(median(history.map((row) => row.distance)), 2))}
+      ${metric("Career PO GP", number(history.reduce((sum, row) => sum + Number(row.playoffGames || 0), 0)))}
+      ${metric("Career P/GP change", signedNumber(mean(history.map((row) => row.ppgChange)), 2))}
+    </section>
+    <div class="playoff-delta-grid">
+      ${playoffDeltaChart(
+        history,
+        "regPpg",
+        "playoffPpg",
+        "Scoring Rate: Regular Season vs Playoffs",
+        2,
+      )}
+      ${playoffDeltaChart(
+        history,
+        "regToi",
+        "playoffToi",
+        "Ice Time: Regular Season vs Playoffs (min)",
+        1,
+      )}
     </div>
+    ${playoffCareerTranslation(history)}
+    ${playoffShiftTable(history, history.length)}
   `;
 }
 
 async function renderPlayoffs() {
   if (!appState.playoffs) {
     loading("Loading playoff histories…");
-    appState.playoffs = await getJSON(`${DATA_ROOT}/playoffs.json`);
-    const viable = appState.playoffs
-      .filter((row) => row.playoffGames >= 1)
-      .map((row) => row.season)
+    appState.playoffs = await getJSON(
+      `${DATA_ROOT}/playoffs.json?v=${DATA_VERSION}`,
+    );
+    const viable = [
+      ...new Set(
+        appState.playoffs
+          .filter((row) => row.playoffGames >= 1)
+          .map((row) => row.season),
+      ),
+    ]
       .sort()
       .reverse();
     appState.playoffSeason = viable[0] || appState.playoffs[0]?.season;
   }
   if (appState.route !== "playoffs") return;
-  const rows = playoffFiltered();
+  cleanupCanvases();
+  const base = playoffBaseRows();
+  const seasonRows = playoffSeasonRows(base);
   main.innerHTML = `
-    <article class="page">
-      ${pageHeader(
-        "Playoff pressure",
-        "What survives the postseason?",
-        "Compare regular-season identity with the role a player actually carried in the playoffs.",
-        playoffControls(),
-      )}
-      <div class="controls" style="margin-bottom:22px">
+    <article class="page playoff-page">
+      <header class="playoff-page-head">
+        <div>
+          <h1>How Does Play Style Change in the Playoffs?</h1>
+          <p>
+            We all know that the playoffs feel different — tighter systems,
+            better goaltending, and higher stakes. But how much does a player's
+            <em>actual style</em> change when the intensity ramps up? This page
+            answers that question using the same archetype model that classifies
+            regular-season play, now applied to playoff data.
+          </p>
+        </div>
+        <div class="controls">${playoffControls()}</div>
+      </header>
+      ${playoffExplainer()}
+      ${playoffPrimarySignal()}
+      <section class="playoff-filter-panel" aria-label="Playoff sample filters">
         <div class="field">
-          <label for="playoff-reg-games">Minimum regular games · <span id="playoff-reg-value">${appState.playoffMinReg}</span></label>
-          <input id="playoff-reg-games" type="range" min="0" max="82" step="5" value="${appState.playoffMinReg}" />
+          <label for="playoff-reg-games">
+            Min regular-season games
+            <output id="playoff-reg-value">${appState.playoffMinReg}</output>
+          </label>
+          <input
+            id="playoff-reg-games"
+            type="range"
+            min="0"
+            max="82"
+            step="5"
+            value="${appState.playoffMinReg}"
+          />
+          <span><small>0</small><small>82</small></span>
         </div>
         <div class="field">
-          <label for="playoff-po-games">Minimum playoff games · <span id="playoff-po-value">${appState.playoffMinPo}</span></label>
-          <input id="playoff-po-games" type="range" min="1" max="28" step="1" value="${appState.playoffMinPo}" />
+          <label for="playoff-po-games">
+            Min playoff games
+            <output id="playoff-po-value">${appState.playoffMinPo}</output>
+          </label>
+          <input
+            id="playoff-po-games"
+            type="range"
+            min="1"
+            max="28"
+            step="1"
+            value="${appState.playoffMinPo}"
+          />
+          <span><small>1</small><small>28</small></span>
         </div>
-      </div>
+      </section>
       ${tabs(
         [
-          ["shifts", "Player shifts"],
-          ["transitions", "Style transitions"],
-          ["player", "Player career"],
+          ["season", "Season View"],
+          ["archetypes", "Archetypes"],
+          ["player", "Player Career"],
         ],
         appState.playoffTab,
         "playoffs",
       )}
-      <section id="playoff-panel"></section>
-      <footer class="page-footer">
-        <span>Playoff profiles use the regular-season model.</span>
-        <span>Shift score compares full probability mixes.</span>
-      </footer>
+      <section id="playoff-panel">
+        ${
+          appState.playoffTab === "season"
+            ? playoffSeasonView(seasonRows)
+            : appState.playoffTab === "archetypes"
+              ? playoffArchetypesView(base)
+              : playoffPlayerView(base)
+        }
+      </section>
     </article>
   `;
-
-  const panel = document.querySelector("#playoff-panel");
-  if (appState.playoffTab === "shifts") panel.innerHTML = playoffShiftView(rows);
-  else if (appState.playoffTab === "transitions") panel.innerHTML = playoffTransitions(rows);
-  else {
-    panel.innerHTML = playoffPlayerView(rows);
-    bindPlayoffPlayerSearch();
-  }
-  hydratePlayerAssets(panel);
+  hydratePlayerAssets(main);
 
   bindGroupControl("playoff-group", (group) => {
     appState.playoffGroup = group;
     appState.playoffPlayerId = null;
+    appState.playoffQuery = "";
     renderPlayoffs();
   });
-  document.querySelector("#playoff-season")?.addEventListener("change", (event) => {
-    appState.playoffSeason = event.target.value;
-    renderPlayoffs();
-  });
-  document.querySelector("#playoff-reg-games")?.addEventListener("input", (event) => {
-    document.querySelector("#playoff-reg-value").textContent = event.target.value;
-  });
-  document.querySelector("#playoff-reg-games")?.addEventListener("change", (event) => {
-    appState.playoffMinReg = Number(event.target.value);
-    renderPlayoffs();
-  });
-  document.querySelector("#playoff-po-games")?.addEventListener("input", (event) => {
-    document.querySelector("#playoff-po-value").textContent = event.target.value;
-  });
-  document.querySelector("#playoff-po-games")?.addEventListener("change", (event) => {
-    appState.playoffMinPo = Number(event.target.value);
-    renderPlayoffs();
-  });
+  document
+    .querySelector("#playoff-season")
+    ?.addEventListener("change", (event) => {
+      appState.playoffSeason = event.target.value;
+      renderPlayoffs();
+    });
+  document
+    .querySelector("#playoff-reg-games")
+    ?.addEventListener("input", (event) => {
+      document.querySelector("#playoff-reg-value").textContent =
+        event.target.value;
+    });
+  document
+    .querySelector("#playoff-reg-games")
+    ?.addEventListener("change", (event) => {
+      appState.playoffMinReg = Number(event.target.value);
+      appState.playoffPlayerId = null;
+      renderPlayoffs();
+    });
+  document
+    .querySelector("#playoff-po-games")
+    ?.addEventListener("input", (event) => {
+      document.querySelector("#playoff-po-value").textContent =
+        event.target.value;
+    });
+  document
+    .querySelector("#playoff-po-games")
+    ?.addEventListener("change", (event) => {
+      appState.playoffMinPo = Number(event.target.value);
+      appState.playoffPlayerId = null;
+      renderPlayoffs();
+    });
   bindTabs("playoffs", (tab) => {
     appState.playoffTab = tab;
     renderPlayoffs();
   });
+  if (appState.playoffTab === "player") {
+    bindPlayoffPlayerSearch(base);
+  }
 }
 
-function bindPlayoffPlayerSearch() {
-  const players = [...new Map(
-    appState.playoffs
-      .filter((row) => row.group === appState.playoffGroup && row.playoffGames >= 1)
-      .map((row) => [row.id, { id: row.id, name: row.name }]),
-  ).values()].sort((a, b) => a.name.localeCompare(b.name));
+function bindPlayoffPlayerSearch(base) {
+  const players = playoffEligiblePlayers(base);
   const search = document.querySelector("#playoff-player-search");
-  const results = document.querySelector("#playoff-player-results");
+  const matches = document.querySelector("#playoff-player-matches");
+  const status = document.querySelector(".playoff-player-match-status");
+  const noMatches = document.querySelector(".playoff-player-no-matches");
   const draw = () => {
+    if (!search || !matches) return;
     appState.playoffQuery = search.value;
     const query = search.value.trim().toLowerCase();
-    results.innerHTML = players
-      .filter((player) => !query || player.name.toLowerCase().includes(query))
-      .slice(0, 8)
+    const filtered = players.filter(
+      (player) => !query || player.name.toLowerCase().includes(query),
+    );
+    matches.innerHTML = filtered
       .map(
         (player) => `
-          <button class="search-result" type="button" data-playoff-player="${player.id}">
-            <span>${escapeHTML(player.name)}</span><span>View history</span>
-          </button>
+          <option
+            value="${player.id}"
+            ${player.id === appState.playoffPlayerId ? "selected" : ""}
+          >${escapeHTML(`${player.name} - ${player.position}`)}</option>
         `,
       )
       .join("");
+    matches.disabled = filtered.length === 0;
+    if (status) {
+      status.textContent = `${number(filtered.length)} matching player${filtered.length === 1 ? "" : "s"}`;
+    }
+    if (noMatches) noMatches.hidden = filtered.length > 0;
   };
   search?.addEventListener("input", draw);
-  results?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-playoff-player]");
-    if (!button) return;
-    appState.playoffPlayerId = Number(button.dataset.playoffPlayer);
+  matches?.addEventListener("change", () => {
+    const playerId = Number(matches.value);
+    if (!playerId) return;
+    appState.playoffPlayerId = playerId;
     appState.playoffQuery = "";
     renderPlayoffs();
   });

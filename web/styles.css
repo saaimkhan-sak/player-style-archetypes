@@ -2719,6 +2719,953 @@ h3 {
   text-align: right;
 }
 
+.playoff-page {
+  --playoff-coral: #e9573f;
+  --playoff-coral-dark: #a92f22;
+}
+
+.playoff-page-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: clamp(28px, 5vw, 68px);
+  align-items: end;
+  margin-bottom: 30px;
+}
+
+.playoff-page-head h1 {
+  max-width: 900px;
+  margin-bottom: 20px;
+  font-size: clamp(42px, 5.2vw, 68px);
+  line-height: 0.98;
+}
+
+.playoff-page-head > div:first-child > p {
+  max-width: 820px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.68;
+}
+
+.playoff-page-head .controls {
+  align-items: end;
+}
+
+.playoff-methodology {
+  margin-bottom: 20px;
+}
+
+.playoff-methodology .methodology-section > ul,
+.playoff-methodology .methodology-section > ol {
+  display: grid;
+  max-width: 900px;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding-left: 22px;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.playoff-methodology blockquote {
+  max-width: 780px;
+  margin: 18px 0;
+  padding: 17px 20px;
+  border-left: 4px solid var(--coral);
+  border-radius: 0 12px 12px 0;
+  background: var(--ice);
+  color: var(--navy-950);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 18px;
+}
+
+.playoff-method-table-wrap {
+  max-width: 100%;
+  margin: 22px 0;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.playoff-method-table {
+  width: 100%;
+  min-width: 880px;
+  border-collapse: collapse;
+  background: var(--paper-strong);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.playoff-method-table th,
+.playoff-method-table td {
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.playoff-method-table th {
+  background: var(--ice);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.playoff-method-table th:first-child {
+  width: 26%;
+}
+
+.playoff-method-table th:nth-child(2),
+.playoff-method-table th:nth-child(3) {
+  width: 37%;
+}
+
+.playoff-primary-signal {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.42fr) minmax(0, 1.58fr);
+  gap: clamp(22px, 4vw, 48px);
+  align-items: start;
+  margin-bottom: 24px;
+  padding: clamp(22px, 3vw, 30px);
+  border: 1px solid rgba(233, 87, 63, 0.24);
+  border-left: 5px solid var(--coral);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(120deg, rgba(233, 87, 63, 0.08), transparent 50%),
+    rgba(255, 253, 249, 0.9);
+}
+
+.playoff-primary-signal > strong {
+  color: var(--navy-950);
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.playoff-primary-signal p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.playoff-primary-signal p strong {
+  color: var(--navy-950);
+}
+
+.playoff-filter-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 24px;
+  margin-bottom: 22px;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 253, 249, 0.72);
+}
+
+.playoff-filter-panel label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.playoff-filter-panel output {
+  min-width: 34px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--navy-900);
+  color: white;
+  font-size: 12px;
+  text-align: center;
+}
+
+.playoff-filter-panel input[type="range"] {
+  width: 100%;
+  margin-top: 10px;
+  accent-color: var(--coral);
+}
+
+.playoff-filter-panel .field > span {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.playoff-page .tab-bar {
+  margin-bottom: 34px;
+}
+
+.playoff-section-head {
+  max-width: 880px;
+  margin-bottom: 24px;
+}
+
+.playoff-section-head h2 {
+  margin-bottom: 12px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(28px, 3.2vw, 42px);
+  font-weight: 500;
+  line-height: 1.08;
+}
+
+.playoff-section-head > p:last-child {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.playoff-metric-grid {
+  margin-bottom: 28px;
+}
+
+.playoff-scatter-card {
+  margin-bottom: 44px;
+  overflow: visible;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 253, 249, 0.88);
+}
+
+.playoff-scatter-card > header {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.54fr) minmax(0, 1.46fr);
+  gap: 30px;
+  align-items: start;
+  padding: clamp(22px, 3vw, 30px);
+  border-bottom: 1px solid var(--line);
+}
+
+.playoff-scatter-card h3 {
+  margin: 0;
+  color: var(--navy-950);
+  font-size: 21px;
+}
+
+.playoff-scatter-card > header > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.playoff-scatter-stage {
+  position: relative;
+  height: 500px;
+  padding: 24px 28px 64px 78px;
+}
+
+.playoff-scatter-plot {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-left: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background:
+    linear-gradient(rgba(206, 219, 216, 0.34) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(206, 219, 216, 0.34) 1px, transparent 1px);
+  background-size: 20% 20%;
+}
+
+.playoff-scatter-zero-x,
+.playoff-scatter-zero-y {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.playoff-scatter-zero-x {
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed rgba(96, 113, 120, 0.78);
+}
+
+.playoff-scatter-zero-y {
+  right: 0;
+  left: 0;
+  border-top: 1px dashed rgba(96, 113, 120, 0.78);
+}
+
+.playoff-scatter-point {
+  position: absolute;
+  z-index: 2;
+  width: var(--point-size);
+  height: var(--point-size);
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.94);
+  background: var(--profile);
+  box-shadow: 0 2px 7px rgba(7, 24, 33, 0.2);
+  cursor: help;
+  transform: translate(-50%, 50%);
+}
+
+.playoff-scatter-point.is-circle {
+  border-radius: 50%;
+}
+
+.playoff-scatter-point.is-square {
+  border-radius: 4px;
+}
+
+.playoff-scatter-point.is-triangle {
+  border: 0;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.playoff-scatter-point.is-cross {
+  border-radius: 2px;
+  transform: translate(-50%, 50%) rotate(45deg);
+}
+
+.playoff-scatter-point::after {
+  position: absolute;
+  z-index: 8;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  width: max-content;
+  max-width: min(300px, 70vw);
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: var(--navy-950);
+  color: white;
+  content: attr(data-tooltip);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  text-align: left;
+  transform: translateX(-50%) translateY(4px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.playoff-scatter-point:hover,
+.playoff-scatter-point:focus-visible {
+  z-index: 6;
+  outline: 3px solid rgba(33, 182, 168, 0.32);
+  outline-offset: 3px;
+}
+
+.playoff-scatter-point:hover::after,
+.playoff-scatter-point:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.playoff-scatter-y-label,
+.playoff-scatter-x-label {
+  position: absolute;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.playoff-scatter-y-label {
+  top: 50%;
+  left: 18px;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  white-space: nowrap;
+}
+
+.playoff-scatter-x-label {
+  right: 28px;
+  bottom: 22px;
+  left: 78px;
+  text-align: center;
+}
+
+.playoff-scatter-key {
+  display: grid;
+  gap: 16px;
+  padding: 18px clamp(22px, 3vw, 30px) 24px;
+  border-top: 1px solid var(--line);
+}
+
+.playoff-shape-key,
+.playoff-profile-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.playoff-shape-key span,
+.playoff-profile-key span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.playoff-shape-key i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  background: var(--coral);
+}
+
+.playoff-shape-key i.is-circle {
+  border-radius: 50%;
+}
+
+.playoff-shape-key i.is-square {
+  border-radius: 2px;
+}
+
+.playoff-shape-key i.is-triangle {
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.playoff-profile-key i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--profile);
+}
+
+.playoff-profile-changes {
+  margin-bottom: 54px;
+}
+
+.playoff-table-wrap {
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 253, 249, 0.88);
+  scrollbar-color: var(--ice-strong) transparent;
+}
+
+.playoff-table {
+  width: 100%;
+  min-width: 1680px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.playoff-table th,
+.playoff-table td {
+  padding: 12px 13px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.playoff-table th {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  background: var(--ice);
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.playoff-table tbody tr:hover {
+  background: rgba(234, 245, 243, 0.45);
+}
+
+.playoff-table .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.playoff-archetype-column {
+  min-width: 230px;
+}
+
+.playoff-band,
+.playoff-score {
+  display: inline-flex;
+  min-height: 25px;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 780;
+  white-space: nowrap;
+}
+
+.playoff-band.is-steady,
+.playoff-score.is-steady {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.playoff-band.is-moderate,
+.playoff-score.is-moderate {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.playoff-band.is-major,
+.playoff-score.is-major {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.playoff-band.is-unavailable,
+.playoff-score.is-unavailable {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.playoff-how-to-read {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 20px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: var(--ice);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.playoff-how-to-read > strong {
+  color: var(--navy-950);
+}
+
+.playoff-how-to-read > span {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 7px;
+}
+
+.playoff-how-to-read > span strong,
+.playoff-how-to-read > span em {
+  grid-column: 2;
+}
+
+.playoff-color-swatch,
+.playoff-size-swatch {
+  grid-row: 1 / span 3;
+  display: inline-block;
+  align-self: start;
+  margin-top: 2px;
+}
+
+.playoff-color-swatch {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--coral);
+}
+
+.playoff-size-swatch {
+  width: 15px;
+  height: 15px;
+  border: 2px solid var(--navy-950);
+  border-radius: 50%;
+}
+
+.playoff-matrix-scroll {
+  max-width: 100%;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 253, 249, 0.88);
+}
+
+.playoff-matrix {
+  display: grid;
+  width: var(--matrix-width);
+  grid-template-columns:
+    minmax(250px, 1.25fr)
+    repeat(var(--season-count), minmax(58px, 1fr));
+  align-items: stretch;
+}
+
+.playoff-matrix > * {
+  min-height: 58px;
+  border-right: 1px solid rgba(206, 219, 216, 0.68);
+  border-bottom: 1px solid rgba(206, 219, 216, 0.68);
+}
+
+.playoff-matrix-corner,
+.playoff-matrix-season {
+  display: grid;
+  place-items: center;
+  background: var(--ice);
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.playoff-matrix-profile {
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  color: var(--navy-950);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.playoff-matrix-cell {
+  display: grid;
+  place-items: center;
+  background: rgba(251, 248, 242, 0.38);
+}
+
+.playoff-matrix-cell.is-empty {
+  background:
+    linear-gradient(
+      135deg,
+      transparent 48%,
+      rgba(206, 219, 216, 0.45) 49%,
+      rgba(206, 219, 216, 0.45) 51%,
+      transparent 52%
+    );
+}
+
+.playoff-matrix-cell i {
+  display: block;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border: 2px solid white;
+  border-radius: 50%;
+  background: rgba(233, 87, 63, var(--dot-alpha));
+  box-shadow: 0 1px 5px rgba(7, 24, 33, 0.2);
+}
+
+.playoff-player-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.playoff-player-controls {
+  padding: clamp(22px, 3vw, 30px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 253, 249, 0.86);
+}
+
+.playoff-player-controls .field + .field {
+  margin-top: 18px;
+}
+
+.playoff-player-controls select {
+  width: 100%;
+  min-height: 190px;
+  padding: 6px;
+}
+
+.playoff-player-controls option {
+  padding: 9px 8px;
+}
+
+.playoff-player-match-status {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.playoff-player-no-matches {
+  margin: 12px 0 0;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: var(--ice);
+  color: var(--aqua-dark);
+  font-size: 13px;
+}
+
+.playoff-selected-player {
+  min-width: 0;
+}
+
+.playoff-selected-player .player-identity {
+  margin-bottom: 0;
+}
+
+.playoff-delta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.playoff-delta-card,
+.playoff-translation-card,
+.playoff-shift-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 253, 249, 0.88);
+}
+
+.playoff-delta-card > header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px 16px;
+  align-items: center;
+  padding: 19px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.playoff-delta-card h3 {
+  width: 100%;
+  margin: 0 0 5px;
+  color: var(--navy-950);
+  font-size: 15px;
+}
+
+.playoff-delta-card header span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.playoff-delta-card header i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.playoff-delta-card .is-regular {
+  background: #94a3b8;
+}
+
+.playoff-delta-card .is-playoffs {
+  background: var(--coral);
+}
+
+.playoff-delta-list {
+  display: grid;
+  padding: 8px 20px 16px;
+}
+
+.playoff-delta-row {
+  display: grid;
+  grid-template-columns: 82px minmax(100px, 1fr) 94px;
+  gap: 11px;
+  align-items: center;
+  min-height: 43px;
+  border-bottom: 1px solid rgba(206, 219, 216, 0.6);
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.playoff-delta-row > span:last-child {
+  text-align: right;
+}
+
+.playoff-delta-track {
+  position: relative;
+  height: 18px;
+}
+
+.playoff-delta-track::before {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: var(--line);
+  content: "";
+}
+
+.playoff-delta-line {
+  position: absolute;
+  top: 50%;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(233, 87, 63, 0.46);
+  transform: translateY(-50%);
+}
+
+.playoff-delta-point {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border: 2px solid white;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(7, 24, 33, 0.18);
+  transform: translate(-50%, -50%);
+}
+
+.playoff-career-comparison {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.playoff-translation-card h3,
+.playoff-shift-card h3 {
+  margin: 0;
+  padding: 19px 20px;
+  border-bottom: 1px solid var(--line);
+  color: var(--navy-950);
+  font-size: 15px;
+}
+
+.playoff-translation-head,
+.playoff-translation-row {
+  display: grid;
+  grid-template-columns: 92px repeat(2, minmax(210px, 1fr));
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(206, 219, 216, 0.6);
+}
+
+.playoff-translation-head {
+  background: var(--ice);
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.playoff-translation-row > strong {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.playoff-shift-bars {
+  display: grid;
+  padding: 9px 18px 16px;
+}
+
+.playoff-shift-row {
+  display: grid;
+  grid-template-columns: 82px minmax(90px, 1fr) 45px;
+  gap: 10px;
+  align-items: center;
+  min-height: 43px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.playoff-shift-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--ice-strong);
+}
+
+.playoff-shift-track i {
+  display: block;
+  min-width: 2px;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f7c9bd, var(--coral));
+}
+
+.playoff-shift-row > strong {
+  color: var(--navy-950);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+@media (max-width: 1050px) {
+  .playoff-page-head {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .playoff-primary-signal,
+  .playoff-scatter-card > header {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .playoff-player-picker,
+  .playoff-career-comparison {
+    grid-template-columns: 1fr;
+  }
+
+  .playoff-how-to-read {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 820px) {
+  .playoff-filter-panel,
+  .playoff-delta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .playoff-scatter-stage {
+    height: 440px;
+    padding: 20px 18px 60px 62px;
+  }
+
+  .playoff-scatter-y-label {
+    left: 13px;
+  }
+
+  .playoff-scatter-x-label {
+    right: 18px;
+    left: 62px;
+  }
+}
+
+@media (max-width: 560px) {
+  .playoff-page-head h1 {
+    font-size: clamp(38px, 11vw, 48px);
+  }
+
+  .playoff-page-head > div:first-child > p,
+  .playoff-methodology .methodology-section > ul,
+  .playoff-methodology .methodology-section > ol {
+    font-size: 15px;
+  }
+
+  .playoff-primary-signal {
+    padding: 20px 18px;
+  }
+
+  .playoff-filter-panel {
+    padding: 18px;
+  }
+
+  .playoff-scatter-stage {
+    height: 390px;
+  }
+
+  .playoff-delta-row {
+    grid-template-columns: 74px minmax(80px, 1fr);
+  }
+
+  .playoff-delta-row > span:last-child {
+    grid-column: 2;
+    text-align: left;
+  }
+
+  .playoff-translation-card {
+    overflow-x: auto;
+  }
+
+  .playoff-translation-head,
+  .playoff-translation-row {
+    min-width: 620px;
+  }
+}
+
 .roster-intro {
   margin-bottom: 24px;
 }

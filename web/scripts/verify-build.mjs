@@ -11,15 +11,25 @@ const required = [
 
 await Promise.all(required.map((path) => access(path)));
 
-const [coreSource, appSource, stylesSource, careersSource, indexSource] = await Promise.all([
+const [
+  coreSource,
+  appSource,
+  stylesSource,
+  careersSource,
+  playoffsSource,
+  indexSource,
+] = await Promise.all([
   readFile("data/core.json", "utf8"),
   readFile("app.js", "utf8"),
   readFile("styles.css", "utf8"),
   readFile("data/careers.json", "utf8"),
+  readFile("data/playoffs.json", "utf8"),
   readFile("index.html", "utf8"),
 ]);
 const data = JSON.parse(coreSource);
 const careers = JSON.parse(careersSource);
+const playoffs = JSON.parse(playoffsSource);
+const normalizedAppSource = appSource.replace(/\s+/g, " ");
 if (!data.meta?.seasons?.length || !data.glossary) {
   throw new Error("The generated site data is incomplete.");
 }
@@ -260,6 +270,203 @@ if (
 ) {
   throw new Error("Career history rows do not match the model-eligible seasons.");
 }
+
+const playoffContent = [
+  "How Does Play Style Change in the Playoffs?",
+  "We all know that the playoffs feel different",
+  "How is the model shift score calculated?",
+  "The short version",
+  "Step 1 — Where the data comes from",
+  "Step 2 — What I calculated from the playoff data",
+  "Expected Goals per 60 min (5v5)",
+  "Shot attempts per 60 min (5v5)",
+  "High-danger shot share",
+  "On-ice xGoals For/Against per 60 (5v5)",
+  "Rebounds created per 60 (5v5)",
+  "xGoals from rebounds per 60 (5v5)",
+  "Shot blocking per 60 (5v5 + 4v5)",
+  "Hits, takeaways, giveaways per 60 (5v5)",
+  "Penalties drawn per 60 (5v5)",
+  "Zone start distribution",
+  "Faceoff win % (5v5)",
+  "Power play xGoals (5v4)",
+  "Penalty kill opponent xGoals (4v5)",
+  "Step 3 — Running it through the model",
+  "NMF compression:",
+  "GMM classification:",
+  "The regular-season model was not re-trained on playoff data",
+  "Step 4 — The model shift score",
+  "Score near 0",
+  "Score around 0.25–0.75",
+  "Score above 0.75",
+  "What about the \"stat shift score\"?",
+  "Use the stat shift as a sanity check, but trust the model shift as the primary signal.",
+  "Limitations",
+  "Playoff sample sizes are smaller than regular-season totals",
+  "This means the model is working slightly \"out of sample\"",
+  "couldn't be recovered from the summary data and are imputed as league average",
+  "Primary signal: Model shift score",
+  "Higher = bigger identity shift.",
+  "Min regular-season games",
+  "Min playoff games",
+  "Season View",
+  "Archetypes",
+  "Player Career",
+  "Playoff Shifts",
+  "Median model shift",
+  "Archetype changes",
+  "% changed archetype",
+  "Scoring and ice-time change",
+  "Biggest Playoff Profile Changes",
+  "Regular-Season Archetypes Under Playoff Pressure",
+  "How to read this:",
+  "Player Career Playoff Pattern",
+  "Playoff seasons",
+  "Career PO GP",
+  "Career P/GP change",
+  "Scoring Rate: Regular Season vs Playoffs",
+  "Ice Time: Regular Season vs Playoffs (min)",
+  "Archetype Translation",
+  "How Much the Playoff Profile Moved",
+];
+const playoffTableLabels = [
+  "REG archetype",
+  "Projected PO archetype",
+  "REG GP",
+  "PO GP",
+  "REG P/GP",
+  "PO P/GP",
+  "P/GP change",
+  "TOI change",
+  "Model shift ↑",
+  "Model shift band",
+  "Stat shift",
+  "Stat shift band",
+  "REG ATOI",
+  "PO ATOI",
+];
+if (
+  playoffContent.some((content) => !normalizedAppSource.includes(content)) ||
+  playoffTableLabels.some((label) => !appSource.includes(label)) ||
+  !indexSource.includes("<span>Playoff Trends</span>") ||
+  !appSource.includes('playoffs: "Playoff Trends"') ||
+  indexSource.includes("<span>Playoff pressure</span>") ||
+  !appSource.includes("function playoffBaseRows()") ||
+  !appSource.includes("function playoffScatter(rows)") ||
+  !appSource.includes("function playoffArchetypeMatrix(rows)") ||
+  !appSource.includes("function playoffDeltaChart(") ||
+  !appSource.includes("function playoffCareerTranslation(history)") ||
+  !appSource.includes("rows.filter((row) => row.changed).length") ||
+  !appSource.includes(".filter((row) => row.players >= 3)") ||
+  !stylesSource.includes(".playoff-page-head") ||
+  !stylesSource.includes(".playoff-scatter-point") ||
+  !stylesSource.includes(".playoff-matrix") ||
+  !stylesSource.includes(".playoff-delta-card") ||
+  !stylesSource.includes(".playoff-translation-card")
+) {
+  throw new Error(
+    "Playoff Trends is missing Streamlit content, navigation, or the responsive comparison views.",
+  );
+}
+
+const requiredPlayoffFields = [
+  "season",
+  "group",
+  "id",
+  "name",
+  "team",
+  "position",
+  "regGames",
+  "playoffGames",
+  "regProfile",
+  "playoffProfile",
+  "regConfidence",
+  "playoffConfidence",
+  "distance",
+  "shiftBand",
+  "changed",
+  "regPpg",
+  "playoffPpg",
+  "ppgChange",
+  "regToi",
+  "playoffToi",
+  "toiChange",
+  "shotRateChange",
+  "pimRateChange",
+  "plusMinusRateChange",
+  "statShift",
+  "statBand",
+];
+const validShiftBands = new Set([
+  "Held steady",
+  "Moderate shift",
+  "Major shift",
+]);
+for (const row of playoffs) {
+  const key = `${row.group}:${row.id}:${row.season}`;
+  const expectedShiftBand =
+    Number(row.distance) <= 0.25
+      ? "Held steady"
+      : Number(row.distance) <= 0.75
+        ? "Moderate shift"
+        : "Major shift";
+  const expectedStatBand =
+    Number(row.statShift) <= 2
+      ? "Held steady"
+      : Number(row.statShift) <= 3.5
+        ? "Moderate shift"
+        : "Major shift";
+  if (
+    requiredPlayoffFields.some((field) => !(field in row)) ||
+    !validShiftBands.has(row.shiftBand) ||
+    !validShiftBands.has(row.statBand) ||
+    !Number.isFinite(Number(row.distance)) ||
+    Number(row.distance) < 0 ||
+    !Number.isFinite(Number(row.statShift)) ||
+    Number(row.statShift) < 0 ||
+    !Number.isFinite(Number(row.ppgChange)) ||
+    !Number.isFinite(Number(row.toiChange)) ||
+    row.shiftBand !== expectedShiftBand ||
+    row.statBand !== expectedStatBand ||
+    Math.abs(
+      Number(row.ppgChange) -
+        (Number(row.playoffPpg) - Number(row.regPpg)),
+    ) > 0.0002 ||
+    Math.abs(
+      Number(row.toiChange) -
+        (Number(row.playoffToi) - Number(row.regToi)),
+    ) > 0.02
+  ) {
+    throw new Error(`${key} has incomplete or invalid playoff trend data.`);
+  }
+}
+const playoffFixture = playoffs.filter(
+  (row) =>
+    row.season === "20242025" &&
+    row.group === "forwards" &&
+    Number(row.regGames) >= 20 &&
+    Number(row.playoffGames) >= 4,
+);
+const fixtureMedian = [...playoffFixture]
+  .map((row) => Number(row.distance))
+  .sort((left, right) => left - right)[
+    Math.floor(playoffFixture.length / 2)
+  ];
+const anzeKopitarFixture = playoffFixture.find(
+  (row) => Number(row.id) === 8471685,
+);
+if (
+  playoffs.length !== 5991 ||
+  playoffFixture.length !== 191 ||
+  playoffFixture.filter((row) => row.changed).length !== 145 ||
+  Math.abs(fixtureMedian - 1.3729) > 0.00005 ||
+  Math.abs(Number(anzeKopitarFixture?.statShift) - 5.6507) > 0.00005
+) {
+  throw new Error(
+    "The Playoff Trends fixture no longer matches the Streamlit projection data.",
+  );
+}
+
 const careerByKey = new Map(
   careers.map((row) => [
     `${row.group}:${row.id}:${row.season}`,
