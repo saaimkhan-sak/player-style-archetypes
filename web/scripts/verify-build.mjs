@@ -166,6 +166,14 @@ if (
   !appSource.includes("<label for=\"career-search\">Search player name</label>") ||
   !appSource.includes("<label for=\"career-matches\">Matches</label>") ||
   !appSource.includes("Selected: ${escapeHTML(selected?.display || \"No player\")}") ||
+  !appSource.includes("function careerPlayerStatistics(rows)") ||
+  !appSource.includes("Career statistics summary") ||
+  !appSource.includes("Career totals in dataset") ||
+  !appSource.includes("Model-eligible seasons") ||
+  !appSource.includes("Most frequent style") ||
+  !appSource.includes("Style changes") ||
+  !appSource.includes("careerPlayerStatistics(rows)") ||
+  !appSource.includes("rows.filter((row) => row.changed).length") ||
   !appSource.includes("Seasons in dataset") ||
   !appSource.includes("Avg confidence") ||
   !appSource.includes("Avg mixedness") ||
@@ -183,6 +191,9 @@ if (
   !appSource.includes("careerSeasonCard(row, index, rows.length)") ||
   appSource.includes("Style is a timeline, not a label.") ||
   !stylesSource.includes(".career-picker") ||
+  !stylesSource.includes(".career-card-summary") ||
+  !stylesSource.includes(".career-card-stat-grid") ||
+  !stylesSource.includes(".career-card-style") ||
   !stylesSource.includes(".career-summary-grid") ||
   !stylesSource.includes(".career-chart-point.is-change::after") ||
   !stylesSource.includes(".career-season-card") ||

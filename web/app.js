@@ -2673,6 +2673,79 @@ function careerStat(label, value) {
   `;
 }
 
+function careerCardStat(label, value) {
+  return `
+    <div>
+      <dt>${escapeHTML(label)}</dt>
+      <dd>${escapeHTML(value)}</dd>
+    </div>
+  `;
+}
+
+function careerPlayerStatistics(rows) {
+  if (!rows.length) return "";
+  const total = (field) =>
+    rows.reduce((sum, row) => sum + Number(row[field] || 0), 0);
+  const profileCounts = new Map();
+  const profileRecency = new Map();
+  rows.forEach((row, index) => {
+    profileCounts.set(row.profile, (profileCounts.get(row.profile) || 0) + 1);
+    profileRecency.set(row.profile, index);
+  });
+  const mostFrequentProfile =
+    [...profileCounts.keys()].sort(
+      (left, right) =>
+        profileCounts.get(right) - profileCounts.get(left) ||
+        profileRecency.get(right) - profileRecency.get(left),
+    )[0] || "—";
+  const styleChanges = rows.filter((row) => row.changed).length;
+
+  return `
+    <section
+      class="career-card-summary"
+      aria-labelledby="career-card-summary-title"
+    >
+      <header>
+        <div>
+          <p class="career-card-eyebrow">Career statistics summary</p>
+          <h2 id="career-card-summary-title">Career totals in dataset</h2>
+        </div>
+        <span class="career-card-note">Model-eligible seasons</span>
+      </header>
+      <div class="career-card-stat-groups">
+        <section class="career-card-stat-group" aria-labelledby="career-card-reg-title">
+          <h3 id="career-card-reg-title">Regular season</h3>
+          <dl class="career-card-stat-grid">
+            ${careerCardStat("GP", number(total("games")))}
+            ${careerCardStat("G", number(total("goals")))}
+            ${careerCardStat("A", number(total("assists")))}
+            ${careerCardStat("P", number(total("points")))}
+          </dl>
+        </section>
+        <section class="career-card-stat-group" aria-labelledby="career-card-po-title">
+          <h3 id="career-card-po-title">Playoffs</h3>
+          <dl class="career-card-stat-grid">
+            ${careerCardStat("GP", number(total("playoffGames")))}
+            ${careerCardStat("G", number(total("playoffGoals")))}
+            ${careerCardStat("A", number(total("playoffAssists")))}
+            ${careerCardStat("P", number(total("playoffPoints")))}
+          </dl>
+        </section>
+      </div>
+      <div class="career-card-style">
+        <div class="career-card-primary-style">
+          <span>Most frequent style</span>
+          ${profileChip(mostFrequentProfile)}
+        </div>
+        <div class="career-card-change-count">
+          <span>Style changes</span>
+          <strong>${number(styleChanges)}</strong>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 function careerSeasonCard(row, index, total) {
   const isLatest = index === total - 1;
   return `
@@ -3117,6 +3190,7 @@ async function renderCareer() {
                 )
               : '<div class="detail-name">No player</div>'
           }
+          ${selectedWithTeam ? careerPlayerStatistics(rows) : ""}
         </div>
       </section>
       <section id="career-view">${careerView(rows)}</section>
