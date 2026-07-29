@@ -1648,7 +1648,7 @@ h3 {
 
 .player-identity {
   display: grid;
-  grid-template-columns: minmax(88px, 112px) minmax(0, 1fr) 48px;
+  grid-template-columns: minmax(88px, 112px) minmax(0, 1fr) 72px;
   grid-template-areas: "portrait copy logos";
   column-gap: clamp(14px, 2vw, 20px);
   align-items: start;
@@ -1729,7 +1729,7 @@ h3 {
   z-index: auto;
   grid-area: logos;
   display: grid;
-  grid-template-columns: 48px;
+  grid-template-columns: 72px;
   align-self: start;
   align-items: center;
   justify-self: end;
@@ -1739,15 +1739,15 @@ h3 {
 .team-logo-frame {
   position: relative;
   display: grid;
-  width: 48px;
-  height: 48px;
+  width: 72px;
+  height: 72px;
   flex: 0 0 auto;
   place-items: center;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: var(--paper-strong);
-  box-shadow: 0 5px 14px rgba(7, 24, 33, 0.13);
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .team-logo-frame + .team-logo-frame {
@@ -1763,9 +1763,9 @@ h3 {
 
 .team-logo {
   position: absolute;
-  inset: 4px;
-  width: calc(100% - 8px);
-  height: calc(100% - 8px);
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   opacity: 0;
   transition: opacity 160ms ease;
@@ -3273,17 +3273,17 @@ h3 {
   }
 
   .player-identity {
-    grid-template-columns: minmax(76px, 92px) minmax(0, 1fr) 44px;
+    grid-template-columns: minmax(76px, 92px) minmax(0, 1fr) 58px;
     column-gap: 12px;
   }
 
   .team-logo-list {
-    grid-template-columns: 44px;
+    grid-template-columns: 58px;
   }
 
   .player-identity .team-logo-frame {
-    width: 44px;
-    height: 44px;
+    width: 58px;
+    height: 58px;
   }
 
   h1,

@@ -47,7 +47,10 @@ if (
   !/\.team-logo-list\s*\{[\s\S]*?align-self:\s*start;[\s\S]*?justify-self:\s*end;[\s\S]*?\}/.test(
     stylesSource,
   ) ||
-  !/\.team-logo-frame\s*\{[\s\S]*?width:\s*48px;[\s\S]*?height:\s*48px;[\s\S]*?\}/.test(
+  !/\.team-logo-frame\s*\{[\s\S]*?width:\s*72px;[\s\S]*?height:\s*72px;[\s\S]*?border:\s*0;[\s\S]*?border-radius:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none;[\s\S]*?\}/.test(
+    stylesSource,
+  ) ||
+  !/\.team-logo\s*\{[\s\S]*?inset:\s*0;[\s\S]*?width:\s*100%;[\s\S]*?height:\s*100%;[\s\S]*?\}/.test(
     stylesSource,
   )
 ) {
