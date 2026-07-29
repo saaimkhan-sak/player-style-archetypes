@@ -272,294 +272,535 @@ STYLE_READS: dict[str, tuple[str, str]] = {
     ),
 }
 
-SEASON_EDITORIALS: dict[str, dict[str, tuple[str, str]]] = {
+# These reads interpret only the within-season profile mix. They describe role
+# and statistical identity, not player quality, causal change, or year-over-year
+# movement. Blocks, hits, and giveaways are treated as contextual signals rather
+# than automatic evidence of defense, forechecking success, or carelessness.
+SEASON_EDITORIALS: dict[
+    str,
+    dict[str, tuple[str, tuple[str, str]]],
+] = {
     "20082009": {
         "forwards": (
-            "Transition and playmaking control the map",
-            "The two creation-first lanes—{dominant_name} and "
-            "{runner_up_name}—combine for {top_two_share}% of the forward "
-            "pool. With only {tail_share}% outside the top three, the model "
-            "resolves a clear hierarchy rather than six equal-sized roles.",
+            "Speed sets the table; playmaking makes the next play",
+            (
+                "{dominant_name} is the clearest attacking identity in this "
+                "pool. Its shot and possession-continuation signals read like "
+                "a role built to push pace and create before five defenders "
+                "can settle into shape.",
+                "{runner_up_name} adds a connective layer through assists and "
+                "takeaways, giving the attack another route to its next chance. "
+                "{third_name} supplies a defensive-detail counterweight, so the "
+                "forward pool separates creation from support instead of asking "
+                "every player to solve the same problem.",
+            ),
         ),
         "defense": (
-            "A defensive lead with an offensive counterweight",
-            "{dominant_name} leads, but {runner_up_name} still takes "
-            "{runner_up_share}% of the defense pool. The top three absorb "
-            "{top_three_share}% across {profile_count} learned styles, leaving "
-            "the last two as edge cases rather than co-equal lanes.",
+            "The blue line splits between surviving and advancing",
+            (
+                "{dominant_name} describes a block-heavy workload under "
+                "sustained shot pressure. That is a role signal, not proof of "
+                "better defense: the opponent has to own enough of the shift "
+                "for those blocks to accumulate.",
+                "The roster-construction story is the combined presence of "
+                "{runner_up_name} and {third_name}. One adds production from "
+                "the back end; the other links recoveries to the next play, "
+                "creating natural complements for a stay-at-home partner.",
+            ),
         ),
     },
     "20092010": {
         "forwards": (
-            "Two creation lanes split the forward pool",
-            "Only {dominant_gap} points separate {dominant_name} from "
-            "{runner_up_name}, and together they account for "
-            "{top_two_share}% of forwards. This is less a runaway than a "
-            "two-lane division of high-creation players.",
+            "The puck runs through the creators",
+            (
+                "{dominant_name} carries the signature of offensive "
+                "responsibility: scoring, frequent involvement and more failed "
+                "plays as the price of attempting difficult ones. The giveaway "
+                "signal is better read as workload than carelessness.",
+                "{runner_up_name} offers a more connective version of creation, "
+                "with assists and takeaways doing more of the separating. With "
+                "{third_name} carrying more block-and-exposure work, the pool "
+                "shows how creators and support roles divide the burden of a "
+                "shift.",
+            ),
         ),
         "defense": (
-            "The blue line lands in a near dead heat",
-            "The leading defense profiles sit just {dominant_gap} points "
-            "apart. With {after_top_two_share}% of defenders outside that "
-            "pair, the model sees a genuine contest at the top and a "
-            "meaningful supporting tier behind it.",
+            "No single defense job owns the blue line",
+            (
+                "{dominant_name} and {runner_up_name} are almost level, but "
+                "they describe opposite shift economies. One tries to move "
+                "play out of danger; the other is identified by the work that "
+                "happens when danger has already arrived.",
+                "{third_name} prevents this from becoming a simple mover-versus-"
+                "stopper split. In pairing terms, the season offers several "
+                "ways to distribute puck advancement, shooting-lane work and "
+                "offensive responsibility.",
+            ),
         ),
     },
     "20102011": {
         "forwards": (
-            "Net-front finishing swallows the forward map",
-            "{dominant_name} contains {dominant_share}% of the forward pool "
-            "and clears the runner-up by {dominant_gap} points. Even with "
-            "{profile_count} learned styles, this season’s feature space is "
-            "organized around one overwhelming interior-scoring identity.",
+            "Inside finishing becomes the common scoring identity",
+            (
+                "The named-profile map compresses heavily around "
+                "{dominant_name}. Rebound, high-danger and finishing signals "
+                "make second-chance offense the clearest separator, even if "
+                "the broad label contains more than one kind of player.",
+                "{runner_up_name} and {third_name} describe much of the labor "
+                "around that offense—blocking lanes, disrupting touches and "
+                "keeping shifts competitive. The hockey lesson is "
+                "complementarity, not that three quarters of the league played "
+                "an identical crease game.",
+            ),
         ),
         "defense": (
-            "Defensive detail leads without monopolizing",
-            "{dominant_name} holds the largest share, but "
-            "{after_dominant_share}% of defenders land elsewhere. The "
-            "{tail_share}% outside the top three keeps the bottom of the map "
-            "relevant instead of reducing the season to one defensive type.",
+            "The blue line needs an anchor and an outlet",
+            (
+                "{dominant_name} is the largest workload family, marked by "
+                "blocks and repeated defensive-zone involvement. It tells us "
+                "what those defenders were asked to absorb, not whether the "
+                "team spent enough time on offense.",
+                "{runner_up_name} and {third_name} supply two different "
+                "outlets: measured distribution and a higher-variance offensive "
+                "role. A useful pair can divide those jobs instead of asking "
+                "one defender to absorb pressure and handle every puck-"
+                "advancement touch.",
+            ),
         ),
     },
     "20112012": {
         "forwards": (
-            "Rush offense provides the anchor",
-            "Nearly one in two forwards land in {dominant_name}. The remaining "
-            "{after_dominant_share}% is spread across five other styles, so "
-            "the model shows one strong anchor above a diversified support "
-            "layer.",
+            "Rush creation leads; the support jobs are defensive",
+            (
+                "{dominant_name} reads as the primary offensive lane: "
+                "shot volume and extended attacking sequences with less of "
+                "the profile devoted to physical work.",
+                "{runner_up_name} is better understood as defensive detail "
+                "than pure contact, while {third_name} carries more puck and "
+                "creation risk. That division gives a coach three distinct "
+                "tools—pace, recovery work and high-touch offense—rather than "
+                "one generic forward type.",
+            ),
         ),
         "defense": (
-            "No single defense identity breaks away",
-            "{dominant_name} leads at {dominant_share}%, but "
-            "{runner_up_name} remains close at {runner_up_share}%. Six "
-            "learned styles and a {tail_share}% share outside the top three "
-            "make this a comparatively distributed within-season map.",
+            "Pressure matters only if the next pass works",
+            (
+                "{dominant_name} leads a genuinely plural blue-line map. Its "
+                "takeaway and continuation signals suggest defenders whose "
+                "value proposition begins with recovering the puck and doing "
+                "something useful with the next touch.",
+                "{runner_up_name} absorbs more shooting-lane work, while "
+                "{third_name} adds creation from the back end. Together they "
+                "form a recognizable pairing architecture: recover, protect, "
+                "then advance.",
+            ),
         ),
     },
     "20122013": {
         "forwards": (
-            "Perimeter skill becomes the central lane",
-            "{dominant_name} and {runner_up_name} combine for "
-            "{top_two_share}% of the forward pool. Once the third profile is "
-            "included, only {tail_share}% remains for the other two styles—a "
-            "sharply concentrated snapshot.",
+            "Skill lives outside the paint; support keeps it playable",
+            (
+                "In the lockout-shortened snapshot, {dominant_name} dominates "
+                "the named profile mix. The underlying combination of goals, "
+                "shots and lower inside-shot concentration points to offense "
+                "created from space rather than a roster living at the crease.",
+                "{runner_up_name} is the important counterbalance: takeaways "
+                "and playmaking travel with the scoring. When the first attack "
+                "comes from the outside, that second layer helps a line recover "
+                "the puck and create another decision.",
+            ),
         ),
         "defense": (
-            "Transition pressure creates separation",
-            "{dominant_name} clears the next defense style by "
-            "{dominant_gap} points. The bottom three profiles share just "
-            "{tail_share}% of the pool, so most defenders sit inside a clear "
-            "three-tier hierarchy.",
+            "A pressure-first back end tries to end defense quickly",
+            (
+                "{dominant_name} combines takeaways with possession "
+                "continuation, a profile that reads less like passive "
+                "containment and more like ending the defensive phase with a "
+                "useful next play.",
+                "{runner_up_name} reflects the shifts that last long enough to "
+                "require blocks; {third_name} reflects the defenders who can "
+                "tilt play after the recovery. One manages the emergency, the "
+                "other two try to prevent the next one.",
+            ),
         ),
     },
     "20132014": {
         "forwards": (
-            "Cycle pressure gives the season its shape",
-            "The leading pair accounts for {top_two_share}% of forwards, with "
-            "{dominant_name} holding the larger lane. The final three styles "
-            "combine for only {tail_share}%, leaving cycle pressure and "
-            "two-way shot-share play as the defining split.",
+            "The cycle is not possession for possession’s sake",
+            (
+                "{dominant_name} carries a credible sustained-pressure "
+                "fingerprint: rebounds, continued offensive-zone play and a "
+                "favorable share of the chance environment. The point is to "
+                "make the defense survive another rotation, not simply hold "
+                "the puck along the wall.",
+                "{runner_up_name} reaches a similar territorial outcome with "
+                "more direct scoring and playmaking. {third_name} supplies "
+                "defensive detail beneath those lanes, giving the roster both "
+                "pressure players and the shifts that earn them another start.",
+            ),
         ),
         "defense": (
-            "Puck movement and shot blocking share the stage",
-            "The gap between {dominant_name} and {runner_up_name} is "
-            "{dominant_gap} points, while {tail_share}% sits outside the top "
-            "three. The model reads the blue line as a contest between "
-            "advancement and defensive detail, not a one-style season.",
+            "Puck movement carries one shift; shot blocking carries another",
+            (
+                "{dominant_name} is the clearest advancement profile, built "
+                "around distribution and a healthier on-ice chance balance. "
+                "{runner_up_name} is the mirror image: more blocks, more "
+                "defensive exposure and less event creation.",
+                "The contrast between {dominant_name} and {runner_up_name} is "
+                "the useful hockey read. A blue line needs defenders who can "
+                "shorten the trip through the neutral zone and defenders who "
+                "can stabilize a shift when that trip never starts; the labels "
+                "describe different jobs, not a value ranking.",
+            ),
         ),
     },
     "20142015": {
         "forwards": (
-            "Contrasting identities define the top",
-            "{dominant_name} and {runner_up_name} together cover "
-            "{top_two_share}% of forwards. Their labels describe opposite "
-            "routes to a roster role—transition creation versus contact and "
-            "defensive involvement—while the other three styles share only "
-            "{tail_share}%.",
+            "The forward pool is split between pace and resistance",
+            (
+                "{dominant_name} owns the clearest attacking brief. Its shot "
+                "and continuation signals read like a role built to carry "
+                "possession into the next phase and generate attempts before "
+                "the defense can reset.",
+                "{runner_up_name} is less a hitting identity than a "
+                "defensive-detail one, with blocks and takeaways doing the "
+                "separating. {third_name} supplies the higher-touch bridge "
+                "between those poles, which is the kind of role balance a "
+                "coach can turn into coherent lines.",
+            ),
         ),
         "defense": (
-            "The blue line is effectively a three-style map",
-            "The top three defense profiles account for {top_three_share}% of "
-            "the pool across four learned styles. The meaningful split is "
-            "between {dominant_name} at {dominant_share}% and "
-            "{runner_up_name} at {runner_up_share}%; the fourth profile is "
-            "barely present.",
+            "Transport and containment divide the workload",
+            (
+                "{dominant_name} and {runner_up_name} form a sharp "
+                "specialization spectrum: one is associated with assists, "
+                "points and team offense; the other with blocks and repeated "
+                "defensive-zone labor.",
+                "{third_name} fills most of the remaining space as a lower-"
+                "creation role. The blue-line question is not which label is "
+                "best in isolation, but whether each pair has a way to move the "
+                "puck when containment finally wins it back.",
+            ),
         ),
     },
     "20152016": {
         "forwards": (
-            "High-touch scoring leads without closing the field",
-            "{dominant_name} owns the plurality at {dominant_share}%, but "
-            "{tail_share}% of forwards remain outside the top three. That "
-            "leaves a clear first identity alongside a real specialist tier, "
-            "rather than a closed three-style market.",
+            "Puck responsibility separates creators from support",
+            (
+                "{dominant_name} combines scoring, possession extension and "
+                "giveaways—the familiar statistical footprint of players "
+                "trusted to try difficult things with the puck and carry more "
+                "of the attack.",
+                "{runner_up_name} creates through a more connective blend of "
+                "assists, takeaways and chance quality. {third_name} carries "
+                "more of the block-and-support workload, so the forward pool "
+                "looks built around who drives the decision and who makes the "
+                "next decision possible.",
+            ),
         ),
         "defense": (
-            "Puck-moving control carries the plurality",
-            "{dominant_name} leads a four-style defense map without reaching "
-            "a majority. The top two take {top_two_share}%, leaving "
-            "{after_top_two_share}% split between the remaining profiles.",
+            "The best defense starts with the puck moving north",
+            (
+                "{dominant_name} is the largest blue-line family, pairing "
+                "production and takeaways with a favorable chance share. In "
+                "hockey terms, the role is to turn a recovery into progression "
+                "rather than settle for a blind clear.",
+                "{runner_up_name} and {third_name} cover the other half of the "
+                "job: shooting-lane work, contact and the physical cost of "
+                "absorbing pressure. High block volume still describes exposure "
+                "as much as effectiveness, which is why a puck mover matters "
+                "beside it.",
+            ),
         ),
     },
     "20162017": {
         "forwards": (
-            "Risk/reward scoring crosses the halfway mark",
-            "{dominant_name} reaches {dominant_share}% and leads the second "
-            "profile by {dominant_gap} points. The bottom three still account "
-            "for {tail_share}%, enough to preserve a smaller but visible "
-            "specialist layer.",
+            "High-touch offense needs a stabilizer",
+            (
+                "{dominant_name} is the season’s majority identity, with "
+                "transition shot volume and failed plays rising together. "
+                "That is what offensive burden often looks like in a box score: "
+                "more creation attempts also mean more ways a possession can "
+                "end.",
+                "{runner_up_name} adds higher-quality playmaking, while "
+                "{third_name} brings takeaways and assists into the scoring "
+                "mix. The roster logic is clear—surround the high-touch driver "
+                "with players who can extend or repair the play.",
+            ),
         ),
         "defense": (
-            "Structure and transition finish level",
-            "{dominant_name} and {runner_up_name} are separated by only "
-            "{dominant_gap} points and combine for {top_two_share}% of the "
-            "defense pool. A third style takes most of what remains, leaving "
-            "just {tail_share}% for the bottom three.",
+            "Several routes to the next possession coexist",
+            (
+                "{dominant_name} and {runner_up_name} sit almost level, but "
+                "the useful distinction is not simply safety versus aggression. "
+                "Both labels contain active puck involvement, and the broad "
+                "names should not be mistaken for two rigid systems.",
+                "{third_name} adds a clearer production-and-distribution lane. "
+                "The hockey read is a plural blue line: different defenders "
+                "influence the next possession through individual chance "
+                "creation, recovery pressure or puck movement.",
+            ),
         ),
     },
     "20172018": {
         "forwards": (
-            "Two-way puck pressure makes an outlier map",
-            "{dominant_name} contains {dominant_share}% of forwards and leads "
-            "the runner-up by {dominant_gap} points. The other four learned "
-            "styles divide only {after_dominant_share}%, making this a nearly "
-            "single-center classification.",
+            "Puck pressure and creation collapse into one broad job",
+            (
+                "{dominant_name} absorbs an extraordinary share of the named "
+                "profile map. That should be read as label compression, not a "
+                "claim that four out of five forwards played identical hockey; "
+                "takeaways, chance share and continuation simply traveled "
+                "together often enough to crowd the other labels.",
+                "{runner_up_name} provides the sharper contrast: more frequent "
+                "puck responsibility, special-situation creation and failed "
+                "touches. The distinction is less who works and who creates "
+                "than how much of the offense runs through one player.",
+            ),
         ),
         "defense": (
-            "Defense-first profiles dominate the split",
-            "{dominant_name} and {runner_up_name} combine for "
-            "{top_two_share}% of defenders. The top three reach "
-            "{top_three_share}% across four styles, so almost the entire map "
-            "sits inside a defense-first hierarchy.",
+            "The broad label hides a sharper blue-line contrast",
+            (
+                "{dominant_name} contains several very different kinds of "
+                "defender, so its headline share should not be treated as one "
+                "uniform stay-at-home identity or one repeatable tactical "
+                "assignment.",
+                "The cleaner hockey comparison sits underneath it: "
+                "{runner_up_name} carries the block-heavy, low-advancement "
+                "footprint, while {third_name} carries the puck-moving one. "
+                "Those are the roles a pairing decision can actually balance.",
+            ),
         ),
     },
     "20182019": {
         "forwards": (
-            "The forward field opens up",
-            "The leading profile reaches only {dominant_share}%, and "
-            "{tail_share}% of forwards sit outside the top three. Across six "
-            "learned styles, the model shows several viable identities rather "
-            "than one dominant lane.",
+            "There is no single recipe for a useful forward",
+            (
+                "{dominant_name} and {runner_up_name} put skill first, but in "
+                "different ways: one scores from space, the other mixes shot "
+                "threat with distribution and recovery.",
+                "The next layer is just as revealing. {third_name} and "
+                "{fourth_name} form a substantial support tier, separating "
+                "disruption and defensive detail from primary creation. That "
+                "is a lineup economy with specialized jobs, not one prototype "
+                "repeated four times.",
+            ),
         ),
         "defense": (
-            "Puck-moving control leads a tiered blue line",
-            "{dominant_name} leads at {dominant_share}%, followed by "
-            "{runner_up_name} at {runner_up_share}%. The last two profiles "
-            "share {tail_share}%, creating a clear top tier with a small tail.",
+            "Puck movement leads a three-part blue line",
+            (
+                "{dominant_name} carries the most complete play-driving "
+                "signature: distribution, team chance share and the willingness "
+                "to accept some puck risk in exchange for moving the attack "
+                "forward.",
+                "{runner_up_name} and {third_name} divide much of the remaining "
+                "work between blocks and lower-event responsibility. The "
+                "practical challenge is to keep enough puck advancement on "
+                "every pair that one bad shift does not become two.",
+            ),
         ),
     },
     "20192020": {
         "forwards": (
-            "Transition and inside offense split the top",
-            "{dominant_name} leads, but {runner_up_name} and the third profile "
-            "keep the map from becoming a runaway. Those three styles account "
-            "for {top_three_share}%, leaving {tail_share}% across the final "
-            "three identities.",
+            "Transition and possession offer two paths into attack",
+            (
+                "{dominant_name} and {third_name} form the clearest tactical "
+                "poles in the interrupted season: create in motion or hold the "
+                "puck long enough to extend the sequence.",
+                "{runner_up_name} fills the space between them, but its name "
+                "should not be treated as proof of constant crease work; the "
+                "interior signal is modest here. The stronger roster read is "
+                "that transport, possession and finishing responsibility were "
+                "distributed across different players.",
+            ),
         ),
         "defense": (
-            "Two profiles nearly absorb the defense pool",
-            "{dominant_name} and {runner_up_name} combine for "
-            "{top_two_share}% of defenders. With the top three at "
-            "{top_three_share}% across four learned styles, the fourth profile "
-            "is statistically peripheral.",
+            "The blue line is almost a binary choice",
+            (
+                "{dominant_name} and {runner_up_name} create one of the cleanest "
+                "stylistic splits in the dataset. One is associated with "
+                "distribution and favorable team chances; the other with blocks "
+                "and lower point involvement.",
+                "{third_name} adds a smaller, more confrontational lane. The "
+                "pairing question is how much puck-advancement responsibility "
+                "to place beside a defender whose statistical identity is built "
+                "around blocks and contact.",
+            ),
         ),
     },
     "20202021": {
         "forwards": (
-            "Rush creation leads a two-lane attack",
-            "{dominant_name} and {runner_up_name} account for "
-            "{top_two_share}% of the forward pool. The final three profiles "
-            "combine for {tail_share}%, so the model’s main divide sits "
-            "between transition offense and perimeter skill.",
+            "Rush creation is the clearest offensive lane",
+            (
+                "Within a short, division-only schedule, {dominant_name} is the "
+                "most distinct attacking signature. Its shot and continuation "
+                "profile reads like quick-strike offense designed to attack "
+                "before the defense can reset.",
+                "{runner_up_name} supplies a more patient skill lane. Beneath "
+                "them, {third_name} is best read as an exposure-and-workload "
+                "profile—not proof of successful suppression—while the support "
+                "tier absorbs the lower-event minutes around the creators.",
+            ),
         ),
         "defense": (
-            "Transition pressure clears space",
-            "{dominant_name} leads the next defense style by "
-            "{dominant_gap} points in a four-profile map. The lone style "
-            "outside the top three still takes {tail_share}%, so the season "
-            "has a clear leader without erasing its fourth lane.",
+            "Pressure turns defense into the first pass",
+            (
+                "{dominant_name} is the largest of four meaningful blue-line "
+                "jobs. Its takeaway and advancement signals point toward "
+                "defenders expected to convert pressure into the next "
+                "possession rather than merely end the current threat.",
+                "{runner_up_name} and {third_name} carry more own-zone exposure "
+                "and blocking work; {fourth_name} adds a cleaner play-driving "
+                "lane. The mix is about distributing responsibility, not "
+                "crowning one universal defense type.",
+            ),
         ),
     },
     "20212022": {
         "forwards": (
-            "Shot creation becomes the primary identity",
-            "{dominant_name} reaches {dominant_share}% and pairs with "
-            "{runner_up_name} for {top_two_share}% of forwards. The bottom "
-            "three styles share only {tail_share}%, making shot volume and "
-            "two-way scoring the model’s central divide.",
+            "Shot creation drives the first full-season attack",
+            (
+                "In the first 82-game schedule after two shortened seasons, "
+                "{dominant_name} becomes the central offensive identity. Shots, "
+                "expected goals, rebounds and continued zone time all point to "
+                "players who manufacture attempts rather than wait for one "
+                "perfect look.",
+                "{runner_up_name} adds takeaways and playmaking to that offense, "
+                "while {third_name} carries more high-touch variance. The "
+                "hockey tradeoff is familiar: volume creates pressure, but "
+                "another player still has to recover the puck and make the "
+                "next chance better.",
+            ),
         ),
         "defense": (
-            "Three profiles—and one overwhelming leader",
-            "Because the model learned exactly three defense profiles, the "
-            "top-three share is mechanically 100%. The meaningful result is "
-            "the imbalance inside that set: {dominant_name} holds "
-            "{dominant_share}%, compared with {runner_up_share}% for the "
-            "runner-up.",
+            "One broad defense label; one clearly active counterweight",
+            (
+                "The consolidated profile map is unusually compressed around "
+                "{dominant_name}. Several distinct statistical groups collapse "
+                "into that one name, so its share describes a broad family of "
+                "roles rather than one quiet, low-creation tactical job.",
+                "{runner_up_name} is the useful counterweight, carrying more "
+                "takeaways and production from the back end. A coach can "
+                "concentrate that activation on selected pairs without asking "
+                "the entire blue line to play at the same risk level.",
+            ),
         ),
     },
     "20222023": {
         "forwards": (
-            "Two-way possession leads a layered mix",
-            "{dominant_name} holds the largest share at {dominant_share}%, "
-            "while {runner_up_name} takes {runner_up_share}%. The bottom three "
-            "profiles still combine for {tail_share}%, leaving more texture "
-            "than the headline ranking alone suggests.",
+            "Territory, defensive detail and inside scoring share the attack",
+            (
+                "{dominant_name} is best understood through the lower rate of "
+                "opponent attempts and chances attached to the group. The "
+                "identity is territorial: spend less of the shift defending "
+                "and give the offense another turn.",
+                "{runner_up_name} supplies block-and-support work rather than "
+                "a pure contact story, while {third_name} owns the clearest "
+                "rebound and high-danger fingerprint. Those jobs form a useful "
+                "sequence—stabilize the shift, tilt the ice, then finish inside.",
+            ),
         ),
         "defense": (
-            "Shot-blocking defense takes majority position",
-            "{dominant_name} contains {dominant_share}% of defenders, and the "
-            "top two styles combine for {top_two_share}%. The top three reach "
-            "{top_three_share}% in a four-profile model, leaving the final "
-            "lane almost empty.",
+            "Shot blocking is the workload; transition is the escape",
+            (
+                "{dominant_name} is the majority identity, defined by blocks "
+                "and heavy shot exposure. That can be valuable labor, but it "
+                "also means the opponent had enough possession to make the "
+                "block necessary.",
+                "{runner_up_name} offers the countermeasure: take the puck away "
+                "and attach offense to the recovery. In pairing terms, the "
+                "contrast is between absorbing shot pressure and getting the "
+                "shift moving in the other direction.",
+            ),
         ),
     },
     "20232024": {
         "forwards": (
-            "Puck pressure and defensive contact set the frame",
-            "{dominant_name} and {runner_up_name} combine for "
-            "{top_two_share}% of forwards. Once the third style is included, "
-            "only {tail_share}% remains for the final two profiles, producing "
-            "a tightly ordered five-style map.",
+            "Pressure is useful only when it becomes the next chance",
+            (
+                "{dominant_name} and {runner_up_name} are broad statistical "
+                "umbrellas, not literal descriptions of two clean systems. The "
+                "first combines puck-pressure signals with heavier defensive "
+                "exposure; the second looks more like takeaways and chance "
+                "quality than raw contact.",
+                "{third_name} is the sharpest specialty in the pool, with "
+                "rebounds, high-danger attempts and continued zone play. The "
+                "hockey read is a forward group that separates recovery, "
+                "support and inside finishing rather than asking one archetype "
+                "to own the whole sequence.",
+            ),
         ),
         "defense": (
-            "The blue line becomes a two-profile story",
-            "{dominant_name} and {runner_up_name} absorb {top_two_share}% of "
-            "the defense pool. The third profile lifts the concentration to "
-            "{top_three_share}% across four styles, so nearly all of the "
-            "season sits inside two main identities.",
+            "The blue line splits between driving play and absorbing it",
+            (
+                "{dominant_name} and {runner_up_name} form a clean "
+                "advancement-versus-workload contrast. Distribution and team "
+                "chance share sit on one side; blocks and lower transition "
+                "involvement sit on the other.",
+                "{third_name} remains a small physical specialty rather than "
+                "the season’s organizing principle. The practical roster "
+                "question is whether each pair has enough puck movement to "
+                "keep shot-blocking from becoming its default state.",
+            ),
         ),
     },
     "20242025": {
         "forwards": (
-            "The forward map has no runaway leader",
-            "The largest style reaches {dominant_share}%, while "
-            "{tail_share}% of forwards sit outside the top three. Six learned "
-            "profiles retain meaningful representation, making this a broad "
-            "within-season distribution rather than a top-heavy one.",
+            "A modern forward corps is a portfolio, not a prototype",
+            (
+                "{dominant_name} leads, but three other profiles occupy "
+                "substantial parts of the lineup. The clearest contrast is "
+                "between scoring from space and the territorial contribution "
+                "captured by {fourth_name}.",
+                "{runner_up_name} and {third_name} describe separate support "
+                "lanes, although their names are stronger than the direct "
+                "contact evidence underneath them. The useful hockey insight "
+                "is role coverage: creation, disruption, defensive detail and "
+                "shot-share work all need roster space.",
+            ),
         ),
         "defense": (
-            "Five defense identities remain in play",
-            "{dominant_name} leads at {dominant_share}%, but the bottom two "
-            "profiles still account for {tail_share}% of defenders. The "
-            "distribution has a clear ordering without collapsing into a "
-            "two- or three-style map.",
+            "Puck movement comes in several risk settings",
+            (
+                "{dominant_name} leads a blue-line spectrum that runs from "
+                "shot-and-chance exposure to raw production and active rush "
+                "involvement. The broad label is a starting point, not a "
+                "complete description of the defenders inside it.",
+                "{runner_up_name} carries the clearer scoring signature, while "
+                "{third_name} is quieter and lower-contact rather than a proven "
+                "transition driver. {fourth_name} is the more assertive play-"
+                "driving option, whether through extending possessions or "
+                "adding dangerous offense. Roster construction is about "
+                "choosing the right setting for each pair.",
+            ),
         ),
     },
     "20252026": {
         "forwards": (
-            "Puck-dominant scoring pulls away",
-            "{dominant_name} and {runner_up_name} together account for "
-            "{top_two_share}% of forwards, with the leading style alone above "
-            "half. The bottom three share {tail_share}%, so specialist roles "
-            "remain visible without setting the season’s center of gravity.",
+            "High-touch creation sets the attack; balance makes the line work",
+            (
+                "{dominant_name} owns the majority of the forward map. The "
+                "combination of scoring, extended possessions and giveaways "
+                "describes offensive burden: these players are asked to make "
+                "more plays, including the difficult ones that sometimes fail.",
+                "{runner_up_name} adds takeaways and playmaking, but it should "
+                "not be mistaken for automatic defensive suppression. Its value "
+                "in this mix is connective: a second decision-maker who can keep "
+                "the attack from stalling around one high-touch creator.",
+            ),
         ),
         "defense": (
-            "The defense pool stays genuinely plural",
-            "No defense style reaches 40%, and {tail_share}% of defenders sit "
-            "outside the top three. Across five learned profiles, the model "
-            "shows a broad distribution with a leader but no controlling "
-            "majority.",
+            "The blue line keeps several answers in the bag",
+            (
+                "{dominant_name} is only a plurality, and its blocks reflect "
+                "own-zone labor as much as defensive success. "
+                "{runner_up_name} supplies the clearest production-and-"
+                "distribution alternative.",
+                "{third_name} is too broad to carry a literal defensive claim, "
+                "while {fourth_name} owns the more credible physical specialty. "
+                "The season’s hockey story is specialization: one pair can "
+                "advance, another can absorb pressure and a third can impose "
+                "contact without any single job swallowing the blue line.",
+            ),
         ),
     },
 }
@@ -578,6 +819,8 @@ def build_season_read(
 
     dominant = profiles[0]
     runner_up = profiles[1]
+    third = profiles[2] if len(profiles) > 2 else runner_up
+    fourth = profiles[3] if len(profiles) > 3 else third
     player_count = len(payload["players"])
     dominant_share = 100 * int(dominant["count"]) / player_count
     runner_up_share = 100 * int(runner_up["count"]) / player_count
@@ -596,7 +839,6 @@ def build_season_read(
     confidence_pct = float(payload["averageConfidence"]) * 100
     mixed_count = int(payload["mixedCount"])
     mixed_share = 100 * mixed_count / player_count if player_count else 0.0
-    player_noun = "forwards" if group == "forwards" else "defenders"
     short_style = STYLE_READS.get(
         str(dominant["name"]),
         (
@@ -605,21 +847,27 @@ def build_season_read(
         ),
     )[0]
 
-    editorial_headline, editorial_template = SEASON_EDITORIALS.get(
+    editorial_headline, editorial_templates = SEASON_EDITORIALS.get(
         season,
         {},
     ).get(
         group,
         (
             f"{short_style} leads the season",
-            "{dominant_name} holds {dominant_share}% of the group, while "
-            "{tail_share}% remains outside the three most common learned "
-            "styles.",
+            (
+                "{dominant_name} is the clearest within-season role family, "
+                "but its share describes statistical identity rather than "
+                "player quality.",
+                "{runner_up_name} provides the counterweight, giving the "
+                "roster another way to distribute responsibility.",
+            ),
         ),
     )
     editorial_context = {
         "dominant_name": str(dominant["name"]),
         "runner_up_name": str(runner_up["name"]),
+        "third_name": str(third["name"]),
+        "fourth_name": str(fourth["name"]),
         "dominant_share": one_decimal(dominant_share),
         "runner_up_share": one_decimal(runner_up_share),
         "third_share": one_decimal(third_share),
@@ -631,23 +879,15 @@ def build_season_read(
         "tail_share": one_decimal(tail_share),
         "profile_count": profile_count,
     }
-    style_group = "forward" if group == "forwards" else "defense"
-    factual_paragraph = (
-        f"The {season_label(season)} model learned {profile_count} "
-        f"{style_group} styles. {dominant['name']} led with "
-        f"{int(dominant['count']):,} of {player_count:,} {player_noun} "
-        f"({one_decimal(dominant_share)}%), followed by "
-        f"{runner_up['name']} at {one_decimal(runner_up_share)}%."
-    )
     headline = f"{season_label(season)}: {editorial_headline}"
-    editorial_paragraph = editorial_template.format(**editorial_context)
+    editorial_paragraphs = [
+        template.format(**editorial_context)
+        for template in editorial_templates
+    ]
 
     return {
         "headline": headline,
-        "paragraphs": [
-            factual_paragraph,
-            editorial_paragraph,
-        ],
+        "paragraphs": editorial_paragraphs,
         "facts": [
             {
                 "label": "Lead over No. 2",

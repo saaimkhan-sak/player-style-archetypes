@@ -39,6 +39,19 @@ if (
     "Player profile cards are missing their headshot, team logo, or games-played treatment.",
   );
 }
+if (
+  !appSource.includes("function profileMentionMarkup(value, profileNames)") ||
+  !appSource.includes("escapeHTML(text.slice(offset, index))") ||
+  !appSource.includes(">${escapeHTML(name)}</strong>") ||
+  !appSource.includes("profileMentionMarkup(paragraph, profileNames)") ||
+  !/\.season-read-profile\s*\{[\s\S]*?var\(--profile\)[\s\S]*?\}/.test(
+    stylesSource,
+  )
+) {
+  throw new Error(
+    "Season reads are missing safe, color-coded archetype mentions.",
+  );
+}
 
 const seasonPayloads = await Promise.all(
   data.meta.seasons.map(async ({ key }) => ({
@@ -49,10 +62,13 @@ const seasonPayloads = await Promise.all(
   })),
 );
 const seasonReadSignatures = new Set();
-const seasonEditorials = new Set();
+const seasonParagraphs = new Set();
 for (const { key, payload } of seasonPayloads) {
   for (const group of ["forwards", "defense"]) {
     const read = payload[group]?.seasonRead;
+    const groupProfileNames = payload[group].profiles.map(
+      (profile) => profile.name,
+    );
     if (
       !read?.headline ||
       read.paragraphs?.length < 2 ||
@@ -63,7 +79,28 @@ for (const { key, payload } of seasonPayloads) {
     seasonReadSignatures.add(
       `${read.headline}\n${read.paragraphs.join("\n")}`,
     );
-    seasonEditorials.add(read.paragraphs[1]);
+    if (
+      read.paragraphs.some(
+        (paragraph) =>
+          !groupProfileNames.some((name) => paragraph.includes(name)),
+      )
+    ) {
+      throw new Error(
+        `${key} ${group} has a paragraph without a current archetype mention.`,
+      );
+    }
+    if (
+      read.paragraphs.some((paragraph) =>
+        /model learned|account for|combine for|top[- ]three|\d+\.\d+%/i.test(
+          paragraph,
+        ),
+      )
+    ) {
+      throw new Error(
+        `${key} ${group} fell back to data-regurgitation copy.`,
+      );
+    }
+    read.paragraphs.forEach((paragraph) => seasonParagraphs.add(paragraph));
     if (
       read.comparison !== null ||
       read.metrics?.profileCount !== payload[group].profiles.length
@@ -76,9 +113,11 @@ for (const { key, payload } of seasonPayloads) {
 }
 if (
   seasonReadSignatures.size !== data.meta.seasonCount * 2 ||
-  seasonEditorials.size !== data.meta.seasonCount * 2
+  seasonParagraphs.size !== data.meta.seasonCount * 4
 ) {
-  throw new Error("Season reads must be unique for every season and group.");
+  throw new Error(
+    "Every season read must contain two unique editorial paragraphs.",
+  );
 }
 
 console.log(

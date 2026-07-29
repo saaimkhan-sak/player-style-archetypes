@@ -1,5 +1,5 @@
 const DATA_ROOT = "/data";
-const DATA_VERSION = "20260729-season-reads-v1";
+const DATA_VERSION = "20260729-editorial-reads-v2";
 
 const appState = {
   core: null,
@@ -217,6 +217,32 @@ function profileColor(name) {
     hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
   }
   return PROFILE_COLORS[hash % PROFILE_COLORS.length];
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function profileMentionMarkup(value, profileNames) {
+  const text = String(value ?? "");
+  const names = [...new Set(
+    (profileNames || [])
+      .map((name) => String(name || "").trim())
+      .filter(Boolean),
+  )].sort((left, right) => right.length - left.length);
+  if (!names.length) return escapeHTML(text);
+
+  const expression = new RegExp(names.map(escapeRegExp).join("|"), "g");
+  let markup = "";
+  let offset = 0;
+  for (const match of text.matchAll(expression)) {
+    const index = match.index ?? offset;
+    const name = match[0];
+    markup += escapeHTML(text.slice(offset, index));
+    markup += `<strong class="season-read-profile" style="--profile:${profileColor(name)}">${escapeHTML(name)}</strong>`;
+    offset = index + name.length;
+  }
+  return `${markup}${escapeHTML(text.slice(offset))}`;
 }
 
 function number(value, digits = 0) {
@@ -1386,6 +1412,12 @@ function renderSeasonSnapshot(groupData) {
   const topThree = groupData.profiles
     .slice(0, 3)
     .reduce((sum, profile) => sum + profile.share, 0);
+  const profileNames = [
+    ...(appState.core?.glossary?.[appState.group] || []).map(
+      (profile) => profile.name,
+    ),
+    ...groupData.profiles.map((profile) => profile.name),
+  ];
   const seasonRead = groupData.seasonRead || {
     headline: `${dominant.name} leads the season`,
     paragraphs: [
@@ -1434,7 +1466,10 @@ function renderSeasonSnapshot(groupData) {
         </div>
         <div class="season-read-copy">
           ${seasonRead.paragraphs
-            .map((paragraph) => `<p>${escapeHTML(paragraph)}</p>`)
+            .map(
+              (paragraph) =>
+                `<p>${profileMentionMarkup(paragraph, profileNames)}</p>`,
+            )
             .join("")}
         </div>
         <div class="season-read-facts" aria-label="Season read supporting figures">
