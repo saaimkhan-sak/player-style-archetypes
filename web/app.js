@@ -6,7 +6,6 @@ const appState = {
   season: null,
   group: "forwards",
   glossaryGroup: "forwards",
-  glossaryQuery: "",
   seasonTab: "snapshot",
   selectedPlayerId: null,
   seasonCache: new Map(),
@@ -926,28 +925,13 @@ function renderOverview() {
 }
 
 function glossaryRows() {
-  const query = appState.glossaryQuery.trim().toLowerCase();
-  return appState.core.glossary[appState.glossaryGroup].filter((row) => {
-    if (!query) return true;
-    const haystack = [
-      row.name,
-      row.description,
-      ...row.examples,
-      ...row.high.map((trait) => trait.label),
-      ...row.low.map((trait) => trait.label),
-    ]
-      .join(" ")
-      .toLowerCase();
-    return haystack.includes(query);
-  });
+  return appState.core.glossary[appState.glossaryGroup];
 }
 
 function updateGlossaryList() {
   const rows = glossaryRows();
-  const count = document.querySelector("#glossary-count");
   const list = document.querySelector("#glossary-list");
-  if (!count || !list) return;
-  count.textContent = `${rows.length} style${rows.length === 1 ? "" : "s"}`;
+  if (!list) return;
   list.innerHTML = rows.length
     ? rows
         .map(
@@ -983,13 +967,28 @@ function updateGlossaryList() {
               </div>
               <div class="examples">
                 <strong>Recent examples</strong>
-                ${row.examples.map(escapeHTML).join(" · ") || "No recent examples"}
+                <div class="example-links">
+                  ${
+                    row.examples
+                      .map(
+                        (example) => `
+                          <a
+                            href="#career?player=${Number(example.id)}&amp;group=${escapeHTML(appState.glossaryGroup)}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="Open ${escapeHTML(example.name)}’s profile in a new tab"
+                          >${escapeHTML(example.name)}</a>
+                        `,
+                      )
+                      .join("") || "<span>No recent examples</span>"
+                  }
+                </div>
               </div>
             </article>
           `,
         )
         .join("")
-    : `<div class="empty-state">No styles match that search.</div>`;
+    : `<div class="empty-state">No styles are available.</div>`;
 }
 
 function renderGlossary() {
@@ -997,27 +996,14 @@ function renderGlossary() {
     <article class="page">
       ${pageHeader(
         "Style glossary",
-        "Every player style, in plain language.",
-        "See the model’s defining signals and recent examples without decoding raw feature names.",
+        "What Are All the Player Styles According to the Model?",
+        "This glossary aggregates the named archetypes learned across all available seasons. Each row shows the clearest statistical signature and a few recent example players.",
         groupControl(appState.glossaryGroup, "glossary-group"),
       )}
-      <div class="glossary-toolbar">
-        <div class="field" style="width:min(100%, 380px)">
-          <label for="glossary-search">Find a style or player</label>
-          <input
-            class="search-input"
-            id="glossary-search"
-            type="search"
-            value="${escapeHTML(appState.glossaryQuery)}"
-            placeholder="Try playmaker, shutdown, McDavid…"
-          />
-        </div>
-        <span class="result-count" id="glossary-count"></span>
-      </div>
       <section class="glossary-list" id="glossary-list" aria-live="polite"></section>
       <footer class="page-footer">
         <span>Profiles are learned independently each season.</span>
-        <span>Examples show strong recent matches.</span>
+        <span>Examples link to each player’s career profile.</span>
       </footer>
     </article>
   `;
@@ -1025,10 +1011,6 @@ function renderGlossary() {
   bindGroupControl("glossary-group", (group) => {
     appState.glossaryGroup = group;
     renderGlossary();
-  });
-  document.querySelector("#glossary-search")?.addEventListener("input", (event) => {
-    appState.glossaryQuery = event.target.value;
-    updateGlossaryList();
   });
   updateGlossaryList();
 }
@@ -1925,8 +1907,20 @@ function bindPlayoffPlayerSearch() {
 
 async function renderRoute() {
   cleanupCanvases();
-  const route = location.hash.replace(/^#\/?/, "") || "overview";
+  const hash = location.hash.replace(/^#\/?/, "") || "overview";
+  const [route, queryString = ""] = hash.split("?");
+  const routeParams = new URLSearchParams(queryString);
   appState.route = ROUTE_LABELS[route] ? route : "overview";
+  if (appState.route === "career") {
+    const requestedGroup = routeParams.get("group");
+    const requestedPlayer = Number(routeParams.get("player"));
+    if (requestedGroup === "forwards" || requestedGroup === "defense") {
+      appState.careerGroup = requestedGroup;
+    }
+    if (Number.isInteger(requestedPlayer) && requestedPlayer > 0) {
+      appState.careerPlayerId = requestedPlayer;
+    }
+  }
   document.querySelectorAll("[data-route]").forEach((link) => {
     const active = link.dataset.route === appState.route;
     link.classList.toggle("is-active", active);

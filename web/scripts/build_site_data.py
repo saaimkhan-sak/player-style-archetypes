@@ -132,6 +132,12 @@ def build_glossary(
     maps: dict[str, dict[str, dict[int, str]]],
     all_frames: dict[str, list[pd.DataFrame]],
 ) -> dict[str, list[dict[str, Any]]]:
+    season_groups = [
+        ("20212022", "20252026"),
+        ("20172018", "20202021"),
+        ("20122013", "20162017"),
+        ("20082009", "20112012"),
+    ]
     output: dict[str, list[dict[str, Any]]] = {}
     for group in ("forwards", "defense"):
         variants: dict[str, dict[str, Counter[str]]] = defaultdict(
@@ -150,20 +156,71 @@ def build_glossary(
                 variants[name]["high"][str(row.get("top_traits", ""))] += 1
                 variants[name]["low"][str(row.get("low_traits", ""))] += 1
 
-        examples: dict[str, list[str]] = defaultdict(list)
-        seen_ids: dict[str, set[int]] = defaultdict(set)
+        candidates: dict[
+            str,
+            dict[int, dict[int, dict[str, Any]]],
+        ] = defaultdict(lambda: defaultdict(dict))
         for frame in all_frames[group]:
             season = str(frame["season"].iloc[0])
-            for _, row in frame.sort_values("confidence", ascending=False).iterrows():
+            season_group = next(
+                (
+                    index
+                    for index, (start, end) in enumerate(season_groups)
+                    if start <= season <= end
+                ),
+                None,
+            )
+            if season_group is None:
+                continue
+            for _, row in frame.iterrows():
                 cluster = int(row["top_cluster"])
                 name = maps[group][season].get(cluster)
                 if not name:
                     continue
                 player_id = int(row["player_id"])
-                if player_id in seen_ids[name] or len(examples[name]) >= 5:
+                games_value = row.get("reg_games", 0)
+                games = float(games_value) if pd.notna(games_value) else 0.0
+                candidate = candidates[name][season_group].setdefault(
+                    player_id,
+                    {
+                        "id": player_id,
+                        "name": str(row["full_name"]),
+                        "games": 0.0,
+                    },
+                )
+                candidate["games"] += games
+
+        examples: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for name, grouped_candidates in candidates.items():
+            used_ids: set[int] = set()
+            for season_group in range(len(season_groups)):
+                ranked = sorted(
+                    grouped_candidates.get(season_group, {}).values(),
+                    key=lambda player: (
+                        -float(player["games"]),
+                        str(player["name"]),
+                        int(player["id"]),
+                    ),
+                )
+                selected = next(
+                    (
+                        player
+                        for player in ranked
+                        if int(player["id"]) not in used_ids
+                    ),
+                    None,
+                )
+                if selected is None:
                     continue
-                seen_ids[name].add(player_id)
-                examples[name].append(str(row["full_name"]))
+                player_id = int(selected["id"])
+                used_ids.add(player_id)
+                examples[name].append(
+                    {
+                        "id": player_id,
+                        "name": str(selected["name"]),
+                        "games": clean(selected["games"], 0),
+                    }
+                )
 
         rows: list[dict[str, Any]] = []
         for name in sorted(variants):
