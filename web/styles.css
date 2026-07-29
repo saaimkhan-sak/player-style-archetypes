@@ -1635,6 +1635,124 @@ h3 {
   top: 28px;
 }
 
+.player-identity {
+  display: grid;
+  grid-template-columns: minmax(88px, 112px) minmax(0, 1fr);
+  gap: clamp(14px, 2vw, 20px);
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.player-identity-copy {
+  min-width: 0;
+}
+
+.player-identity-copy .detail-meta {
+  margin-bottom: 0;
+}
+
+.player-visual {
+  position: relative;
+  width: 100%;
+  padding-bottom: 9px;
+}
+
+.player-headshot-frame {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border: 1px solid rgba(11, 117, 109, 0.2);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.96), transparent 42%),
+    linear-gradient(155deg, var(--ice), var(--ice-strong));
+}
+
+.player-headshot-frame::after {
+  position: absolute;
+  right: 12%;
+  bottom: 9%;
+  left: 12%;
+  height: 1px;
+  background: rgba(11, 117, 109, 0.22);
+  content: "";
+}
+
+.player-headshot-initials {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(11, 117, 109, 0.55);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(25px, 3vw, 36px);
+  letter-spacing: -0.04em;
+}
+
+.player-headshot {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.player-headshot-frame.is-loaded .player-headshot {
+  opacity: 1;
+}
+
+.team-logo-list {
+  position: absolute;
+  z-index: 2;
+  right: -5px;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+}
+
+.team-logo-frame {
+  position: relative;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--paper-strong);
+  box-shadow: 0 5px 14px rgba(7, 24, 33, 0.13);
+}
+
+.team-logo-frame + .team-logo-frame {
+  margin-left: -8px;
+}
+
+.team-logo-code {
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.team-logo {
+  position: absolute;
+  inset: 4px;
+  width: calc(100% - 8px);
+  height: calc(100% - 8px);
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.team-logo-frame.is-loaded .team-logo {
+  opacity: 1;
+}
+
 .detail-kicker {
   margin-bottom: 7px;
   color: var(--coral);
@@ -1659,7 +1777,7 @@ h3 {
 
 .detail-stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1px;
   margin: 20px 0;
   overflow: hidden;
@@ -1677,6 +1795,8 @@ h3 {
   display: block;
   color: var(--muted);
   font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -1684,7 +1804,7 @@ h3 {
   display: block;
   margin-top: 5px;
   color: var(--navy-950);
-  font-size: 17px;
+  font-size: 19px;
 }
 
 .probability-list {

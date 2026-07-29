@@ -56,6 +56,161 @@ function escapeHTML(value) {
     .replaceAll("'", "&#039;");
 }
 
+function teamCodes(value) {
+  return [...new Set(
+    String(value || "")
+      .split("/")
+      .map((team) => team.trim().toUpperCase())
+      .filter((team) => /^[A-Z0-9]{2,4}$/.test(team)),
+  )];
+}
+
+function playerInitials(name) {
+  return String(name || "")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0] || "")
+    .join("")
+    .toUpperCase();
+}
+
+function assetSources(value) {
+  return escapeHTML(JSON.stringify([...new Set(value.filter(Boolean))]));
+}
+
+function teamLogoSources(team, season) {
+  const seasonKey = String(season || "");
+  const historical = {
+    ATL: "ATL_19992000-20102011_light.svg",
+    PHX: "PHX_20032004-20132014_light.svg",
+  };
+  const filenames = [
+    historical[team],
+    team === "UTA" && seasonKey === "20242025"
+      ? "UTA_20242025-20242025_light.svg"
+      : null,
+    `${team}_light.svg`,
+    `${team}_dark.svg`,
+  ].filter(Boolean);
+  return filenames.map(
+    (filename) => `https://assets.nhle.com/logos/nhl/svg/${filename}`,
+  );
+}
+
+function playerVisual(player, season) {
+  if (!player) return "";
+  const teams = teamCodes(player.team);
+  const seasonKey = /^\d{8}$/.test(String(season)) ? String(season) : "latest";
+  const playerId = String(player.id || "").replace(/\D/g, "");
+  const headshotSources = playerId
+    ? [
+        ...teams.map(
+          (team) =>
+            `https://assets.nhle.com/mugs/nhl/${seasonKey}/${team}/${playerId}.png`,
+        ),
+        `https://assets.nhle.com/mugs/nhl/${seasonKey}/${playerId}.png`,
+        ...teams.map(
+          (team) =>
+            `https://assets.nhle.com/mugs/nhl/latest/${team}/${playerId}.png`,
+        ),
+        `https://assets.nhle.com/mugs/nhl/latest/${playerId}.png`,
+      ]
+    : [];
+  return `
+    <div class="player-visual">
+      <div class="player-headshot-frame" data-asset-frame>
+        <span class="player-headshot-initials" aria-hidden="true">${escapeHTML(playerInitials(player.name))}</span>
+        ${
+          headshotSources.length
+            ? `<img
+                class="player-headshot"
+                data-asset-sources="${assetSources(headshotSources)}"
+                alt="${escapeHTML(player.name)} headshot"
+                loading="lazy"
+                decoding="async"
+              />`
+            : ""
+        }
+      </div>
+      ${
+        teams.length
+          ? `
+            <div class="team-logo-list" role="list" aria-label="${teams.length === 1 ? "Team" : "Teams"}">
+              ${teams
+                .map(
+                  (team) => `
+                    <span
+                      class="team-logo-frame"
+                      data-asset-frame
+                      role="listitem"
+                      aria-label="${escapeHTML(team)} team logo"
+                      title="${escapeHTML(team)}"
+                    >
+                      <span class="team-logo-code" aria-hidden="true">${escapeHTML(team)}</span>
+                      <img
+                        class="team-logo"
+                        data-asset-sources="${assetSources(teamLogoSources(team, seasonKey))}"
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </span>
+                  `,
+                )
+                .join("")}
+            </div>
+          `
+          : ""
+      }
+    </div>
+  `;
+}
+
+function playerIdentity(player, season, kicker, meta) {
+  if (!player) return "";
+  return `
+    <div class="player-identity">
+      ${playerVisual(player, season)}
+      <div class="player-identity-copy">
+        <p class="detail-kicker">${escapeHTML(kicker)}</p>
+        <div class="detail-name">${escapeHTML(player.name)}</div>
+        <p class="detail-meta">${escapeHTML(meta)}</p>
+      </div>
+    </div>
+  `;
+}
+
+function hydratePlayerAssets(root = document) {
+  root.querySelectorAll("img[data-asset-sources]").forEach((image) => {
+    if (image.dataset.assetBound === "true") return;
+    let sources = [];
+    try {
+      sources = JSON.parse(image.dataset.assetSources || "[]");
+    } catch {
+      sources = [];
+    }
+    const frame = image.closest("[data-asset-frame]");
+    let sourceIndex = 0;
+    const loadNext = () => {
+      if (sourceIndex >= sources.length) {
+        image.remove();
+        frame?.classList.add("is-missing");
+        return;
+      }
+      image.src = sources[sourceIndex];
+      sourceIndex += 1;
+    };
+    image.dataset.assetBound = "true";
+    image.addEventListener("load", () => {
+      frame?.classList.remove("is-missing");
+      frame?.classList.add("is-loaded");
+    });
+    image.addEventListener("error", loadNext);
+    loadNext();
+  });
+}
+
 function profileColor(name) {
   let hash = 0;
   for (const char of String(name)) {
@@ -1312,11 +1467,15 @@ function playerDetail(player) {
   }
   return `
     <aside class="detail-panel player-detail" aria-label="${escapeHTML(player.name)} detail">
-      <p class="detail-kicker">Player profile</p>
-      <div class="detail-name">${escapeHTML(player.name)}</div>
-      <p class="detail-meta">${escapeHTML(player.position)} · ${escapeHTML(player.team)} · ${number(player.games)} games</p>
+      ${playerIdentity(
+        player,
+        appState.season,
+        "Player profile",
+        [player.position, player.team].filter(Boolean).join(" · "),
+      )}
       ${profileChip(player.profile)}
       <div class="detail-stats">
+        <div class="detail-stat"><span>Games played</span><strong>${number(player.games)}</strong></div>
         <div class="detail-stat"><span>Points</span><strong>${number(player.points)}</strong></div>
         <div class="detail-stat"><span>TOI</span><strong>${number(player.toi, 1)}</strong></div>
         <div class="detail-stat"><span>Fit</span><strong>${percent(player.confidence)}</strong></div>
@@ -1594,6 +1753,7 @@ async function renderSeason() {
       panel.innerHTML = renderNeedFinder(groupData);
       bindNeedFinder(groupData);
     }
+    hydratePlayerAssets(panel);
   };
   bindTabs("season", (tab) => {
     appState.seasonTab = tab;
@@ -1619,6 +1779,7 @@ function bindSeasonPlayerExplorer(groupData) {
       (item) => item.id === appState.selectedPlayerId,
     );
     detail.innerHTML = playerDetail(player);
+    hydratePlayerAssets(detail);
     drawRows();
   });
 }
@@ -1740,6 +1901,14 @@ async function renderCareer() {
       record.group === appState.careerGroup &&
       record.id === appState.careerPlayerId,
   );
+  const latest = [...history].sort((a, b) => b.season.localeCompare(a.season))[0];
+  const selectedWithTeam = selected
+    ? {
+        ...selected,
+        team: latest?.team || "",
+        position: latest?.position || selected.position,
+      }
+    : null;
 
   main.innerHTML = `
     <article class="page">
@@ -1765,9 +1934,16 @@ async function renderCareer() {
           <div class="search-results" id="career-search-results"></div>
         </div>
         <div class="detail-panel">
-          <p class="detail-kicker">Selected player</p>
-          <div class="detail-name">${escapeHTML(selected?.name || "No player")}</div>
-          <p class="detail-meta">${escapeHTML(selected?.position || "")} · ${number(selected?.seasons || 0)} seasons</p>
+          ${
+            selectedWithTeam
+              ? playerIdentity(
+                  selectedWithTeam,
+                  latest?.season,
+                  "Selected player",
+                  `${selectedWithTeam.position} · ${number(selected?.seasons || 0)} seasons`,
+                )
+              : '<div class="detail-name">No player</div>'
+          }
         </div>
       </div>
       <section id="career-view">${careerView(history)}</section>
@@ -1777,6 +1953,7 @@ async function renderCareer() {
       </footer>
     </article>
   `;
+  hydratePlayerAssets(main);
 
   bindGroupControl("career-group", (group) => {
     appState.careerGroup = group;
@@ -1957,6 +2134,14 @@ function playoffPlayerView(rows) {
     )
     .sort((a, b) => a.season.localeCompare(b.season));
   const selected = players.find((player) => player.id === appState.playoffPlayerId);
+  const latest = history.at(-1);
+  const selectedWithTeam = selected
+    ? {
+        ...selected,
+        team: latest?.team || "",
+        position: latest?.position || "",
+      }
+    : null;
   return `
     <div class="two-column" style="margin-bottom:28px">
       <div>
@@ -1967,9 +2152,16 @@ function playoffPlayerView(rows) {
         <div class="search-results" id="playoff-player-results"></div>
       </div>
       <div class="detail-panel">
-        <p class="detail-kicker">Selected player</p>
-        <div class="detail-name">${escapeHTML(selected?.name || "No player")}</div>
-        <p class="detail-meta">${history.length} playoff season${history.length === 1 ? "" : "s"} in the dataset</p>
+        ${
+          selectedWithTeam
+            ? playerIdentity(
+                selectedWithTeam,
+                latest?.season,
+                "Selected player",
+                `${history.length} playoff season${history.length === 1 ? "" : "s"} in the dataset`,
+              )
+            : '<div class="detail-name">No player</div>'
+        }
       </div>
     </div>
     <div class="table-wrap">
@@ -2051,6 +2243,7 @@ async function renderPlayoffs() {
     panel.innerHTML = playoffPlayerView(rows);
     bindPlayoffPlayerSearch();
   }
+  hydratePlayerAssets(panel);
 
   bindGroupControl("playoff-group", (group) => {
     appState.playoffGroup = group;

@@ -28,6 +28,17 @@ if (
 ) {
   throw new Error("Season profile bars are not using visible, literal shares.");
 }
+if (
+  !appSource.includes("https://assets.nhle.com/mugs/nhl/") ||
+  !appSource.includes("https://assets.nhle.com/logos/nhl/svg/") ||
+  !appSource.includes("<span>Games played</span>") ||
+  !stylesSource.includes(".player-headshot-frame") ||
+  !stylesSource.includes(".team-logo-frame")
+) {
+  throw new Error(
+    "Player profile cards are missing their headshot, team logo, or games-played treatment.",
+  );
+}
 
 const seasonPayloads = await Promise.all(
   data.meta.seasons.map(async ({ key }) => ({
