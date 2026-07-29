@@ -3183,9 +3183,10 @@ async function renderCareer() {
                   selectedWithTeam,
                   latest?.season,
                   "Selected player",
-                  `${selectedWithTeam.position} · ${careerSeasonLabel(
+                  `${selectedWithTeam.position}
+${careerSeasonLabel(
                     selected?.firstSeason,
-                  )} - ${careerSeasonLabel(selected?.lastSeason)}`,
+                  )} to ${careerSeasonLabel(selected?.lastSeason)}`,
                 )
               : '<div class="detail-name">No player</div>'
           }

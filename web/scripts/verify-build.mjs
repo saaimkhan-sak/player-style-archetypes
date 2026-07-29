@@ -173,6 +173,7 @@ if (
   !appSource.includes("Most frequent style") ||
   !appSource.includes("Style changes") ||
   !appSource.includes("careerPlayerStatistics(rows)") ||
+  !appSource.includes(")} to ${careerSeasonLabel(selected?.lastSeason)}") ||
   !appSource.includes("rows.filter((row) => row.changed).length") ||
   !appSource.includes("Seasons in dataset") ||
   !appSource.includes("Avg confidence") ||
@@ -191,6 +192,8 @@ if (
   !appSource.includes("careerSeasonCard(row, index, rows.length)") ||
   appSource.includes("Style is a timeline, not a label.") ||
   !stylesSource.includes(".career-picker") ||
+  !stylesSource.includes(".career-selected-player .detail-meta") ||
+  !stylesSource.includes("white-space: pre-line") ||
   !stylesSource.includes(".career-card-summary") ||
   !stylesSource.includes(".career-card-stat-grid") ||
   !stylesSource.includes(".career-card-style") ||
