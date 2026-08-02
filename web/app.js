@@ -863,7 +863,7 @@ function setupHeroRink(canvas) {
         [[cx - outer, cy - upperBar], [cx - inner, cy - upperBar], [cx - inner, cy - top]],
         [[cx + inner, cy - top], [cx + inner, cy - upperBar], [cx + outer, cy - upperBar]],
         [[cx - outer, cy + lowerBar], [cx - inner, cy + lowerBar], [cx - inner, cy + bottom]],
-        [[cx + inner, cy + lowerBar], [cx + outer, cy + lowerBar], [cx + inner, cy + bottom]],
+        [[cx + inner, cy + bottom], [cx + inner, cy + lowerBar], [cx + outer, cy + lowerBar]],
       ].forEach((segments) => {
         context.beginPath();
         context.moveTo(segments[0][0], segments[0][1]);
