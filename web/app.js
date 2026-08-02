@@ -467,11 +467,11 @@ function seasonMethodology() {
             role="math"
             aria-label="Shots per 60 equals shots divided by the quantity time on ice in seconds divided by 3,600"
           >
-            <span>Shots/60</span>
+            <span><var>Shots</var>/60</span>
             <span class="equation-symbol">=</span>
             <span class="fraction">
-              <span>Shots</span>
-              <span>TOI<sub>seconds</sub> / 3600</span>
+              <span><var>Shots</var></span>
+              <span><var>TOI</var><sub>seconds</sub> / 3600</span>
             </span>
           </div>
           <p>Special-teams usage, faceoffs, and scoring outcomes remain available for context tables, but are excluded from the v2 style fingerprint.</p>
@@ -504,10 +504,10 @@ function seasonMethodology() {
           >
             <var>X</var>
             <span class="equation-symbol">≈</span>
-            <var>WH</var>
+            <var>W</var><var>H</var>
           </div>
           <p>
-            You can think of each row of <strong>W</strong> as a compact
+            You can think of each row of <var>W</var> as a compact
             <em>style fingerprint</em> for that player.
           </p>
         </section>
@@ -522,7 +522,7 @@ function seasonMethodology() {
           >
             <span><var>p</var>(<var>z</var>)</span>
             <span class="equation-symbol">=</span>
-            <span>∑<sub>k=1</sub><sup>K</sup> π<sub>k</sub> N(<var>z</var> | μ<sub>k</sub>, Σ<sub>k</sub>)</span>
+            <span>∑<sub><var>k</var>=1</sub><sup><var>K</var></sup> <var>π</var><sub><var>k</var></sub> N(<var>z</var> | <var>μ</var><sub><var>k</var></sub>, <var>Σ</var><sub><var>k</var></sub>)</span>
           </div>
           <p>For each player (<var>i</var>), the model outputs a membership weight for each learned style:</p>
           <div
@@ -530,9 +530,9 @@ function seasonMethodology() {
             role="math"
             aria-label="p i k equals the membership weight for style k given z i"
           >
-            <span><var>p</var><sub>ik</sub></span>
+            <span><var>p</var><sub><var>i</var><var>k</var></sub></span>
             <span class="equation-symbol">=</span>
-            <span>P(Archetype = <var>k</var> | <var>z</var><sub>i</sub>)</span>
+            <span>P(Archetype = <var>k</var> | <var>z</var><sub><var>i</var></sub>)</span>
           </div>
         </section>
 
@@ -1128,9 +1128,9 @@ function renderOverview() {
                 <h3>Step 1 — Normalize for ice time (so players are comparable)</h3>
                 <p>Players have different ice time, so I convert raw counts into per-60 rates:</p>
                 <div class="formula" aria-label="Shots per 60 equals shots divided by time on ice in seconds divided by 3600">
-                  <span>Shots/60</span>
+                  <span><var>Shots</var>/60</span>
                   <b>=</b>
-                  <span>Shots ÷ (TOI<sub>seconds</sub> / 3600)</span>
+                  <span><var>Shots</var> ÷ (<var>TOI</var><sub>seconds</sub> / 3600)</span>
                 </div>
                 <p>Special-teams usage, faceoffs, and scoring outcomes are retained for context and audit tables, but are not part of the v2 style-learning feature blocks.</p>
               </div>
@@ -1142,9 +1142,9 @@ function renderOverview() {
                 <h3>Step 2 — Put all features on the same scale</h3>
                 <p>Some stats have heavy tails. To keep a few extreme values from dominating, I use a robust scaling transformation:</p>
                 <div class="formula" aria-label="x star equals x minus median of x divided by the interquartile range of x">
-                  <span>x<sup>*</sup></span>
+                  <span><var>x</var><sup>*</sup></span>
                   <b>=</b>
-                  <span>(x − median(x)) ÷ IQR(x)</span>
+                  <span>(<var>x</var> − median(<var>x</var>)) ÷ IQR(<var>x</var>)</span>
                 </div>
               </div>
             </article>
@@ -1155,11 +1155,11 @@ function renderOverview() {
                 <h3>Step 3 — Compress into a smaller “style fingerprint”</h3>
                 <p>To summarize correlated features, I use Non-negative Matrix Factorization (NMF):</p>
                 <div class="formula" aria-label="X approximately equals W H">
-                  <span>X</span>
+                  <span><var>X</var></span>
                   <b>≈</b>
-                  <span>WH</span>
+                  <span><var>W</var><var>H</var></span>
                 </div>
-                <p>Think of each row of W as a compact “style fingerprint” describing how a player produces their results.</p>
+                <p>Think of each row of <var>W</var> as a compact “style fingerprint” describing how a player produces their results.</p>
               </div>
             </article>
 
@@ -1169,22 +1169,22 @@ function renderOverview() {
                 <h3>Step 4 — Learn archetypes with a probabilistic clustering model</h3>
                 <p>I fit a Gaussian Mixture Model (GMM) to the fingerprints:</p>
                 <div class="formula formula-wide" aria-label="p of z equals the sum from k equals 1 to K of pi k times a normal distribution">
-                  <span>p(z)</span>
+                  <span><var>p</var>(<var>z</var>)</span>
                   <b>=</b>
-                  <span>Σ<sub>k=1</sub><sup>K</sup> π<sub>k</sub> N(z | μ<sub>k</sub>, Σ<sub>k</sub>)</span>
+                  <span>Σ<sub><var>k</var>=1</sub><sup><var>K</var></sup> <var>π</var><sub><var>k</var></sub> N(<var>z</var> | <var>μ</var><sub><var>k</var></sub>, <var>Σ</var><sub><var>k</var></sub>)</span>
                 </div>
                 <p>For each player-season, the model outputs style-membership weights using this formula. They describe proximity to learned clusters, not the probability that a hockey interpretation is correct.</p>
                 <div class="formula formula-wide">
-                  <span>p<sub>ik</sub></span>
+                  <span><var>p</var><sub><var>i</var><var>k</var></sub></span>
                   <b>=</b>
-                  <span>P(Archetype = k | z<sub>i</sub>)</span>
+                  <span>P(Archetype = <var>k</var> | <var>z</var><sub><var>i</var></sub>)</span>
                 </div>
                 <p>Because this is soft clustering, a player can be “70% Playmaking Scorer, 20% Two-Way Creator, 10% Role Specialist” rather than being forced into a single bucket.</p>
                 <p>I summarize the share outside the top style as a blend indicator:</p>
                 <div class="formula formula-wide">
                   <span>Style blend</span>
                   <b>=</b>
-                  <span>1 − max<sub>k</sub>(p<sub>ik</sub>)</span>
+                  <span>1 − max<sub><var>k</var></sub>(<var>p</var><sub><var>i</var><var>k</var></sub>)</span>
                 </div>
               </div>
             </article>
