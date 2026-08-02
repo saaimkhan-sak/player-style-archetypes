@@ -886,7 +886,11 @@ function setupHeroRink(canvas) {
     context.beginPath();
     context.arc(240, 134, 38, 0, Math.PI * 2);
     context.stroke();
-    faceoffMarking(240, 134);
+    context.fillStyle = colors.logo;
+    context.font = "700 italic 16px Arial, sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText("IHS", 240, 135);
 
     function drawNet(xPosition) {
       context.strokeStyle = colors.red;
