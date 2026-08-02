@@ -751,44 +751,6 @@ function setupHeroRink(canvas) {
   if (!canvas) return;
   const context = canvas.getContext("2d");
   const wrapper = canvas.parentElement;
-  const referenceImage = new Image();
-  const referenceWidth = 240;
-  const referenceHeight = 268;
-
-  function drawReferenceRink() {
-    const width = Math.max(wrapper.clientWidth, 250);
-    const height = Math.max(wrapper.clientHeight, 150);
-    const ratio = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = width * ratio;
-    canvas.height = height * ratio;
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    context.setTransform(ratio, 0, 0, ratio, 0, 0);
-    context.clearRect(0, 0, width, height);
-
-    const scale = Math.min((width - 14) / referenceWidth, (height - 14) / referenceHeight);
-    const offsetX = (width - referenceWidth * scale) / 2;
-    const offsetY = (height - referenceHeight * scale) / 2;
-    context.setTransform(
-      ratio * scale,
-      0,
-      0,
-      ratio * scale,
-      ratio * offsetX,
-      ratio * offsetY,
-    );
-    if (referenceImage.complete && referenceImage.naturalWidth) {
-      context.drawImage(referenceImage, 0, 0, referenceWidth, referenceHeight);
-    }
-  }
-
-  referenceImage.addEventListener("load", drawReferenceRink);
-  referenceImage.src = "data/hero-rink-reference.png";
-  drawReferenceRink();
-  const referenceObserver = new ResizeObserver(drawReferenceRink);
-  referenceObserver.observe(wrapper);
-  appState.canvasCleanups.push(() => referenceObserver.disconnect());
-  return;
 
   const styles = getComputedStyle(document.documentElement);
   const colors = {
@@ -855,6 +817,22 @@ function setupHeroRink(canvas) {
     context.clip();
     context.fillStyle = colors.ice;
     context.fillRect(0, 0, artWidth, artHeight);
+
+    // Standard NHL defensive-zone markings: the goal line is 11 feet from
+    // the end boards, with the goaltender's restricted trapezoid behind it.
+    context.strokeStyle = colors.red;
+    context.lineWidth = 1.8;
+    context.lineCap = "butt";
+    context.beginPath();
+    context.moveTo(28, rink.top);
+    context.lineTo(28, 123);
+    context.moveTo(28, 146);
+    context.lineTo(28, rink.top + rink.height);
+    context.moveTo(28, 104);
+    context.lineTo(rink.left, 95.5);
+    context.moveTo(28, 164);
+    context.lineTo(rink.left, 172.5);
+    context.stroke();
 
     function verticalLine(position, color, thickness = 2) {
       context.fillStyle = color;
@@ -1069,7 +1047,7 @@ function renderOverview() {
             <canvas
               id="hero-rink"
               role="img"
-              aria-label="Regulation NHL half-rink with official markings, tactical X and O player positions, and curved movement arrows"
+              aria-label="Regulation NHL half-rink with goal line, goaltender trapezoid, official markings, tactical X and O player positions, and curved movement arrows"
             ></canvas>
           </div>
           <div class="rink-facts" aria-label="${number(meta.playerCount)} players across ${meta.seasonCount} seasons">
