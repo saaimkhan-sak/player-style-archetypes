@@ -1,0 +1,14 @@
+{
+  "snapshotId": "style-lab-2026-08-02T120000-04:00",
+  "snapshotAsOf": "2026-08-02",
+  "builtAt": "2026-08-02T16:18:00.693799+00:00",
+  "codeCommit": "9691912aa57ddb738d77d4a856d7b3925a185e39",
+  "regularSeasonDataThrough": "2026-04-16",
+  "playoffDataThrough": "2026-06-14",
+  "latestCompleteSeason": "20252026",
+  "upcomingSeason": "20262027",
+  "referenceModelVersion": "season-model-2026-08-02 (reference promotion pending)",
+  "sourceManifestSha256": "4671111150116fcdad9d821ecaf632928fe7433f3c366866b97f2d58a3d0aa7f",
+  "sourceMaxEventDate": "2026-06-14",
+  "qualityGateStatus": "passed"
+}

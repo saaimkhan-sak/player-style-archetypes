@@ -22,6 +22,12 @@ def current_nhl_season_label(now: Optional[datetime] = None) -> str:
     return f"{start_year}{start_year + 1}"
 
 
+def upcoming_nhl_season_label(now: Optional[datetime] = None) -> str:
+    now = now or datetime.now(ZoneInfo("America/New_York"))
+    start_year = now.year if now.month >= 7 else now.year - 1
+    return f"{start_year}{start_year + 1}"
+
+
 def run(args: list[str]) -> None:
     print("\n$ " + " ".join(args))
     subprocess.run(args, cwd=REPO_ROOT, check=True)
@@ -40,7 +46,11 @@ def available_schedule_path(season: str) -> Path:
     schedule = pd.read_parquet(path)
     raw_root = REPO_ROOT / "data" / "raw" / "season" / season / "games"
     schedule = schedule[
+        schedule["game_type"].isin([2, 3])
+    ]
+    schedule = schedule[
         schedule["game_id"].map(lambda gid: (raw_root / str(int(gid)) / "boxscore.json").exists())
+        & schedule["game_id"].map(lambda gid: (raw_root / str(int(gid)) / "play_by_play.json").exists())
     ].copy()
 
     out_path = REPO_ROOT / "data" / "processed" / f"schedule_{season}_available.parquet"
@@ -123,6 +133,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Refresh latest NHL archetype data and app artifacts.")
     parser.add_argument("--season_label", help="Override season label, e.g. 20252026.")
     parser.add_argument("--skip_moneypuck_download", action="store_true")
+    parser.add_argument("--as_of_date", help="Snapshot date passed to schedule reconciliation.")
     args = parser.parse_args(argv)
 
     season = args.season_label or current_nhl_season_label()
@@ -132,7 +143,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if not args.skip_moneypuck_download:
         run([py, "scripts/download_moneypuck_game_by_game.py", "--season_label", season])
 
-    run([py, "pipelines/00_reconcile_season_schedule.py", "--season_label", season, "--download_missing"])
+    schedule_args = [py, "pipelines/00_reconcile_season_schedule.py", "--season_label", season, "--download_missing"]
+    if args.as_of_date:
+        schedule_args.extend(["--as_of_date", args.as_of_date])
+    run(schedule_args)
     schedule_path = available_schedule_path(season)
     available_games = len(pd.read_parquet(schedule_path))
     if available_games == 0:

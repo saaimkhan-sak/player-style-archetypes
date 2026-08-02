@@ -1,8 +1,8 @@
 const DATA_ROOT = "/data";
-const DATA_VERSION = "20260729-playoff-career-v2";
+const DATA_VERSION = "20260802-source-closed-v1";
 const NEED_GAME_VALUES = [
   0, 5, 10, 15, 20, 25, 30, 35, 40,
-  45, 50, 55, 60, 65, 70, 75, 80, 82,
+  45, 50, 55, 60, 65, 70, 75, 80, 82, 84,
 ];
 
 const appState = {
@@ -449,14 +449,13 @@ function seasonMethodology() {
             from the NHL Gamecenter endpoints, then aggregated it into
             <strong>regular season vs playoff</strong> splits.
           </p>
-          <p>Each data point contributes to “style” like this:</p>
+          <p>The v2 style contract uses these canonical signals:</p>
           <ul class="methodology-signals">
-            <li><strong>Scoring/creation:</strong> shots, goals, assists, points → turned into per-60 rates (e.g., Shots/60)</li>
-            <li><strong>Physical/defensive involvement:</strong> hits, blocks → per-60 rates</li>
-            <li><strong>Puck pressure vs risk:</strong> takeaways vs giveaways → per-60 rates</li>
-            <li><strong>Discipline/edge:</strong> penalty minutes → per-60 rate</li>
-            <li><strong>Role/usage:</strong> PP TOI share and PK TOI share (how a coach deploys the player)</li>
-            <li><strong>Deployment signals:</strong> faceoffs per game and faceoff percentage</li>
+            <li><strong>Shot creation and quality:</strong> 5-on-5 shot attempts per 60 and expected goals per attempt</li>
+            <li><strong>Interior access:</strong> high-danger shot share and play-continuation rate</li>
+            <li><strong>Puck pressure and disruption:</strong> hits, takeaways, giveaways, and blocks per 60</li>
+            <li><strong>Two-way context:</strong> on-ice expected goals for and against per 60</li>
+            <li><strong>Unknown states:</strong> missing features remain unknown and are not replaced with zero</li>
           </ul>
         </section>
 
@@ -475,33 +474,7 @@ function seasonMethodology() {
               <span>TOI<sub>seconds</sub> / 3600</span>
             </span>
           </div>
-          <p>I also compute special-teams usage share:</p>
-          <div class="equation-row">
-            <div
-              class="equation"
-              role="math"
-              aria-label="Power-play share equals power-play time on ice divided by total time on ice"
-            >
-              <span>PP Share</span>
-              <span class="equation-symbol">=</span>
-              <span class="fraction">
-                <span>PP TOI</span>
-                <span>Total TOI</span>
-              </span>
-            </div>
-            <div
-              class="equation"
-              role="math"
-              aria-label="Penalty-kill share equals penalty-kill time on ice divided by total time on ice"
-            >
-              <span>PK Share</span>
-              <span class="equation-symbol">=</span>
-              <span class="fraction">
-                <span>PK TOI</span>
-                <span>Total TOI</span>
-              </span>
-            </div>
-          </div>
+          <p>Special-teams usage, faceoffs, and scoring outcomes remain available for context tables, but are excluded from the v2 style fingerprint.</p>
         </section>
 
         <section class="methodology-section" aria-labelledby="method-step-2">
@@ -551,11 +524,11 @@ function seasonMethodology() {
             <span class="equation-symbol">=</span>
             <span>∑<sub>k=1</sub><sup>K</sup> π<sub>k</sub> N(<var>z</var> | μ<sub>k</sub>, Σ<sub>k</sub>)</span>
           </div>
-          <p>For each player (<var>i</var>), the model outputs a probability for each archetype:</p>
+          <p>For each player (<var>i</var>), the model outputs a membership weight for each learned style:</p>
           <div
             class="equation equation-model"
             role="math"
-            aria-label="p i k equals the probability that archetype equals k given z i"
+            aria-label="p i k equals the membership weight for style k given z i"
           >
             <span><var>p</var><sub>ik</sub></span>
             <span class="equation-symbol">=</span>
@@ -569,16 +542,18 @@ function seasonMethodology() {
         >
           <h2 id="method-blends">Why do blended style profiles exist?</h2>
           <p>
-            The model is probabilistic: instead of forcing every player into exactly one
-            bucket, it assigns a probability over archetypes. Some players genuinely
-            combine traits that sit between multiple clusters (e.g., moderate scoring +
-            moderate physical play), so their profile names describe the strongest trait
-            combination rather than pretending every cluster is one clean role.
+            The model is a soft clustering system: instead of forcing every player into
+            exactly one bucket, it assigns a membership weight across learned styles.
+            Some players genuinely combine traits that sit between multiple clusters
+            (e.g., moderate scoring + moderate physical play), so their profile names
+            describe the strongest trait combination rather than pretending every
+            cluster is one clean role.
           </p>
           <p>
-            <strong>Interpretation:</strong> if a player’s probabilities are
-            (0.1, 87.3, 6.4, 6.3)% then the player is mostly aligned to one profile with
-            <strong>87.3% confidence</strong>.
+            <strong>Interpretation:</strong> if a player’s membership weights are
+            (0.1, 87.3, 6.4, 6.3)%, the largest share is aligned to one learned style.
+            This is a within-season model fit signal, not a probability that the
+            hockey interpretation is correct.
           </p>
         </section>
       </div>
@@ -1071,8 +1046,8 @@ function renderOverview() {
           </span>
         </div>
         ${metric("Players analyzed", number(meta.playerCount), "NHL players")}
-        ${metric("Different styles", number(meta.namedStyleCount), `${styleBreakdown.forwards} forward · ${styleBreakdown.defense} defense`)}
-        ${metric("Avg. Model Confidence", `${number(meta.averageModelConfidence, 1)}%`, "across all seasons")}
+        ${metric("Named labels", number(meta.namedStyleCount), `${styleBreakdown.forwards} forward · ${styleBreakdown.defense} defense; season-derived`)}
+        ${metric("Model contract", escapeHTML(meta.modelContractVersion || "style-v2.0.0"), "feature validity and source-state contract")}
       </section>
 
       <div class="overview-longform">
@@ -1115,35 +1090,17 @@ function renderOverview() {
             <h3>What “style profile definitions” means:</h3>
             <p>Each season’s model learns K archetypes, then names them from the traits that are unusually high or low for that cluster. Some are clean roles like offense-driving, shot-blocking, or puck-pressure profiles; others are blended profiles whose names describe the strongest trait combination instead of using generic numbered labels.</p>
           </div>
-          <div class="switch-grid">
-            <div>
-              <span>Forwards Median Switch Rate</span>
-              <strong>${number(meta.switchRates.forwards, 2)}</strong>
-            </div>
-            <div>
-              <span>Defense Median Switch Rate</span>
-              <strong>${number(meta.switchRates.defense, 2)}</strong>
-            </div>
-          </div>
           <div class="definition-callout">
-            <h3>Interpreting median switch rate:</h3>
-            <p>Forwards median switch rate = 0.86 means the “typical” forward (among players with ≥3 seasons in the dataset) changes their top archetype in about 86% of year-to-year transitions.</p>
-            <p>Defense median switch rate = 0.90 means the “typical” defenseman changes archetype in about 90% of transitions.</p>
+            <h3>Freshness and comparability</h3>
+            <p><strong>Latest complete style season:</strong> ${escapeHTML(meta.latestCompleteSeason || "20252026")}</p>
+            <p><strong>Regular-season evidence through:</strong> ${escapeHTML(meta.regularSeasonDataThrough || "—")}</p>
+            <p><strong>Playoff evidence through:</strong> ${escapeHTML(meta.playoffDataThrough || "—")}</p>
+            <p><strong>Upcoming NHL season:</strong> 2026–27, 84 games per club. Season-derived labels are not treated as stable career identities.</p>
           </div>
-        </section>
-
-        <section class="story-section" id="model-confidence">
-          <div class="story-heading">
-            <h2>How Confident was the Model Season by Season?</h2>
-          </div>
-          <div class="chart-panel overview-confidence-chart">
-            <div class="legend" aria-label="Chart legend">
-              <span><i style="--legend-color:var(--aqua)"></i>Forwards</span>
-              <span><i style="--legend-color:var(--coral)"></i>Defense</span>
-            </div>
-            <div class="canvas-wrap">
-              <canvas id="confidence-chart" role="img" aria-label="Average model confidence for forwards and defense by season"></canvas>
-            </div>
+          <div class="definition-callout release-evidence-callout">
+            <h3>Release evidence</h3>
+            <p>The current 2025–26 release reconciles 1,394 official NHL regular/playoff game IDs: 1,312 regular-season games and 82 playoff games through the June 14, 2026 Stanley Cup Final.</p>
+            <p>Playoff projections use direct MoneyPuck game-by-game player files plus official NHL game records. <a href="/data/manifest.json" target="_blank" rel="noreferrer">Open the release manifest</a> or <a href="/data/freshness.json" target="_blank" rel="noreferrer">freshness record</a>.</p>
           </div>
         </section>
 
@@ -1155,19 +1112,20 @@ function renderOverview() {
 
           <div class="data-used">
             <h3>Data used</h3>
-            <p>From NHL game endpoints I aggregate per player:</p>
+            <p>From official NHL game endpoints I aggregate per player:</p>
             <ul>
               <li>regular season vs playoff statistics</li>
-              <li>time on ice and special-teams usage</li>
-              <li>boxscore counting stats (goals/assists/points/shots/hits/blocks/PIM/takeaways/giveaways, etc.)</li>
+              <li>time on ice, game state, teams, scores, and game dates</li>
+              <li>canonical boxscore counting stats (hits/blocks/takeaways/giveaways plus context outcomes)</li>
             </ul>
-            <p>From MoneyPuck player game files I add advanced regular-season signals:</p>
+            <p>From MoneyPuck’s listed player game-by-game downloads I add advanced regular- and playoff-season signals. MoneyPuck data is used for this noncommercial project with clear credit; saved page HTML is not a production input.</p>
             <ul>
-              <li>expected goals, shot quality, high-danger chances, and rebound chances</li>
-              <li>on-ice expected goals for/against and shot-attempt impact</li>
-              <li>situation splits for 5-on-5, power play, and penalty kill</li>
-              <li>shift starts, play-continuation metrics, penalties drawn, and faceoff context</li>
+              <li>5-on-5 shot-attempt rate and expected goals per attempt</li>
+              <li>high-danger shot share and play-continuation rate</li>
+              <li>on-ice expected goals for/against rates</li>
+              <li>game-level coverage, retrieval date, hashes, and explicit unknown states</li>
             </ul>
+            <p>Special-teams usage, faceoffs, and scoring outcomes remain available for context tables, but are excluded from the v2 style fingerprint so role and outcome fields do not duplicate the style signal.</p>
             <p>Because those MoneyPuck files start in 2008, the site focuses on seasons from 2008-09 forward.</p>
           </div>
 
@@ -1182,11 +1140,7 @@ function renderOverview() {
                   <b>=</b>
                   <span>Shots ÷ (TOI<sub>seconds</sub> / 3600)</span>
                 </div>
-                <p>Special-teams usage is represented as share of total TOI:</p>
-                <div class="formula formula-pair">
-                  <span>PP Share = PP TOI ÷ Total TOI</span>
-                  <span>PK Share = PK TOI ÷ Total TOI</span>
-                </div>
+                <p>Special-teams usage, faceoffs, and scoring outcomes are retained for context and audit tables, but are not part of the v2 style-learning feature blocks.</p>
               </div>
             </article>
 
@@ -1227,16 +1181,16 @@ function renderOverview() {
                   <b>=</b>
                   <span>Σ<sub>k=1</sub><sup>K</sup> π<sub>k</sub> N(z | μ<sub>k</sub>, Σ<sub>k</sub>)</span>
                 </div>
-                <p>For each player-season, the model outputs archetype probabilities using this formula:</p>
+                <p>For each player-season, the model outputs style-membership weights using this formula. They describe proximity to learned clusters, not the probability that a hockey interpretation is correct.</p>
                 <div class="formula formula-wide">
                   <span>p<sub>ik</sub></span>
                   <b>=</b>
                   <span>P(Archetype = k | z<sub>i</sub>)</span>
                 </div>
                 <p>Because this is soft clustering, a player can be “70% Playmaking Scorer, 20% Two-Way Creator, 10% Role Specialist” rather than being forced into a single bucket.</p>
-                <p>I summarize how “mixed” a player is using:</p>
+                <p>I summarize the share outside the top style as a blend indicator:</p>
                 <div class="formula formula-wide">
-                  <span>Mixedness</span>
+                  <span>Style blend</span>
                   <b>=</b>
                   <span>1 − max<sub>k</sub>(p<sub>ik</sub>)</span>
                 </div>
@@ -1351,27 +1305,12 @@ function renderOverview() {
             </ul>
           </div>
         </section>
-        <p class="data-disclaimer">I try to keep the data as up-to-date as possible but there's always a chance that things may be out of date.</p>
+        <p class="data-disclaimer">This page is a dated release. Check the freshness record and source manifest before treating a season as complete.</p>
       </div>
     </article>
   `;
 
   setupHeroRink(document.querySelector("#hero-rink"));
-  const trend = meta.confidenceTrend;
-  setupLineChart(
-    document.querySelector("#confidence-chart"),
-    [
-      {
-        color: "#21b6a8",
-        values: trend.map((row) => ({ label: row.label, value: row.forwards })),
-      },
-      {
-        color: "#f06445",
-        values: trend.map((row) => ({ label: row.label, value: row.defense })),
-      },
-    ],
-    { min: 60, max: 100, unit: "%" },
-  );
 }
 
 function glossaryRows() {
@@ -1538,20 +1477,16 @@ function renderSeasonSnapshot(groupData) {
     paragraphs: [
       `${dominant.name} accounts for ${number(dominant.share, 1)}% of the group, while the three most common styles cover ${number(topThree, 1)}%.`,
     ],
-    facts: [
-      {
-        label: "Average confidence",
-        value: percent(groupData.averageConfidence, 1),
-      },
-      {
-        label: "Styles present",
-        value: number(groupData.profiles.length),
-      },
-      {
-        label: "Mixed profiles",
-        value: number(groupData.mixedCount),
-      },
-    ],
+      facts: [
+        {
+          label: "Learned styles",
+          value: number(groupData.profiles.length),
+        },
+        {
+          label: "Player-seasons",
+          value: number(groupData.players.length),
+        },
+      ],
   };
   return `
     <section class="metric-grid">
@@ -1562,7 +1497,7 @@ function renderSeasonSnapshot(groupData) {
         `${number(topThree, 1)}%`,
         "Players in that season’s 3 most common learned styles",
       )}
-      ${metric("Mixed profiles", number(groupData.mixedCount), "below 80% top-style confidence")}
+      ${metric("Learned styles", number(groupData.profiles.length), "season-derived style categories")}
     </section>
     <section class="analysis-grid season-snapshot-layout">
       <div class="chart-panel">
@@ -1628,8 +1563,9 @@ function playerDetail(player) {
         <div class="detail-stat"><span>Games played</span><strong>${number(player.games)}</strong></div>
         <div class="detail-stat"><span>Points</span><strong>${number(player.points)}</strong></div>
         <div class="detail-stat"><span>TOI</span><strong>${number(player.toi, 1)}</strong></div>
-        <div class="detail-stat"><span>Fit</span><strong>${percent(player.confidence)}</strong></div>
+        <div class="detail-stat"><span>Top-style share</span><strong>${percent(player.confidence)}</strong></div>
       </div>
+      <p class="detail-caption">Membership weights across learned styles; this is a within-season fit signal, not a correctness probability.</p>
       <div class="probability-list">
         ${player.probabilities
           .map(
@@ -1661,7 +1597,7 @@ function renderPlayerTable(players, selectedId, interactive = true) {
             <th>Style</th>
             <th class="numeric">GP</th>
             <th class="numeric">PTS</th>
-            <th class="numeric">Fit</th>
+            <th class="numeric">Top-style share</th>
           </tr>
         </thead>
         <tbody>
@@ -1705,7 +1641,7 @@ function renderSeasonPlayers(groupData) {
         <label for="player-search">Search players</label>
         <input class="search-input" id="player-search" type="search" placeholder="Player name" />
       </div>
-      <span class="result-count">Select a name for the full probability mix.</span>
+    <span class="result-count">Select a name for the full style-membership mix.</span>
     </div>
     <div class="two-column">
       <div id="player-table">${renderPlayerTable(initialPlayers, appState.selectedPlayerId)}</div>
@@ -1764,7 +1700,7 @@ function rosterUnitCard(unit, construction, season) {
                   <div class="roster-skater-name">
                     <strong>${escapeHTML(player.name)}</strong>
                     <span class="roster-status-chip ${confidenceBand(player.confidence)}">
-                      ${number(Number(player.confidence || 0) * 100, 1)}%
+                      ${number(Number(player.confidence || 0) * 100, 1)}% top-style share
                     </span>
                   </div>
                   <p>
@@ -1836,7 +1772,7 @@ function rosterDepthTable(construction) {
             <th class="numeric">REG P</th>
             <th class="numeric">REG G</th>
             <th class="numeric">REG A</th>
-            <th class="numeric">Confidence</th>
+            <th class="numeric">Top-style share</th>
           </tr>
         </thead>
         <tbody>
@@ -2110,11 +2046,25 @@ function playerTargetSimilarity(player, cluster, targetProfile) {
 }
 
 function needGamesValue(control) {
+  const maxGames = Number(
+    appState.core?.meta?.scheduleDimension?.[appState.season] || 82,
+  );
+  const values = NEED_GAME_VALUES.filter((value) => value <= maxGames);
+  if (!values.includes(maxGames)) values.push(maxGames);
   const index = Math.max(
     0,
-    Math.min(NEED_GAME_VALUES.length - 1, Number(control?.value || 0)),
+    Math.min(values.length - 1, Number(control?.value || 0)),
   );
-  return NEED_GAME_VALUES[index];
+  return values[index];
+}
+
+function needGameOptions() {
+  const maxGames = Number(
+    appState.core?.meta?.scheduleDimension?.[appState.season] || 82,
+  );
+  const values = NEED_GAME_VALUES.filter((value) => value <= maxGames);
+  if (!values.includes(maxGames)) values.push(maxGames);
+  return { maxGames, values };
 }
 
 function needPlayerCard(player, rank, targetSimilarity, details) {
@@ -2139,12 +2089,12 @@ function needPlayerCard(player, rank, targetSimilarity, details) {
           ${needTeamMarks(player, appState.season)}
         </span>
         <span class="need-similarity ${similarityBand}">
-          <span class="need-summary-label">Target similarity</span>
+          <span class="need-summary-label">Profile fit</span>
           <strong>${number(targetSimilarity, 1)}%</strong>
           <span
             class="need-similarity-track"
             role="progressbar"
-            aria-label="${escapeHTML(player.name)} target similarity"
+            aria-label="${escapeHTML(player.name)} profile fit"
             aria-valuemin="0"
             aria-valuemax="100"
             aria-valuenow="${escapeHTML(targetSimilarity)}"
@@ -2156,7 +2106,7 @@ function needPlayerCard(player, rank, targetSimilarity, details) {
           <span class="need-summary-label">Archetype</span>
           ${profileChip(player.profile)}
           <span class="need-confidence ${confidenceClass}">
-            ${number(Number(player.confidence || 0) * 100, 1)}% confidence
+            ${number(Number(player.confidence || 0) * 100, 1)}% top-style share
           </span>
         </span>
         <span class="need-quick-stats" aria-label="Regular-season summary">
@@ -2216,6 +2166,9 @@ function needPlayerCard(player, rank, targetSimilarity, details) {
 
 function renderNeedFinder(groupData) {
   const targets = needFinderTargets(groupData);
+  const { maxGames, values } = needGameOptions();
+  const defaultGames = Math.min(20, maxGames);
+  const defaultIndex = Math.max(0, values.indexOf(defaultGames));
   const teams = [...new Set(
     groupData.players.flatMap((player) => player.team.split("/").filter(Boolean)),
   )].sort();
@@ -2229,7 +2182,7 @@ function renderNeedFinder(groupData) {
         <div>
           <h3>What you’re looking at</h3>
           <ul>
-            <li>A ranked list of players who best match a selected style profile.</li>
+            <li>A ranked list of players who best match a selected statistical style profile.</li>
           </ul>
         </div>
         <div>
@@ -2238,7 +2191,7 @@ function renderNeedFinder(groupData) {
             <li>Pick the archetype you want to add to a roster.</li>
             <li>Optionally exclude your own team.</li>
             <li>Increase minimum regular-season games to avoid tiny samples.</li>
-            <li>“Target similarity (%)” is the model’s estimated probability that the player belongs to that archetype.</li>
+            <li>“Profile fit (%)” is a within-season fitted match score, not a probability that the hockey interpretation is correct.</li>
           </ul>
         </div>
       </div>
@@ -2259,25 +2212,25 @@ function renderNeedFinder(groupData) {
       </div>
       <div class="field need-games-field">
         <div class="need-range-label">
-          <label for="need-games">Min REG games</label>
-          <output id="need-games-value" for="need-games">20</output>
+            <label for="need-games">Min REG games (max ${maxGames})</label>
+            <output id="need-games-value" for="need-games">${defaultGames}</output>
         </div>
         <input
           id="need-games"
           type="range"
           min="0"
-          max="${NEED_GAME_VALUES.length - 1}"
-          value="${NEED_GAME_VALUES.indexOf(20)}"
+          max="${values.length - 1}"
+          value="${defaultIndex}"
           step="1"
           aria-valuemin="0"
-          aria-valuemax="82"
-          aria-valuenow="20"
-          aria-valuetext="20 regular-season games"
+          aria-valuemax="${maxGames}"
+          aria-valuenow="${defaultGames}"
+          aria-valuetext="${defaultGames} regular-season games"
         />
-        <div class="need-range-ends" aria-hidden="true"><span>0</span><span>82</span></div>
+        <div class="need-range-ends" aria-hidden="true"><span>0</span><span>${maxGames}</span></div>
       </div>
     </section>
-    <div id="need-results" aria-live="polite">${needResults(groupData, target.cluster, target.profile, "", 20)}</div>
+    <div id="need-results" aria-live="polite">${needResults(groupData, target.cluster, target.profile, "", defaultGames)}</div>
   `;
 }
 
@@ -2312,7 +2265,7 @@ function needResults(groupData, targetCluster, targetProfile, excludedTeam, minG
         <div>
           <p class="eyebrow">Ranked matches</p>
           <h3>${escapeHTML(targetProfile)}</h3>
-          <p>Ordered by target similarity, then regular-season points.</p>
+          <p>Ordered by fitted profile fit, then regular-season points. Model version and data reliability should be checked before using a match.</p>
         </div>
         <div class="need-results-count">
           <strong>${number(matches.length)}</strong>
@@ -2571,31 +2524,31 @@ function careerExplainer(latestSeason) {
         <section class="methodology-section">
           <h2>What Does the Evolution Really Mean?</h2>
           <ul class="career-explainer-list">
-            <li><strong>Stable top archetype + high confidence</strong> → consistent role/style across years</li>
+            <li><strong>Stable top archetype + high membership concentration</strong> → consistent role/style across years</li>
             <li><strong>Shifts in top archetype</strong> → role changes, team/system changes, aging, or deployment changes</li>
-            <li><strong>Lower confidence</strong> → “mixed profile” seasons where the player blends multiple archetype patterns</li>
+            <li><strong>Lower membership concentration</strong> → blended seasons where the player shares traits with multiple learned styles</li>
           </ul>
         </section>
         <section class="methodology-section">
-          <h2>What is Mixedness?</h2>
-          <p>In this table, you will see a value for each player called "mixedness". What is that?</p>
-          <p>I define <strong>Mixedness</strong> as:</p>
+          <h2>What is Style Blend?</h2>
+          <p>In this table, the style-blend value shows how much membership sits outside the player's top learned style.</p>
+          <p>I define <strong>Style blend</strong> as:</p>
           <div
             class="career-formula"
             role="img"
-            aria-label="Mixedness equals one minus the maximum archetype probability for player i"
+            aria-label="Style blend equals one minus the maximum archetype membership for player i"
           >
-            <span>Mixedness</span>
+            <span>Style blend</span>
             <span>=</span>
             <span>1 − max<sub>k</sub>(p<sub>ik</sub>)</span>
           </div>
           <p>
-            where <strong>max<sub>k</sub>(p<sub>ik</sub>)</strong> is the probability
-            of the player’s <strong>top archetype</strong> that season.
+            where <strong>max<sub>k</sub>(p<sub>ik</sub>)</strong> is the membership
+            share of the player’s <strong>top archetype</strong> that season.
           </p>
           <ul class="career-explainer-list">
-            <li>Mixedness near <strong>0.00</strong> → the model is very confident the player fits a single archetype</li>
-            <li>Mixedness &gt;= <strong>0.40</strong> → the player blends multiple archetypes (probability mass is spread out)</li>
+            <li>Style blend near <strong>0.00</strong> → most membership sits in one learned style</li>
+            <li>Style blend &gt;= <strong>0.40</strong> → membership is spread across multiple learned styles</li>
           </ul>
         </section>
       </div>
@@ -2790,11 +2743,11 @@ function careerSeasonCard(row, index, total) {
             </span>
             <span class="career-season-measures">
               <span>
-                <small>Confidence (%)</small>
+                <small>Top-style share (%)</small>
                 <strong>${number(row.confidencePct, 1)}%</strong>
               </span>
               <span>
-                <small>Mixedness</small>
+                <small>Style blend</small>
                 <strong>${number(row.mixedness, 3)}</strong>
               </span>
             </span>
@@ -2867,15 +2820,15 @@ function careerTimeline(rows) {
       <div
         class="career-chart-scroll"
         tabindex="0"
-        aria-label="Career confidence timeline; scroll horizontally when needed"
+        aria-label="Career top-style share timeline; scroll horizontally when needed"
       >
         <div
           class="career-chart-stage"
           style="--career-chart-width:${chartWidth}px"
           role="group"
-          aria-label="Top-archetype confidence by season"
+          aria-label="Top-archetype share by season"
         >
-          <span class="career-y-axis-title" aria-hidden="true">Top-archetype confidence (%)</span>
+          <span class="career-y-axis-title" aria-hidden="true">Top-archetype share (%)</span>
           <canvas id="career-chart" aria-hidden="true"></canvas>
           <div class="career-chart-points" role="group" aria-label="Career seasons">
             ${rows
@@ -2888,7 +2841,7 @@ function careerTimeline(rows) {
                     style="--profile:${profileColor(row.profile)}"
                     aria-controls="career-season-${escapeHTML(row.season)}"
                     aria-label="${escapeHTML(
-                      `${row.displaySeason}. ${row.profile}. Confidence ${number(row.confidencePct, 1)} percent. Mixedness ${number(row.mixedness, 3)}. Teams ${row.team || "none"}. Position ${row.position || "unknown"}.${row.changed ? " Archetype changed from the previous season." : ""} Open season details.`,
+                      `${row.displaySeason}. ${row.profile}. Top-style share ${number(row.confidencePct, 1)} percent. Style blend ${number(row.mixedness, 3)}. Teams ${row.team || "none"}. Position ${row.position || "unknown"}.${row.changed ? " Archetype changed from the previous season." : ""} Open season details.`,
                     )}"
                   ></button>
                 `,
@@ -2920,14 +2873,14 @@ function careerView(rows) {
         <strong>${number(rows.length)}</strong>
       </article>
       <article class="career-summary-card">
-        <span>Avg confidence</span>
+        <span>Avg top-style share</span>
         <div>
           <strong>${number(avgConfidence, 1)}%</strong>
           <em class="career-status ${confidenceClass}">${escapeHTML(confidenceLabel)}</em>
         </div>
       </article>
       <article class="career-summary-card">
-        <span>Avg mixedness</span>
+        <span>Avg style blend</span>
         <div>
           <strong>${number(avgMixedness, 3)}</strong>
           <em class="career-status ${mixednessClass}">${escapeHTML(mixednessLabel)}</em>
@@ -3042,8 +2995,8 @@ function setupCareerTimeline(rows) {
       <strong>${escapeHTML(row.displaySeason)}</strong>
       <span>${escapeHTML(row.profile)}</span>
       <dl>
-        <div><dt>Confidence</dt><dd>${number(row.confidencePct, 1)}%</dd></div>
-        <div><dt>Mixedness</dt><dd>${number(row.mixedness, 3)}</dd></div>
+        <div><dt>Top-style share</dt><dd>${number(row.confidencePct, 1)}%</dd></div>
+        <div><dt>Style blend</dt><dd>${number(row.mixedness, 3)}</dd></div>
         <div><dt>Teams</dt><dd>${escapeHTML(row.team || "—")}</dd></div>
         <div><dt>Pos</dt><dd>${escapeHTML(row.position || "UNK")}</dd></div>
       </dl>
@@ -3338,18 +3291,17 @@ function playoffExplainer() {
             possession at the individual player level, game by game.
           </p>
           <p>
-            <strong>Playoffs:</strong> MoneyPuck publishes playoff statistics on
-            the same site, but only as a season summary (not game by game). I saved
-            the playoff statistics pages for all 18 seasons from 2008-09 through
-            2025-26 and extracted the data directly from each page's HTML. To
-            capture special-teams context, I collected four separate views for
-            each season:
+            <strong>Playoffs:</strong> the current release uses MoneyPuck's listed
+            player game-by-game download together with official NHL game records.
+            The 2025–26 source register reconciles every regular-season and playoff
+            game ID through the June 14, 2026 Stanley Cup Final. The model uses the
+            same canonical style features in both contexts:
           </p>
           <ul>
-            <li><strong>All situations combined</strong></li>
-            <li><strong>5-on-5 (even strength)</strong> — the most important slice, where most of the game is played</li>
-            <li><strong>5-on-4 (power play)</strong> — when a team has the man advantage</li>
-            <li><strong>4-on-5 (penalty kill)</strong> — when a team is shorthanded</li>
+            <li><strong>5-on-5 shot creation and shot quality</strong></li>
+            <li><strong>high-danger access and play continuation</strong></li>
+            <li><strong>canonical NHL disruption rates</strong> — hits, takeaways, giveaways, and blocks</li>
+            <li><strong>on-ice expected goals for and against</strong></li>
           </ul>
         </section>
         <section class="methodology-section">
@@ -3364,28 +3316,20 @@ function playoffExplainer() {
                 <tr><th>Metric</th><th>What it measures</th><th>Why it matters</th></tr>
               </thead>
               <tbody>
-                <tr><td><strong>Expected Goals per 60 min (5v5)</strong></td><td>How many goals a player's shots <em>should</em> produce per hour of ice time, based on shot location and type</td><td>Separates lucky goal-scorers from genuine shot-quality creators</td></tr>
+                <tr><td><strong>Expected goals per shot attempt (5v5)</strong></td><td>The average expected-goal value of a player's attempts</td><td>Captures shot-quality style without treating goals as a style input</td></tr>
                 <tr><td><strong>Shot attempts per 60 min (5v5)</strong></td><td>How frequently a player gets involved in shooting plays</td><td>Captures offensive pressure regardless of whether shots go in</td></tr>
                 <tr><td><strong>High-danger shot share</strong></td><td>What fraction of a player's shots come from the most dangerous areas (in tight, directly in front)</td><td>Identifies net-front finishers vs perimeter shooters</td></tr>
+                <tr><td><strong>Play continuation per 60 (5v5)</strong></td><td>How often a player's offensive-zone sequence continues</td><td>Captures possession continuation and puck support</td></tr>
                 <tr><td><strong>On-ice xGoals For/Against per 60 (5v5)</strong></td><td>How good/bad the team was at creating and allowing expected goals <em>while this player was on the ice</em></td><td>Measures two-way impact and deployment quality</td></tr>
-                <tr><td><strong>Rebounds created per 60 (5v5)</strong></td><td>How often a player's shots lead to rebound opportunities</td><td>Distinguishes power-play net-front threats from perimeter options</td></tr>
-                <tr><td><strong>xGoals from rebounds per 60 (5v5)</strong></td><td>Expected goal value generated specifically from rebound shots</td><td>Captures a specific scoring style</td></tr>
-                <tr><td><strong>Shot blocking per 60 (5v5 + 4v5)</strong></td><td>How often a player blocks opposing shots</td><td>Key defensive archetype signal</td></tr>
-                <tr><td><strong>Hits, takeaways, giveaways per 60 (5v5)</strong></td><td>Physical and puck-battle contributions</td><td>Separates checking-line forwards from skill players</td></tr>
-                <tr><td><strong>Penalties drawn per 60 (5v5)</strong></td><td>How often a player draws penalties</td><td>Identifies cycle forwards who generate PP time</td></tr>
-                <tr><td><strong>Zone start distribution</strong></td><td>What share of a player's shifts start in the offensive, neutral, or defensive zone</td><td>Captures deployment role — sheltered offensive player vs defensive specialist</td></tr>
-                <tr><td><strong>Faceoff win % (5v5)</strong></td><td>How often a center wins faceoffs</td><td>Key center archetype signal</td></tr>
-                <tr><td><strong>Power play xGoals (5v4)</strong></td><td>Expected goals on the power play</td><td>Identifies PP specialists</td></tr>
-                <tr><td><strong>Penalty kill opponent xGoals (4v5)</strong></td><td>Expected goals allowed while shorthanded</td><td>Identifies PK specialists</td></tr>
+                <tr><td><strong>Hits, takeaways, giveaways, and blocks per 60</strong></td><td>Canonical NHL physical and puck-battle contributions</td><td>Separates disruption styles without duplicating MoneyPuck event fields</td></tr>
               </tbody>
             </table>
           </div>
           <p>
-            For situations where MoneyPuck's summary view doesn't publish a metric
-            (specifically: play-continuation rates and after-shift xGoals in
-            non-5v5 situations), I substituted the league-average value from the
-            regular-season model — meaning those signals are neutral rather than
-            actively misleading.
+            Playoff rows are built from the permitted MoneyPuck game-by-game
+            download and official NHL game records. Missing playoff features are
+            treated as unknown and do not copy regular-season values. Rows require
+            at least five playoff games and 150 eligible seconds before publication.
           </p>
         </section>
         <section class="methodology-section">
@@ -3399,12 +3343,12 @@ function playoffExplainer() {
           </p>
           <p>
             <strong>GMM classification:</strong> A Gaussian Mixture Model then takes
-            that fingerprint and outputs a <em>probability distribution</em> across
-            archetypes. For example, a player might be classified as:
+            that fingerprint and outputs a <em>membership distribution</em> across
+            learned styles. For example, a player might be represented as:
           </p>
           <ul>
-            <li>Regular season: 72% Playmaking Scorer, 18% Two-Way Creator, 10% Other</li>
-            <li>Playoffs: 41% Playmaking Scorer, 44% Two-Way Creator, 15% Other</li>
+            <li>Regular season: 72% membership in Playmaking Scorer, 18% in Two-Way Creator, 10% elsewhere</li>
+            <li>Playoffs: 41% membership in Playmaking Scorer, 44% in Two-Way Creator, 15% elsewhere</li>
           </ul>
           <p>
             The regular-season model was not re-trained on playoff data — I used
@@ -3416,10 +3360,10 @@ function playoffExplainer() {
           <h2>Step 4 — The model shift score</h2>
           <p>
             The <strong>model shift score</strong> is the Euclidean distance between
-            those two probability distributions:
+            those two membership distributions:
           </p>
           <blockquote>
-            <em>How much did the probability mass move across archetypes from regular season to playoffs?</em>
+            <em>How much did the player's style-membership profile move from regular season to playoffs?</em>
           </blockquote>
           <ul>
             <li><strong>Score near 0</strong> → The model sees essentially the same player in both contexts. The style fingerprint barely changed.</li>
@@ -3441,8 +3385,9 @@ function playoffExplainer() {
             <li>It doesn't capture shot quality, on-ice possession, or zone-start context</li>
           </ol>
           <p>
-            The model shift score addresses both of these problems. Use the stat
-            shift as a sanity check, but trust the model shift as the primary signal.
+            The model shift score is a descriptive comparison, not proof that a
+            player’s underlying style changed. Treat it as a sample-dependent
+            profile movement signal and check the reliability grade beside it.
           </p>
         </section>
         <section class="methodology-section">
@@ -3450,7 +3395,7 @@ function playoffExplainer() {
           <ul>
             <li>Playoff sample sizes are smaller than regular-season totals, adding noise — especially for players eliminated in round one</li>
             <li>The model was trained on regular-season distributions, which are slightly wider than playoff distributions (extreme performers are more common in the regular season). This means the model is working slightly "out of sample" when applied to playoffs</li>
-            <li>A handful of metrics (play-continuation rates, after-shift xGoals) couldn't be recovered from the summary data and are imputed as league average</li>
+            <li>Playoff evidence is sample-limited; missing features remain unknown rather than being copied from the regular season.</li>
           </ul>
         </section>
       </div>
@@ -3464,8 +3409,8 @@ function playoffPrimarySignal() {
       <strong>Primary signal: Model shift score</strong>
       <p>
         — measures how far a player's playoff style fingerprint moves in archetype
-        space, based on xGoals, shot quality, on-ice possession, and zone starts at
-        even strength, power play, and penalty kill.
+        space, based on 5-on-5 shot creation, shot quality, continuation,
+        disruption, and on-ice expected-goal rates.
         <strong>Higher = bigger identity shift.</strong> The scatter plot shape
         encodes shift band; point size encodes playoff games played.
       </p>
@@ -3528,6 +3473,7 @@ function playoffShiftTable(rows, limit = 30, order = "shift") {
             <th class="numeric">TOI change</th>
             <th class="numeric">Model shift ↑</th>
             <th>Model shift band</th>
+            <th>Sample reliability</th>
             <th class="numeric">Stat shift</th>
             <th>Stat shift band</th>
             <th>REG ATOI</th>
@@ -3553,6 +3499,7 @@ function playoffShiftTable(rows, limit = 30, order = "shift") {
                   <td class="numeric">${signedNumber(row.toiChange, 1)}</td>
                   <td class="numeric">${playoffScorePill(row.distance)}</td>
                   <td>${playoffBandPill(row.shiftBand)}</td>
+                  <td>${escapeHTML(row.sampleReliability || "unknown")}</td>
                   <td class="numeric">${number(row.statShift, 2)}</td>
                   <td>${playoffBandPill(row.statBand)}</td>
                   <td>${minuteClock(row.regToi)}</td>
@@ -4354,6 +4301,9 @@ async function renderPlayoffs() {
   cleanupCanvases();
   const base = playoffBaseRows();
   const seasonRows = playoffSeasonRows(base);
+  const playoffRegMax = Number(
+    appState.core?.meta?.scheduleDimension?.[appState.playoffSeason] || 82,
+  );
   main.innerHTML = `
     <article class="page playoff-page">
       <header class="playoff-page-head">
@@ -4381,11 +4331,11 @@ async function renderPlayoffs() {
             id="playoff-reg-games"
             type="range"
             min="0"
-            max="82"
+            max="${playoffRegMax}"
             step="5"
             value="${appState.playoffMinReg}"
           />
-          <span><small>0</small><small>82</small></span>
+          <span><small>0</small><small>${playoffRegMax}</small></span>
         </div>
         <div class="field">
           <label for="playoff-po-games">
@@ -4567,7 +4517,7 @@ async function init() {
     const oldest = appState.core.meta.seasons.at(-1).label;
     const latest = appState.core.meta.seasons[0].label;
     document.querySelector("#coverage-label").textContent =
-      `${oldest} to ${latest} · public data`;
+      `${latest} complete · PO through ${meta.playoffDataThrough || "—"}`;
     await renderRoute();
   } catch (error) {
     showError(error);

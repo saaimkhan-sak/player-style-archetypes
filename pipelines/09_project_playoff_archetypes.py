@@ -62,14 +62,14 @@ def scaled_playoff_matrix(stats: pd.DataFrame, schema: dict, group: str) -> pd.D
         po_col = regular_feature_to_playoff_feature(reg_col)
         if po_col in stats.columns:
             values = numeric_column(stats, po_col)
-        elif reg_col in stats.columns:
-            values = numeric_column(stats, reg_col)
         else:
-            values = pd.Series(float(scaler["median"].get(reg_col, 0.0)), index=stats.index)
+            # A regular-season value is not a playoff observation. Keep it
+            # unknown so the projection cannot silently copy regular form.
+            values = pd.Series(np.nan, index=stats.index)
         med = float(scaler["median"].get(reg_col, 0.0))
         iqr = float(scaler["iqr"].get(reg_col, 1.0)) or 1.0
         out[reg_col] = (values - med) / iqr
-        out[reg_col] = out[reg_col].replace([np.inf, -np.inf], np.nan).fillna(0.0).clip(-10.0, 10.0)
+        out[reg_col] = out[reg_col].replace([np.inf, -np.inf], np.nan).clip(-10.0, 10.0)
     return out
 
 
@@ -104,7 +104,12 @@ def project_latent(X_scaled: pd.DataFrame, nmf_artifact: dict, schema: dict, gro
     return np.concatenate(parts, axis=1)
 
 
-def build_group_projection(season: str, group: str, min_po_games: int) -> pd.DataFrame:
+def build_group_projection(
+    season: str,
+    group: str,
+    min_po_games: int,
+    min_po_toi_s: int,
+) -> pd.DataFrame:
     stats_path = Path("data/features") / f"player_season_boxscore_{season}.parquet"
     if not stats_path.exists():
         raise FileNotFoundError(f"Missing {stats_path}")
@@ -113,13 +118,24 @@ def build_group_projection(season: str, group: str, min_po_games: int) -> pd.Dat
     stats = pd.read_parquet(stats_path)
     stats["position"] = stats["position"].map(norm_pos)
     stats["po_games"] = playoff_games_column(stats).astype(int)
+    stats["po_toi_s"] = numeric_column(stats, "po_toi_s")
 
     positions = FORWARD_POS if group == "forwards" else DEFENSE_POS
-    stats = stats[(stats["position"].isin(positions)) & (stats["po_games"] >= min_po_games)].copy()
+    stats = stats[
+        (stats["position"].isin(positions))
+        & (stats["po_games"] >= min_po_games)
+        & (stats["po_toi_s"] >= min_po_toi_s)
+    ].copy()
     if stats.empty:
         return pd.DataFrame()
 
     X_scaled = scaled_playoff_matrix(stats, schema, group)
+    missing = X_scaled.isna().any(axis=1)
+    if missing.any():
+        stats = stats.loc[~missing].copy()
+        X_scaled = X_scaled.loc[~missing].copy()
+    if stats.empty:
+        return pd.DataFrame()
 
     model_dir = Path("models") / season
     nmf_artifact = joblib.load(model_dir / f"nmf_{group}.joblib")
@@ -141,7 +157,7 @@ def build_group_projection(season: str, group: str, min_po_games: int) -> pd.Dat
     reg_keep = ["season", "player_id", "cluster", *reg_pcols]
     reg = reg[reg_keep].rename(columns={"cluster": "reg_top_cluster", **{c: f"reg_{c}" for c in reg_pcols}})
 
-    out = stats[["season", "player_id", "position", "reg_games", "po_games"]].copy()
+    out = stats[["season", "player_id", "position", "reg_games", "po_games", "po_toi_s"]].copy()
     out = out.merge(reg, on=["season", "player_id"], how="left")
     for k in range(po_probs.shape[1]):
         out[f"po_p{k}"] = po_probs[:, k]
@@ -150,6 +166,12 @@ def build_group_projection(season: str, group: str, min_po_games: int) -> pd.Dat
     out["po_confidence"] = po_conf
     out["reg_confidence"] = out[[f"reg_p{k}" for k in range(po_probs.shape[1]) if f"reg_p{k}" in out.columns]].max(axis=1)
     out["archetype_changed"] = out["reg_top_cluster"].astype("Int64") != out["po_top_cluster"].astype("Int64")
+    out["sample_reliability"] = np.select(
+        [out["po_games"].ge(10) & out["po_toi_s"].ge(300), out["po_games"].ge(5) & out["po_toi_s"].ge(150)],
+        ["high", "medium"],
+        default="low",
+    )
+    out["insufficient_sample"] = False
 
     prob_deltas = []
     for k in range(po_probs.shape[1]):
@@ -173,7 +195,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     parser.add_argument("--season_label")
     parser.add_argument("--all", action="store_true", help="Project every season with feature/model artifacts.")
-    parser.add_argument("--min_po_games", type=int, default=1)
+    parser.add_argument("--min_po_games", type=int, default=5)
+    parser.add_argument("--min_po_toi_s", type=int, default=150)
     args = parser.parse_args(argv)
 
     if not args.all and not args.season_label:
@@ -197,7 +220,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             if not (model_dir / f"nmf_{group}.joblib").exists() or not (model_dir / f"gmm_{group}.joblib").exists():
                 print(f"Skipping {season} {group}: missing model artifact")
                 continue
-            projected = build_group_projection(season, group, args.min_po_games)
+            projected = build_group_projection(season, group, args.min_po_games, args.min_po_toi_s)
             for outdir in (processed_outdir, app_outdir):
                 outpath = outdir / f"playoff_archetype_projection_{group}_{season}.parquet"
                 projected.to_parquet(outpath, index=False)

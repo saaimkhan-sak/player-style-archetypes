@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import sys
 import time
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -53,18 +55,59 @@ def game_type_from_id(game_id: str) -> int:
 def season_start_year_from_label(season_label: str) -> str:
     return str(season_label)[:4]
 
-def fetch_team_season_schedule(team: str, season_label: str, cache_dir: Path) -> Dict[str, Any]:
+def _cache_is_fresh(
+    path: Path,
+    max_cache_age_hours: float | None,
+    expected_snapshot_as_of: str | None = None,
+) -> bool:
+    if not path.exists() or max_cache_age_hours is None:
+        return False
+    try:
+        cached = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(cached, dict) or "payload" not in cached:
+        return False
+    if expected_snapshot_as_of is not None and cached.get("snapshot_as_of") != expected_snapshot_as_of:
+        return False
+    age_hours = (datetime.now(timezone.utc).timestamp() - path.stat().st_mtime) / 3600
+    return age_hours <= max_cache_age_hours
+
+
+def fetch_team_season_schedule(
+    team: str,
+    season_label: str,
+    cache_dir: Path,
+    *,
+    as_of_date: str | None = None,
+    force_refresh: bool = False,
+    max_cache_age_hours: float | None = 24.0,
+) -> Dict[str, Any]:
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache_path = cache_dir / f"{team}_{season_label}.json"
-    if cache_path.exists():
-        return json.loads(cache_path.read_text(encoding="utf-8"))
+    if not force_refresh and _cache_is_fresh(
+        cache_path,
+        max_cache_age_hours,
+        expected_snapshot_as_of=as_of_date,
+    ):
+        cached = json.loads(cache_path.read_text(encoding="utf-8"))
+        return cached.get("payload", cached) if isinstance(cached, dict) else cached
 
     # /v1/club-schedule-season/{team}/{season} is documented by multiple public references. :contentReference[oaicite:3]{index=3}
     url = f"{API_WEB}/club-schedule-season/{team}/{season_label}"
     r = requests.get(url, timeout=30)
     r.raise_for_status()
     data = r.json()
-    cache_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    retrieved_at = datetime.now(timezone.utc).isoformat()
+    envelope = {
+        "source_url": url,
+        "retrieved_at": retrieved_at,
+        "http_status": r.status_code,
+        "content_sha256": hashlib.sha256(r.content).hexdigest(),
+        "snapshot_as_of": as_of_date,
+        "payload": data,
+    }
+    cache_path.write_text(json.dumps(envelope, ensure_ascii=False), encoding="utf-8")
     time.sleep(0.05)
     return data
 
@@ -82,7 +125,14 @@ def walk_games(obj: Any, out: List[Dict[str, Any]]) -> None:
         for v in obj:
             walk_games(v, out)
 
-def extract_schedule_rows(season_label: str, team_codes: List[str]) -> pd.DataFrame:
+def extract_schedule_rows(
+    season_label: str,
+    team_codes: List[str],
+    *,
+    as_of_date: str | None = None,
+    force_refresh: bool = False,
+    max_cache_age_hours: float | None = 24.0,
+) -> pd.DataFrame:
     start_year = season_start_year_from_label(season_label)
     cache_dir = Path("data/raw/season_schedules") / season_label
 
@@ -91,7 +141,14 @@ def extract_schedule_rows(season_label: str, team_codes: List[str]) -> pd.DataFr
 
     for team in team_codes:
         try:
-            data = fetch_team_season_schedule(team, season_label, cache_dir)
+            data = fetch_team_season_schedule(
+                team,
+                season_label,
+                cache_dir,
+                as_of_date=as_of_date,
+                force_refresh=force_refresh,
+                max_cache_age_hours=max_cache_age_hours,
+            )
         except Exception:
             continue
 
@@ -118,12 +175,21 @@ def extract_schedule_rows(season_label: str, team_codes: List[str]) -> pd.DataFr
                 if isinstance(st, str) and len(st) >= 10:
                     gd = st[:10]
 
-            rows.append({
+            row = {
                 "season": season_label,
                 "game_id": int(gid),
                 "game_type": game_type_from_id(gid),
                 "game_date": gd,
-            })
+                "game_state": g.get("gameState") or g.get("gameScheduleState") or "",
+                "home_team": ((g.get("homeTeam") or {}).get("abbrev") or ""),
+                "away_team": ((g.get("awayTeam") or {}).get("abbrev") or ""),
+                "home_score": (g.get("homeTeam") or {}).get("score"),
+                "away_score": (g.get("awayTeam") or {}).get("score"),
+                "start_time_utc": g.get("startTimeUTC") or g.get("startTimeUtc") or "",
+            }
+            if as_of_date and gd and str(gd) > as_of_date:
+                continue
+            rows.append(row)
 
     df = pd.DataFrame(rows)
     if df.empty:
@@ -176,25 +242,38 @@ def run_download_missing(miss_path: Path, season_label: str) -> None:
     # Use your existing downloader; it should skip already-present games unless --force is used.
     import subprocess
     subprocess.run([
-        "python", "pipelines/02_pull_game_data.py",
+        sys.executable, "pipelines/02_pull_game_data.py",
         "--schedule_parquet", str(miss_path),
         "--season_label", season_label
     ], check=True)
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    ap = argparse.ArgumentParser(description="Build authoritative season schedule (no dates) and download only missing game JSON.")
+    ap = argparse.ArgumentParser(description="Build an authoritative, versioned season schedule and download missing game JSON.")
     ap.add_argument("--season_label", required=True, help="Season in YYYYYYYY format (e.g., 20192020).")
     ap.add_argument("--download_missing", action="store_true", help="If set, downloads only missing games using pipelines/02_pull_game_data.py")
+    ap.add_argument("--as_of_date", help="Exclude games after this ISO date from the requested snapshot.")
+    ap.add_argument("--force_refresh", action="store_true", help="Ignore schedule cache and retrieve every team schedule.")
+    ap.add_argument("--max_cache_age_hours", type=float, default=24.0, help="Maximum age for a reusable schedule cache entry.")
     args = ap.parse_args(argv)
 
     teams = get_team_codes()
-    df = extract_schedule_rows(args.season_label, teams)
+    df = extract_schedule_rows(
+        args.season_label,
+        teams,
+        as_of_date=args.as_of_date,
+        force_refresh=args.force_refresh,
+        max_cache_age_hours=args.max_cache_age_hours,
+    )
 
     full_path, miss_path, missing = write_parquets(df, args.season_label)
 
     print(f"\nSeason {args.season_label}:")
     print(f"- schedule written: {full_path}")
     print(f"- missing schedule: {miss_path}")
+    counts = df.groupby("game_type").size().to_dict() if not df.empty else {}
+    print(f"- preseason games: {counts.get(1, 0):,}")
+    print(f"- regular-season games: {counts.get(2, 0):,}")
+    print(f"- playoff games: {counts.get(3, 0):,}")
     print(f"- expected games: {len(df):,}")
     print(f"- missing games:  {len(missing):,}")
 

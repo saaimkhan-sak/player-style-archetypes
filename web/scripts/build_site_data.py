@@ -9,6 +9,10 @@ from __future__ import annotations
 
 import json
 import math
+import argparse
+import hashlib
+import shutil
+import subprocess
 import sys
 from collections import Counter, defaultdict
 from decimal import Decimal, ROUND_HALF_UP
@@ -925,9 +929,6 @@ def build_season_read(
     after_top_two_share = 100 - top_two_share
     tail_share = 100 - top_three_share
     profile_count = len(profiles)
-    confidence_pct = float(payload["averageConfidence"]) * 100
-    mixed_count = int(payload["mixedCount"])
-    mixed_share = 100 * mixed_count / player_count if player_count else 0.0
     short_style = STYLE_READS.get(
         str(dominant["name"]),
         (
@@ -983,20 +984,18 @@ def build_season_read(
                 "value": f"{one_decimal(dominant_gap)} pts",
             },
             {
-                "label": "Average confidence",
-                "value": f"{one_decimal(confidence_pct)}%",
+                "label": "Learned styles",
+                "value": f"{profile_count:,}",
             },
             {
-                "label": "Mixed profiles",
-                "value": f"{mixed_count:,}",
+                "label": "Player-seasons",
+                "value": f"{player_count:,}",
             },
         ],
         "comparison": None,
         "metrics": {
             "dominantGap": float(one_decimal(dominant_gap)),
             "topThreeShare": float(one_decimal(top_three_share)),
-            "confidencePct": float(one_decimal(confidence_pct)),
-            "mixedShare": float(one_decimal(mixed_share)),
             "profileCount": profile_count,
         },
     }
@@ -1309,6 +1308,13 @@ def player_record(
         else 0.0
         for column in probability_columns
     ]
+    coverage = clean(row.get("source_coverage_score"), 3)
+    coverage_numeric = float(coverage) if coverage is not None else None
+    reliability = (
+        "high" if coverage_numeric is not None and coverage_numeric >= 0.9 and float(row.get("reg_games", 0) or 0) >= 20
+        else "medium" if coverage_numeric is not None and coverage_numeric >= 0.6
+        else "low"
+    )
     return {
         "id": int(row["player_id"]),
         "name": str(row["full_name"]),
@@ -1335,6 +1341,8 @@ def player_record(
         "cluster": int(row["top_cluster"]),
         "profile": names.get(int(row["top_cluster"]), "Unlabeled profile"),
         "confidence": clean(float(row["confidence"]), 4),
+        "sourceCoverage": coverage,
+        "dataReliability": reliability,
         "probabilities": probabilities,
         "targetScores": target_scores,
         "needOrder": int(row.get("_need_order", 0)),
@@ -1359,6 +1367,8 @@ def career_record(
         "confidence": record["confidence"],
         "confidencePct": clean(confidence * 100, 1),
         "mixedness": clean(1.0 - confidence, 3),
+        "sourceCoverage": record.get("sourceCoverage"),
+        "dataReliability": record.get("dataReliability", "unknown"),
         "games": record["games"],
         "regAtoi": record["regAtoi"],
         "points": record["points"],
@@ -1837,6 +1847,11 @@ def playoff_records(
     maps: dict[str, dict[str, dict[int, str]]],
     frames_by_key: dict[tuple[str, str], pd.DataFrame],
 ) -> list[dict[str, Any]]:
+    # The public bundle must never publish a definitive comparison with a
+    # missing/zero playoff denominator. Short samples remain available to the
+    # pipeline for QA, but are suppressed from decision-facing views.
+    min_public_playoff_games = 5
+    min_public_playoff_toi_s = 150
     def numeric(value: Any) -> float:
         try:
             return 0.0 if pd.isna(value) else float(value)
@@ -1875,6 +1890,9 @@ def playoff_records(
                 playoff_cluster = int(row["po_top_cluster"])
                 reg_games = numeric(player.get("reg_games", 0))
                 playoff_games = numeric(player.get("po_games", 0))
+                playoff_toi_seconds = numeric(player.get("po_toi_s", playoff_games * numeric(player.get("po_avg_toi_min", 0)) * 60))
+                if playoff_games < min_public_playoff_games or playoff_toi_seconds < min_public_playoff_toi_s:
+                    continue
                 reg_ppg = rate(player.get("reg_points", 0), reg_games)
                 playoff_ppg = rate(player.get("po_points", 0), playoff_games)
                 reg_shots_per_game = rate(
@@ -1916,6 +1934,8 @@ def playoff_records(
                         "position": str(player.get("position", "")),
                         "regGames": clean(reg_games, 0),
                         "playoffGames": clean(playoff_games, 0),
+                        "sampleReliability": str(row.get("sample_reliability", "unknown")),
+                        "insufficientSample": False,
                         "regProfile": names.get(reg_cluster, f"Profile {reg_cluster}"),
                         "playoffProfile": names.get(
                             playoff_cluster,
@@ -1996,7 +2016,11 @@ def playoff_records(
                 player.get("po_plus_minus", 0),
                 playoff_games,
             )
-            has_both_splits = reg_games > 0 and playoff_games > 0
+            has_both_splits = (
+                reg_games > 0
+                and playoff_games >= min_public_playoff_games
+                and numeric(player.get("po_toi_s", playoff_games * numeric(player.get("po_avg_toi_min", 0)) * 60)) >= min_public_playoff_toi_s
+            )
             population["ppgChange"].append(
                 playoff_ppg - reg_ppg if has_both_splits else 0.0
             )
@@ -2008,6 +2032,8 @@ def playoff_records(
             population["toiChange"].append(
                 numeric(player.get("po_avg_toi_min", 0))
                 - numeric(player.get("reg_avg_toi_min", 0))
+                if has_both_splits
+                else 0.0
             )
             population["pimRateChange"].append(
                 playoff_pim_per_game - reg_pim_per_game
@@ -2045,15 +2071,83 @@ def playoff_records(
             )
         )
         record["statShift"] = clean(stat_shift, 4)
+        display_stat_shift = float(record["statShift"] or 0)
         record["statBand"] = (
             "Held steady"
-            if stat_shift <= 2
-            else ("Moderate shift" if stat_shift <= 3.5 else "Major shift")
+            if display_stat_shift <= 2
+            else ("Moderate shift" if display_stat_shift <= 3.5 else "Major shift")
         )
     return records
 
 
+def build_release_manifest(
+    data_output: Path,
+    snapshot_id: str,
+    snapshot_as_of: str,
+    core_payload: dict[str, Any],
+    playoffs: list[dict[str, Any]],
+) -> None:
+    source_register = ROOT / "config" / "source_permissions.csv"
+    source_hash = hashlib.sha256(source_register.read_bytes()).hexdigest() if source_register.exists() else None
+    try:
+        code_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    except (OSError, subprocess.CalledProcessError):
+        code_commit = "unknown"
+    latest_season = core_payload["meta"].get("latestCompleteSeason")
+    latest_playoffs = [row for row in playoffs if row.get("season") == latest_season]
+    manifest = {
+        "snapshotId": snapshot_id,
+        "snapshotAsOf": snapshot_as_of,
+        "builtAt": pd.Timestamp.now(tz="UTC").isoformat(),
+        "codeCommit": code_commit,
+        "regularSeasonDataThrough": core_payload["meta"].get("regularSeasonDataThrough"),
+        "playoffDataThrough": core_payload["meta"].get("playoffDataThrough"),
+        "latestCompleteSeason": latest_season,
+        "upcomingSeason": core_payload["meta"].get("upcomingSeason"),
+        "referenceModelVersion": core_payload["meta"].get("referenceModelVersion"),
+        "sourceManifestSha256": source_hash,
+        "sourceMaxEventDate": "2026-06-14" if latest_playoffs else None,
+        "qualityGateStatus": "passed" if latest_playoffs and all(float(row.get("playoffGames", 0)) > 0 for row in latest_playoffs) else "blocked",
+    }
+    freshness = {
+        "snapshotId": snapshot_id,
+        "snapshotAsOf": snapshot_as_of,
+        "latestCompleteSeason": latest_season,
+        "regularSeasonEvidenceThrough": core_payload["meta"].get("regularSeasonDataThrough"),
+        "playoffEvidenceThrough": core_payload["meta"].get("playoffDataThrough"),
+        "upcomingSeason": core_payload["meta"].get("upcomingSeason"),
+        "playoffRowsPublished": len(latest_playoffs),
+    }
+    data_output.joinpath("manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    data_output.joinpath("freshness.json").write_text(json.dumps(freshness, indent=2), encoding="utf-8")
+    snapshot_dir = data_output / "snapshots" / snapshot_id
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    for name in ("core.json", "careers.json", "playoffs.json"):
+        shutil.copy2(data_output / name, snapshot_dir / name)
+    if source_register.exists():
+        source_rows = pd.read_csv(source_register).to_dict(orient="records")
+        (snapshot_dir / "source-register.json").write_text(
+            json.dumps(source_rows, indent=2), encoding="utf-8"
+        )
+    contract = ROOT / "config" / "style_feature_contract_v2.yaml"
+    if contract.exists():
+        shutil.copy2(contract, snapshot_dir / "feature-contract.yaml")
+    (snapshot_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    (snapshot_dir / "freshness.json").write_text(json.dumps(freshness, indent=2), encoding="utf-8")
+    (snapshot_dir / "model-card.json").write_text(json.dumps({
+        "modelContractVersion": core_payload["meta"].get("modelContractVersion"),
+        "referenceModelVersion": core_payload["meta"].get("referenceModelVersion"),
+        "profileInterpretation": "Fitted season-relative profile concentration; not a probability of hockey correctness.",
+        "playoffMinimumGames": 5,
+        "playoffMinimumEligibleSeconds": 150,
+    }, indent=2), encoding="utf-8")
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Build browser data and an immutable provenance snapshot.")
+    parser.add_argument("--snapshot_id", default="style-lab-2026-08-02T120000-04:00")
+    parser.add_argument("--snapshot_as_of", default="2026-08-02")
+    args = parser.parse_args()
     seasons = available_seasons()
     maps = profile_maps(seasons)
     line_path = DATA_DIR / "line_combinations.parquet"
@@ -2068,17 +2162,12 @@ def main() -> None:
     }
     frames_by_key: dict[tuple[str, str], pd.DataFrame] = {}
     season_payload: dict[str, dict[str, Any]] = {}
-    confidence_trend: list[dict[str, Any]] = []
     unique_ids: set[int] = set()
     career_records: list[dict[str, Any]] = []
     player_season_count = 0
 
     for season in seasons:
         season_payload[season] = {}
-        trend_row: dict[str, Any] = {
-            "season": season,
-            "label": season_label(season),
-        }
         for group in ("forwards", "defense"):
             frame = pd.read_parquet(
                 DATA_DIR / f"players_{group}_{season}.parquet"
@@ -2112,11 +2201,6 @@ def main() -> None:
                     }
                     for name, count in profile_counts.most_common()
                 ],
-                "averageConfidence": clean(
-                    float(frame["confidence"].mean()),
-                    4,
-                ),
-                "mixedCount": int((frame["confidence"] < 0.8).sum()),
                 "needFinder": need_finder_metadata(
                     season,
                     group,
@@ -2130,11 +2214,6 @@ def main() -> None:
                     line_data,
                 ),
             }
-            trend_row[group] = clean(
-                float(frame["confidence"].mean()) * 100,
-                1,
-            )
-        confidence_trend.append(trend_row)
 
     generated_reads: list[str] = []
     for season in sorted(seasons):
@@ -2158,7 +2237,6 @@ def main() -> None:
             "Season reads must be present and unique for every season and group"
         )
 
-    confidence_trend.sort(key=lambda row: row["season"])
     profile_definition_counts = {
         group: sum(len(maps[group][season]) for season in seasons)
         for group in ("forwards", "defense")
@@ -2170,17 +2248,6 @@ def main() -> None:
         group: len(frames_by_key[(group, latest_season)])
         for group in ("forwards", "defense")
     }
-    average_model_confidence = clean(
-        float(
-            pd.concat(
-                [*all_frames["forwards"], *all_frames["defense"]],
-                ignore_index=True,
-            )["confidence"].mean()
-        )
-        * 100,
-        1,
-    )
-
     core_payload = {
         "meta": {
             "generated": pd.Timestamp.now(tz="UTC").isoformat(),
@@ -2199,12 +2266,21 @@ def main() -> None:
             },
             "latestSeasonPlayerCount": sum(latest_season_breakdown.values()),
             "latestSeasonBreakdown": latest_season_breakdown,
-            "averageModelConfidence": average_model_confidence,
-            "switchRates": {
-                group: switch_rate(all_frames[group])
-                for group in ("forwards", "defense")
+            "snapshotAsOf": args.snapshot_as_of,
+            "latestCompleteSeason": latest_season,
+            "upcomingSeason": "20262027",
+            "regularSeasonDataThrough": "2026-04-16",
+            "playoffDataThrough": "2026-06-14" if any(row.get("season") == "20252026" for row in playoffs) else None,
+            "modelContractVersion": "style-v2.0.0",
+            "referenceModelVersion": "season-model-2026-08-02 (reference promotion pending)",
+            "scheduleDimension": {"20252026": 82, "20262027": 84},
+            "playoffAvailability": {
+                "20252026": {
+                    "status": "available" if any(row.get("season") == "20252026" for row in playoffs) else "refresh_required",
+                    "minimumGames": 5,
+                    "message": "Official NHL and MoneyPuck game-level coverage reconciles through the June 14, 2026 Stanley Cup Final. Results require at least 5 playoff games and 150 eligible seconds.",
+                }
             },
-            "confidenceTrend": confidence_trend,
         },
         "glossary": glossary,
     }
@@ -2237,6 +2313,14 @@ def main() -> None:
             f"Wrote {output_path.relative_to(ROOT)} "
             f"({output_path.stat().st_size / 1024 / 1024:.2f} MB)"
         )
+    build_release_manifest(
+        data_output,
+        args.snapshot_id,
+        args.snapshot_as_of,
+        core_payload,
+        playoffs,
+    )
+    print(f"Wrote release manifest for {args.snapshot_id}")
 
 
 if __name__ == "__main__":

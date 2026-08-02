@@ -22,9 +22,10 @@ DEFENSE_POS = {"D","LD","RD"}
 
 def robust_scale(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     params = {"median": {}, "iqr": {}}
-    out = df.replace([np.inf, -np.inf], np.nan).fillna(0.0).copy()
+    out = df.replace([np.inf, -np.inf], np.nan).copy()
     for c in out.columns:
         med = float(np.nanmedian(out[c].values))
+        out[c] = out[c].fillna(med)
         q1 = float(np.nanpercentile(out[c].values, 25))
         q3 = float(np.nanpercentile(out[c].values, 75))
         iqr = q3 - q1
@@ -55,69 +56,42 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     min_reg_toi_s = 60 * 60
     df = df[(df["reg_games"] >= min_reg_games) & (df["reg_toi_s"] >= min_reg_toi_s)].copy()
 
-    # Feature blocks from REG per60 + usage shares, enriched with MoneyPuck
-    # advanced features when the 03b aggregation has been merged in.
+    # v2 style blocks. Role/deployment (PP/PK, faceoffs), outcomes (goals,
+    # points), and duplicate NHL/MoneyPuck event copies are intentionally kept
+    # out of archetype learning and remain display/context fields.
     blocks = {
-        "shooting_scoring": [
-            "reg_shots_per60","reg_goals_per60","reg_assists_per60","reg_points_per60",
-            "mp_reg_5on5_I_F_xGoals_per60",
-            "mp_reg_5on5_I_F_xGoalsPerAttempt",
+        "shot_creation": [
             "mp_reg_5on5_I_F_shotAttempts_per60",
+            "reg_shots_per60",
+            "mp_reg_5on5_I_F_xGoalsPerAttempt",
         ],
-        "chance_quality_netfront": [
+        "interior_access": [
             "mp_reg_5on5_I_F_highDangerShots_per60",
-            "mp_reg_5on5_I_F_highDangerxGoals_per60",
             "mp_reg_5on5_I_F_highDangerShotShare",
             "mp_reg_5on5_I_F_rebounds_per60",
             "mp_reg_5on5_I_F_reboundxGoals_per60",
-            "mp_reg_5on5_I_F_reboundxGoalsShare",
-            "mp_reg_5on5_I_F_xGoals_with_earned_rebounds_per60",
         ],
-        "play_driving": [
-            "mp_reg_5on5_OnIce_xGoalsPercentage_calc",
-            "mp_reg_5on5_OnIce_F_xGoals_per60",
-            "mp_reg_5on5_OnIce_F_shotAttempts_per60",
+        "possession_continuation": [
             "mp_reg_5on5_I_F_playContinuedInZone_per60",
             "mp_reg_5on5_I_F_playContinuedOutsideZone_per60",
-            "mp_reg_5on5_xGoalsForAfterShifts_per60",
         ],
-        "defensive_impact": [
-            "reg_blocked_shots_per60",
+        "contextual_creation": [
+            "mp_reg_5on5_OnIce_F_xGoals_per60",
+            "mp_reg_5on5_OnIce_F_shotAttempts_per60",
             "mp_reg_5on5_OnIce_A_xGoals_per60",
-            "mp_reg_5on5_OnIce_A_shotAttempts_per60",
-            "mp_reg_5on5_OnIce_A_highDangerxGoals",
-            "mp_reg_5on5_shotsBlockedByPlayer_per60",
-            "mp_reg_5on5_xGoalsAgainstAfterShifts_per60",
-            "mp_reg_4on5_OnIce_A_xGoals_per60",
-            "mp_reg_4on5_shotsBlockedByPlayer_per60",
         ],
-        "physical_disruption": [
+        "disruption": [
+            "reg_blocked_shots_per60",
             "reg_hits_per60","reg_takeaways_per60","reg_giveaways_per60",
-            "mp_reg_5on5_I_F_hits_per60",
-            "mp_reg_5on5_I_F_takeaways_per60",
-            "mp_reg_5on5_I_F_giveaways_per60",
             "mp_reg_5on5_penaltiesDrawn_per60",
-        ],
-        "discipline": ["reg_pim_per60"],
-        "special_teams_usage": [
-            "reg_pp_share","reg_pk_share",
-            "mp_reg_5on4_I_F_xGoals_per60",
-            "mp_reg_5on4_OnIce_F_xGoals_per60",
-            "mp_reg_4on5_OnIce_A_xGoals_per60",
-        ],
-        "faceoffs": [
-            "reg_fo_pct","reg_fo_taken_per_game",
-            "mp_reg_5on5_faceoffPct",
-            "mp_reg_5on5_faceoffsWon",
-            "mp_reg_4on5_faceoffsWon",
         ],
     }
 
     for b, cols in blocks.items():
         for c in cols:
             if c not in df.columns:
-                df[c] = 0.0
-            df[c] = pd.to_numeric(df[c], errors="coerce").replace([np.inf, -np.inf], np.nan).fillna(0.0)
+                raise RuntimeError(f"Required style feature is absent from source snapshot: {c}")
+            df[c] = pd.to_numeric(df[c], errors="coerce").replace([np.inf, -np.inf], np.nan)
 
     # Split groups
     fwd = df[df["position"].isin(FORWARD_POS)].copy()
@@ -129,7 +103,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     def make_matrix(sub: pd.DataFrame, name: str):
         all_cols = list(dict.fromkeys(sum([blocks[b] for b in blocks], [])))
-        X = sub[all_cols].copy().fillna(0.0)
+        X = sub[all_cols].copy()
 
         Xs, scaler = robust_scale(X)
 

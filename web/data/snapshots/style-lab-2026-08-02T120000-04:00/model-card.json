@@ -1,0 +1,7 @@
+{
+  "modelContractVersion": "style-v2.0.0",
+  "referenceModelVersion": "season-model-2026-08-02 (reference promotion pending)",
+  "profileInterpretation": "Fitted season-relative profile concentration; not a probability of hockey correctness.",
+  "playoffMinimumGames": 5,
+  "playoffMinimumEligibleSeconds": 150
+}

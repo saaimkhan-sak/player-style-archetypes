@@ -40,6 +40,10 @@ jobs:
       - name: Check out repository
         if: env.SHOULD_RUN == 'true'
         uses: actions/checkout@v4
+        with:
+          # Keep the scheduler and the Vercel/static product on the same
+          # authoritative production branch until the branches are merged.
+          ref: codex/vercel-rebuild
 
       - name: Set up Python
         if: env.SHOULD_RUN == 'true'
@@ -68,12 +72,21 @@ jobs:
           python scripts/health_check.py
           python -m pytest
 
+      - name: Build static serving bundle
+        if: env.SHOULD_RUN == 'true'
+        run: |
+          SNAPSHOT_ID="style-lab-$(TZ=America/New_York date +%Y-%m-%dT%H%M%S%z)"
+          python web/scripts/build_site_data.py --snapshot_id "$SNAPSHOT_ID" --snapshot_as_of "$(TZ=America/New_York date +%F)"
+          cd web
+          npm ci
+          npm run build
+
       - name: Commit refreshed artifacts
         if: env.SHOULD_RUN == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A data/app reports models
+          git add -A data/app reports models web/data
 
           if git diff --cached --quiet; then
             echo "No app data changes to commit."

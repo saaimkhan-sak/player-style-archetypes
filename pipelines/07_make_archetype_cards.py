@@ -10,27 +10,19 @@ import pandas as pd
 
 # Interpret archetypes using REGULAR SEASON features (more stable, higher sample size)
 FEATURES = [
-    "reg_shots_per60", "reg_goals_per60", "reg_assists_per60", "reg_points_per60",
-    "reg_hits_per60", "reg_blocked_shots_per60", "reg_takeaways_per60", "reg_giveaways_per60",
-    "reg_pim_per60",
-    "reg_pp_share", "reg_pk_share",
-    "reg_fo_pct", "reg_fo_taken_per_game",
-    "mp_reg_5on5_I_F_xGoals_per60",
+    "reg_shots_per60", "reg_hits_per60", "reg_blocked_shots_per60",
+    "reg_takeaways_per60", "reg_giveaways_per60",
     "mp_reg_5on5_I_F_xGoalsPerAttempt",
+    "mp_reg_5on5_I_F_shotAttempts_per60",
     "mp_reg_5on5_I_F_highDangerShots_per60",
     "mp_reg_5on5_I_F_highDangerShotShare",
     "mp_reg_5on5_I_F_rebounds_per60",
     "mp_reg_5on5_I_F_reboundxGoals_per60",
     "mp_reg_5on5_I_F_playContinuedInZone_per60",
     "mp_reg_5on5_I_F_playContinuedOutsideZone_per60",
-    "mp_reg_5on5_OnIce_xGoalsPercentage_calc",
     "mp_reg_5on5_OnIce_F_xGoals_per60",
     "mp_reg_5on5_OnIce_A_xGoals_per60",
-    "mp_reg_5on5_OnIce_A_shotAttempts_per60",
-    "mp_reg_5on5_shotsBlockedByPlayer_per60",
     "mp_reg_5on5_penaltiesDrawn_per60",
-    "mp_reg_5on4_I_F_xGoals_per60",
-    "mp_reg_4on5_OnIce_A_xGoals_per60",
 ]
 
 
@@ -65,11 +57,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     teams = pd.read_parquet(f"data/processed/player_season_teams_{season}.parquet")
     base = pd.read_parquet(f"data/features/player_season_boxscore_{season}.parquet")
 
-    # Ensure features exist
+    # Required style features must exist in the source snapshot. Never create
+    # a silent all-zero modeling dimension when a source schema changes.
     for c in FEATURES:
         if c not in base.columns:
-            base[c] = 0.0
-        base[c] = pd.to_numeric(base[c], errors="coerce").fillna(0.0)
+            raise RuntimeError(f"Required style feature is absent: {c}")
+        base[c] = pd.to_numeric(base[c], errors="coerce")
+        base[c] = base[c].fillna(base[c].median())
 
     outdir = Path("reports")
     outdir.mkdir(parents=True, exist_ok=True)

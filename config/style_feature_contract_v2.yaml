@@ -1,0 +1,187 @@
+version: style-v2.0.0
+reference_training_window: 20182019-20252026
+position_groups:
+  forwards: [C, LW, RW, W, F]
+  defense: [D, LD, RD]
+missing_state_contract: [observed, not_applicable, unknown]
+features:
+  - feature_id: individual_shot_attempt_rate
+    public_label: Individual shot attempts per 60
+    layer: style
+    concept: shot_volume
+    source: MoneyPuck
+    source_column: mp_reg_5on5_I_F_shotAttempts_per60
+    situation: 5on5
+    numerator: individual shot attempts
+    denominator: eligible 5v5 ice time
+    unit: attempts_per_60
+    eligible_population: skaters with >= 60 eligible minutes
+    minimum_minutes: 60
+    missing_policy: unknown_with_indicator
+    shrinkage_method: empirical_bayes_rate
+    direction: higher_is_more
+    allowed_range: [0, 60]
+    included_in_model: true
+    rationale: Repeatable individual involvement in shot creation.
+  - feature_id: expected_goals_per_attempt
+    public_label: Expected goals per attempt
+    layer: style
+    concept: shot_quality
+    source: MoneyPuck
+    source_column: mp_reg_5on5_I_F_xGoalsPerAttempt
+    situation: 5on5
+    numerator: individual expected goals
+    denominator: individual shot attempts
+    unit: xgoals_per_attempt
+    eligible_population: skaters with >= 60 eligible minutes
+    minimum_minutes: 60
+    missing_policy: unknown_with_indicator
+    shrinkage_method: beta_binomial
+    direction: higher_is_more
+    allowed_range: [0, 1]
+    included_in_model: true
+    rationale: Separates chance quality from raw volume.
+  - feature_id: high_danger_attempt_share
+    public_label: High-danger attempt share
+    layer: style
+    concept: interior_access
+    source: MoneyPuck
+    source_column: mp_reg_5on5_I_F_highDangerShotShare
+    situation: 5on5
+    numerator: high-danger individual attempts
+    denominator: individual shot attempts
+    unit: proportion
+    eligible_population: skaters with >= 60 eligible minutes
+    minimum_minutes: 60
+    missing_policy: unknown_with_indicator
+    shrinkage_method: beta_binomial
+    direction: higher_is_more
+    allowed_range: [0, 1]
+    included_in_model: true
+    rationale: Interior versus perimeter shot geography.
+  - feature_id: continuation_rate
+    public_label: Offensive-zone continuation per 60
+    layer: style
+    concept: possession_continuation
+    source: MoneyPuck
+    source_column: mp_reg_5on5_I_F_playContinuedInZone_per60
+    situation: 5on5
+    numerator: offensive-zone continuations
+    denominator: eligible 5v5 ice time
+    unit: events_per_60
+    eligible_population: skaters with >= 60 eligible minutes
+    minimum_minutes: 60
+    missing_policy: unknown_with_indicator
+    shrinkage_method: empirical_bayes_rate
+    direction: higher_is_more
+    allowed_range: [0, 120]
+    included_in_model: true
+    rationale: Repeatable ability to extend offensive possessions.
+  - feature_id: individual_hits_rate
+    public_label: Hits per 60
+    layer: style
+    concept: physical_disruption
+    source: NHL
+    source_column: reg_hits_per60
+    situation: all_situations
+    numerator: hits
+    denominator: total ice time
+    unit: events_per_60
+    eligible_population: skaters with >= 60 total minutes
+    minimum_minutes: 60
+    missing_policy: observed_zero_valid
+    shrinkage_method: empirical_bayes_rate
+    direction: higher_is_more
+    allowed_range: [0, 80]
+    included_in_model: true
+    rationale: Canonical physical event measure; no duplicate MoneyPuck copy.
+  - feature_id: individual_takeaway_rate
+    public_label: Takeaways per 60
+    layer: style
+    concept: puck_recovery
+    source: NHL
+    source_column: reg_takeaways_per60
+    situation: all_situations
+    numerator: takeaways
+    denominator: total ice time
+    unit: events_per_60
+    eligible_population: skaters with >= 60 total minutes
+    minimum_minutes: 60
+    missing_policy: observed_zero_valid
+    shrinkage_method: empirical_bayes_rate
+    direction: higher_is_more
+    allowed_range: [0, 60]
+    included_in_model: true
+    rationale: Canonical puck-recovery measure; no duplicate MoneyPuck copy.
+  - feature_id: individual_giveaway_rate
+    public_label: Giveaways per 60
+    layer: style
+    concept: puck_loss
+    source: NHL
+    source_column: reg_giveaways_per60
+    situation: all_situations
+    numerator: giveaways
+    denominator: total ice time
+    unit: events_per_60
+    eligible_population: skaters with >= 60 total minutes
+    minimum_minutes: 60
+    missing_policy: observed_zero_valid
+    shrinkage_method: empirical_bayes_rate
+    direction: higher_is_more
+    allowed_range: [0, 60]
+    included_in_model: true
+    rationale: Canonical puck-loss measure; no duplicate MoneyPuck copy.
+  - feature_id: shot_block_rate
+    public_label: Blocks per 60
+    layer: style
+    concept: defensive_detail
+    source: NHL
+    source_column: reg_blocked_shots_per60
+    situation: all_situations
+    numerator: blocked shots
+    denominator: total ice time
+    unit: events_per_60
+    eligible_population: defense with >= 60 total minutes
+    minimum_minutes: 60
+    missing_policy: observed_zero_valid
+    shrinkage_method: empirical_bayes_rate
+    direction: higher_is_more
+    allowed_range: [0, 80]
+    included_in_model: true
+    rationale: Defensive detail signal for defense only.
+  - feature_id: on_ice_xgoals_for_rate
+    public_label: On-ice expected goals for per 60
+    layer: style
+    concept: team_context_creation
+    source: MoneyPuck
+    source_column: mp_reg_5on5_OnIce_F_xGoals_per60
+    situation: 5on5
+    numerator: on-ice expected goals for
+    denominator: eligible 5v5 ice time
+    unit: xgoals_per_60
+    eligible_population: skaters with >= 60 eligible minutes
+    minimum_minutes: 60
+    missing_policy: unknown_with_indicator
+    shrinkage_method: empirical_bayes_rate
+    direction: higher_is_more
+    allowed_range: [0, 20]
+    included_in_model: true
+    rationale: Contextual creation signal, explicitly labeled as team-influenced.
+  - feature_id: on_ice_xgoals_against_rate
+    public_label: On-ice expected goals against per 60
+    layer: style
+    concept: team_context_suppression
+    source: MoneyPuck
+    source_column: mp_reg_5on5_OnIce_A_xGoals_per60
+    situation: 5on5
+    numerator: on-ice expected goals against
+    denominator: eligible 5v5 ice time
+    unit: xgoals_per_60
+    eligible_population: skaters with >= 60 eligible minutes
+    minimum_minutes: 60
+    missing_policy: unknown_with_indicator
+    shrinkage_method: empirical_bayes_rate
+    direction: lower_is_more
+    allowed_range: [0, 20]
+    included_in_model: true
+    rationale: Contextual suppression signal; cumulative totals are excluded.

@@ -1,0 +1,38 @@
+[
+  {
+    "source_owner": "MoneyPuck",
+    "url": "https://www.moneypuck.com/data.htm",
+    "allowed_use": "Noncommercial use of listed downloads only",
+    "automated_retrieval_permission": "listed downloads only",
+    "derivative_analysis_permission": "yes with credit",
+    "redistribution_permission": "no",
+    "attribution": "MoneyPuck data used under listed noncommercial guidance",
+    "review_date": "2026-08-02",
+    "cadence": "daily during season",
+    "public_build_status": "approved-listed-downloads-only"
+  },
+  {
+    "source_owner": "NHL",
+    "url": "https://api-web.nhle.com/v1",
+    "allowed_use": "Public game and schedule data; cache politely",
+    "automated_retrieval_permission": "yes",
+    "derivative_analysis_permission": "yes",
+    "redistribution_permission": "verify terms before wider redistribution",
+    "attribution": "NHL public API/pages",
+    "review_date": "2026-08-02",
+    "cadence": "daily during season",
+    "public_build_status": "approved-with-cache-and-hash"
+  },
+  {
+    "source_owner": "NHL Assets",
+    "url": "https://assets.nhle.com/",
+    "allowed_use": "Headshots and logos subject to branding/asset-use review",
+    "automated_retrieval_permission": "verify before automation",
+    "derivative_analysis_permission": "limited",
+    "redistribution_permission": "do not imply endorsement",
+    "attribution": "NHL assets",
+    "review_date": "2026-08-02",
+    "cadence": "as needed",
+    "public_build_status": "review-required"
+  }
+]

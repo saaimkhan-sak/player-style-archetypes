@@ -1,0 +1,4 @@
+source_owner,url,allowed_use,automated_retrieval_permission,derivative_analysis_permission,redistribution_permission,attribution,review_date,cadence,public_build_status
+MoneyPuck,https://www.moneypuck.com/data.htm,Noncommercial use of listed downloads only,listed downloads only,yes with credit,no,MoneyPuck data used under listed noncommercial guidance,2026-08-02,daily during season,approved-listed-downloads-only
+NHL,https://api-web.nhle.com/v1,Public game and schedule data; cache politely,yes,yes,verify terms before wider redistribution,NHL public API/pages,2026-08-02,daily during season,approved-with-cache-and-hash
+NHL Assets,https://assets.nhle.com/,Headshots and logos subject to branding/asset-use review,verify before automation,limited,do not imply endorsement,NHL assets,2026-08-02,as needed,review-required

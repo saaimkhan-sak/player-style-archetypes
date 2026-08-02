@@ -14,8 +14,16 @@ def norm_pos(p: str) -> str:
     return p
 
 
-REQ_REG = ["reg_games","reg_avg_toi_min","reg_goals","reg_assists","reg_points","reg_shots","reg_plus_minus","reg_pim"]
-REQ_PO  = ["po_games","po_avg_toi_min","po_goals","po_assists","po_points","po_shots","po_plus_minus","po_pim"]
+REQ_REG = ["reg_games","reg_toi_s","reg_avg_toi_min","reg_goals","reg_assists","reg_points","reg_shots","reg_plus_minus","reg_pim"]
+REQ_PO  = ["po_games","po_toi_s","po_avg_toi_min","po_goals","po_assists","po_points","po_shots","po_plus_minus","po_pim"]
+QUALITY_COLS = [
+    "reg_boxscore_observed",
+    "po_boxscore_observed",
+    "moneypuck_observed",
+    "source_coverage_score",
+    "reg_data_state",
+    "po_data_state",
+]
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -64,7 +72,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "season","player_id","full_name","teams_played","position",
             *REQ_REG, *REQ_PO,
             "top_cluster","confidence",
-        ] + pcols
+        ] + [c for c in QUALITY_COLS if c in df.columns] + pcols
 
         out = df[keep].copy()
         outpath = outdir / f"players_{group}_{season}.parquet"

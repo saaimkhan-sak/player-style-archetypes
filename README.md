@@ -9,6 +9,11 @@ The project:
 4. Fits NMF + GMM models for soft player archetypes.
 5. Publishes Streamlit views for season-level analysis, roster fit, comps, and player evolution.
 
+The 2025–26 release is source-closed through the June 14, 2026 Stanley Cup
+Final: 1,312 regular-season games plus 82 playoff games are reconciled to the
+official NHL schedule, and MoneyPuck playoff inputs come from its listed
+game-by-game downloads rather than saved HTML pages.
+
 ## Current Shape
 
 - Streamlit entrypoint: `app/Home.py`
@@ -57,6 +62,19 @@ python pipelines/99_build_all_seasons.py --start_year 2008 --end_year 2025 --dow
 
 The advanced-data build starts at 2008-09 because that is the first season covered by the MoneyPuck player files currently used by the project. The all-season runner uses the active Python interpreter, so run it from the activated virtual environment.
 
+Validate a completed release before publishing:
+
+```bash
+python scripts/validate_game_universe.py --season_label 20252026 --as_of_date 2026-08-02 --require_regular_games 1312 --require_playoff_games 82 --require_final
+python scripts/validate_moneypuck_coverage.py --season_label 20252026 --as_of_date 2026-08-02 --require_playoff_games 82
+python scripts/audit_style_features.py --season_label 20252026
+```
+
+The v2 feature contract is in `config/style_feature_contract_v2.yaml`. It
+keeps style signals separate from role/deployment and outcomes, uses one
+canonical event measure per concept, and records source coverage and missing
+data states.
+
 ## Daily Refresh
 
 GitHub Actions runs `.github/workflows/refresh-data.yml` every day at 9am America/New_York time. The workflow:
@@ -65,7 +83,8 @@ GitHub Actions runs `.github/workflows/refresh-data.yml` every day at 9am Americ
 2. Reconciles the NHL schedule and downloads completed game boxscores/play-by-play.
 3. Rebuilds the current season models, app tables, reports, playoff projections, and line combinations.
 4. Runs the health check and smoke tests.
-5. Commits `data/app`, `reports`, and `models` back to `main` only when generated artifacts changed.
+5. Rebuilds and verifies the static `web/data` bundle, including an immutable snapshot manifest.
+6. Commits `data/app`, `reports`, `models`, and `web/data` back to the authoritative production branch only when generated artifacts changed.
 
 You can also start it manually from the GitHub Actions tab and optionally pass a season label such as `20252026`.
 

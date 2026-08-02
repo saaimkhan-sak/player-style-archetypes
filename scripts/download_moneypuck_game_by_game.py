@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import re
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Sequence
 from urllib.error import HTTPError, URLError
@@ -105,6 +108,21 @@ def download_kind(start_year: int, kind: str, out_dir: Path, sleep_s: float, ret
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / KINDS[kind].format(start_year=start_year)
     out.to_csv(out_path, index=False)
+    manifest = {
+        "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        "source_roots": [
+            f"{BASE_URL}/{start_year}/regular/{kind}/",
+            f"{BASE_URL}/{start_year}/playoffs/{kind}/",
+        ],
+        "path": str(out_path),
+        "sha256": hashlib.sha256(out_path.read_bytes()).hexdigest(),
+        "row_count": len(out),
+        "max_game_date": str(out["gameDate"].max()) if "gameDate" in out.columns else None,
+        "game_id_count": int(out["gameId"].nunique()) if "gameId" in out.columns else None,
+    }
+    (out_dir / f"download_manifest_{start_year}_{kind}.json").write_text(
+        json.dumps(manifest, indent=2), encoding="utf-8"
+    )
     print(f"Saved {len(out):,} rows -> {out_path}")
     return out_path
 

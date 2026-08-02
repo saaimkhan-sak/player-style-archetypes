@@ -216,7 +216,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     reg = agg_for_type(2, "reg_")
     po  = agg_for_type(3, "po_")
 
-    ps = pd.merge(reg, po, on=["season","player_id"], how="outer").fillna(0)
+    ps = pd.merge(reg, po, on=["season","player_id"], how="outer")
+    ps["reg_boxscore_observed"] = ps["reg_games"].notna()
+    ps["po_boxscore_observed"] = ps["po_games"].notna()
     ps = ps.merge(pos_df, on=["season","player_id"], how="left")
 
     mp_path = outdir / f"player_season_moneypuck_{args.season_label}.parquet"
@@ -225,6 +227,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         mp["player_id"] = pd.to_numeric(mp["player_id"], errors="coerce").astype("Int64")
         ps["player_id"] = pd.to_numeric(ps["player_id"], errors="coerce").astype("Int64")
         ps = ps.merge(mp, on=["season","player_id"], how="left")
+        ps["moneypuck_observed"] = ps["mp_name"].notna()
+    else:
+        ps["moneypuck_observed"] = False
+
+    ps["source_coverage_score"] = ps[
+        ["reg_boxscore_observed", "po_boxscore_observed", "moneypuck_observed"]
+    ].mean(axis=1)
+    ps["reg_data_state"] = np.where(ps["reg_boxscore_observed"], "observed", "unknown")
+    ps["po_data_state"] = np.where(ps["po_boxscore_observed"], "observed", "not_applicable")
+    for column in ps.columns:
+        if pd.api.types.is_bool_dtype(ps[column]):
+            ps[column] = ps[column].fillna(False)
+        elif pd.api.types.is_numeric_dtype(ps[column]):
+            ps[column] = ps[column].fillna(0)
+        else:
+            ps[column] = ps[column].fillna("")
 
     ps_path = outdir / f"player_season_boxscore_{args.season_label}.parquet"
     ps.to_parquet(ps_path, index=False)
