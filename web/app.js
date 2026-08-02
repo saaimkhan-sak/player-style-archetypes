@@ -4517,7 +4517,7 @@ async function init() {
     const oldest = appState.core.meta.seasons.at(-1).label;
     const latest = appState.core.meta.seasons[0].label;
     document.querySelector("#coverage-label").textContent =
-      `${latest} complete · PO through ${meta.playoffDataThrough || "—"}`;
+      `${latest} complete · PO through ${appState.core.meta.playoffDataThrough || "—"}`;
     await renderRoute();
   } catch (error) {
     showError(error);
