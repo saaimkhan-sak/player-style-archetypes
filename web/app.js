@@ -751,6 +751,45 @@ function setupHeroRink(canvas) {
   if (!canvas) return;
   const context = canvas.getContext("2d");
   const wrapper = canvas.parentElement;
+  const referenceImage = new Image();
+  const referenceWidth = 240;
+  const referenceHeight = 268;
+
+  function drawReferenceRink() {
+    const width = Math.max(wrapper.clientWidth, 250);
+    const height = Math.max(wrapper.clientHeight, 150);
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = width * ratio;
+    canvas.height = height * ratio;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, width, height);
+
+    const scale = Math.min((width - 14) / referenceWidth, (height - 14) / referenceHeight);
+    const offsetX = (width - referenceWidth * scale) / 2;
+    const offsetY = (height - referenceHeight * scale) / 2;
+    context.setTransform(
+      ratio * scale,
+      0,
+      0,
+      ratio * scale,
+      ratio * offsetX,
+      ratio * offsetY,
+    );
+    if (referenceImage.complete && referenceImage.naturalWidth) {
+      context.drawImage(referenceImage, 0, 0, referenceWidth, referenceHeight);
+    }
+  }
+
+  referenceImage.addEventListener("load", drawReferenceRink);
+  referenceImage.src = "data/hero-rink-reference.png";
+  drawReferenceRink();
+  const referenceObserver = new ResizeObserver(drawReferenceRink);
+  referenceObserver.observe(wrapper);
+  appState.canvasCleanups.push(() => referenceObserver.disconnect());
+  return;
+
   const styles = getComputedStyle(document.documentElement);
   const colors = {
     board: "#2c3b53",
