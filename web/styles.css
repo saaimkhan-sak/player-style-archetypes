@@ -484,6 +484,10 @@ h3 {
   background: var(--line);
 }
 
+.overview-metric-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .metric {
   min-height: 132px;
   padding: 24px;

@@ -1009,7 +1009,6 @@ function renderOverview() {
   const { meta } = appState.core;
   const oldest = meta.seasons.at(-1).label;
   const latest = meta.seasons[0].label;
-  const styleBreakdown = meta.namedStyleBreakdown;
 
   main.innerHTML = `
     <article class="page">
@@ -1037,7 +1036,7 @@ function renderOverview() {
         </div>
       </section>
 
-      <section class="metric-grid" aria-label="Dataset summary">
+      <section class="metric-grid overview-metric-grid" aria-label="Dataset summary">
         <div class="metric metric-coverage">
           <span class="metric-label">Season coverage</span>
           <span class="metric-value metric-season-range">
@@ -1046,8 +1045,7 @@ function renderOverview() {
           </span>
         </div>
         ${metric("Players analyzed", number(meta.playerCount), "NHL players")}
-        ${metric("Named labels", number(meta.namedStyleCount), `${styleBreakdown.forwards} forward · ${styleBreakdown.defense} defense; season-derived`)}
-        ${metric("Model contract", escapeHTML(meta.modelContractVersion || "style-v2.0.0"), "feature validity and source-state contract")}
+        ${metric("Different styles", number(meta.namedStyleCount), `${meta.namedStyleBreakdown.forwards} forward · ${meta.namedStyleBreakdown.defense} defense; season-derived`)}
       </section>
 
       <div class="overview-longform">
