@@ -987,12 +987,13 @@ function setupHeroRink(canvas) {
 
     // The reference play: black X/O markers, red forwards/defenders, and their routes.
     straightArrow([111, 31], [161, 69], colors.red, true);
+    straightArrow([84, 93], [44, 93], colors.red);
     straightArrow([168, 78], [168, 128], colors.red);
-    straightArrow([165, 239], [111, 244], colors.red);
+    straightArrow([164, 244], [103, 244], colors.red);
     straightArrow([64, 219], [88, 243], colors.ink, true);
     curveArrow([49, 91], [31, 86], [35, 102], [77, 126], colors.red);
     curveArrow([103, 99], [120, 110], [103, 112], [112, 128], colors.red);
-    curveArrow([126, 177], [107, 179], [113, 151], [118, 144], colors.red);
+    curveArrow([129, 135], [122, 132], [121, 146], [116, 151], colors.red);
     curveArrow([119, 186], [119, 216], [146, 235], [163, 242], colors.red);
 
     marker("X", 90, 32, colors.ink);
