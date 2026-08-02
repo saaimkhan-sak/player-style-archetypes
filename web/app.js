@@ -832,27 +832,44 @@ function setupHeroRink(canvas) {
       context.fill();
     }
 
+    function faceoffMarking(cx, cy) {
+      faceoffDot(cx, cy);
+      context.strokeStyle = colors.redLine;
+      context.lineWidth = 1.5;
+      const inner = 5.5;
+      const outer = 12;
+      const top = 8;
+      const upperBar = 1;
+      const lowerBar = 3;
+      const bottom = 10;
+      [
+        [[cx - outer, cy - upperBar], [cx - inner, cy - upperBar], [cx - inner, cy - top]],
+        [[cx + inner, cy - top], [cx + inner, cy - upperBar], [cx + outer, cy - upperBar]],
+        [[cx - outer, cy + lowerBar], [cx - inner, cy + lowerBar], [cx - inner, cy + bottom]],
+        [[cx + inner, cy + lowerBar], [cx + outer, cy + lowerBar], [cx + inner, cy + bottom]],
+      ].forEach((segments) => {
+        context.beginPath();
+        context.moveTo(segments[0][0], segments[0][1]);
+        context.lineTo(segments[1][0], segments[1][1]);
+        context.lineTo(segments[2][0], segments[2][1]);
+        context.stroke();
+      });
+    }
+
     function faceoffCircle(cx, cy) {
       context.strokeStyle = colors.redLine;
       context.lineWidth = 1.7;
       context.beginPath();
       context.arc(cx, cy, 38, 0, Math.PI * 2);
       context.stroke();
-      faceoffDot(cx, cy);
-      context.lineWidth = 1;
-      context.beginPath();
-      context.moveTo(cx - 12, cy);
-      context.lineTo(cx + 12, cy);
-      context.moveTo(cx, cy - 12);
-      context.lineTo(cx, cy + 12);
-      context.stroke();
+      faceoffMarking(cx, cy);
 
       // The reference uses two short vertical hashmarks above and below each circle.
       context.lineWidth = 1.5;
-      [[cx - 12, cy - 48, cx - 12, cy - 37],
-        [cx + 12, cy - 48, cx + 12, cy - 37],
-        [cx - 12, cy + 37, cx - 12, cy + 48],
-        [cx + 12, cy + 37, cx + 12, cy + 48]].forEach(([x1, y1, x2, y2]) => {
+      [[cx - 7.5, cy - 44, cx - 7.5, cy - 37],
+        [cx + 7.5, cy - 44, cx + 7.5, cy - 37],
+        [cx - 7.5, cy + 37, cx - 7.5, cy + 44],
+        [cx + 7.5, cy + 37, cx + 7.5, cy + 44]].forEach(([x1, y1, x2, y2]) => {
         context.beginPath();
         context.moveTo(x1, y1);
         context.lineTo(x2, y2);
@@ -869,14 +886,7 @@ function setupHeroRink(canvas) {
     context.beginPath();
     context.arc(240, 134, 38, 0, Math.PI * 2);
     context.stroke();
-    faceoffDot(240, 134, 2);
-    context.lineWidth = 1;
-    context.beginPath();
-    context.moveTo(228, 134);
-    context.lineTo(252, 134);
-    context.moveTo(240, 122);
-    context.lineTo(240, 146);
-    context.stroke();
+    faceoffMarking(240, 134);
 
     function drawNet(xPosition) {
       context.strokeStyle = colors.red;
