@@ -847,16 +847,12 @@ function setupHeroRink(canvas) {
       context.lineTo(cx, cy + 12);
       context.stroke();
 
-      // Four pairs of short hashmarks sit just outside the faceoff circle.
-      context.lineWidth = 1.2;
-      [[cx - 12, cy - 45, cx - 12, cy - 32],
-        [cx + 12, cy - 45, cx + 12, cy - 32],
-        [cx - 12, cy + 32, cx - 12, cy + 45],
-        [cx + 12, cy + 32, cx + 12, cy + 45],
-        [cx - 45, cy - 12, cx - 32, cy - 12],
-        [cx - 45, cy + 12, cx - 32, cy + 12],
-        [cx + 32, cy - 12, cx + 45, cy - 12],
-        [cx + 32, cy + 12, cx + 45, cy + 12]].forEach(([x1, y1, x2, y2]) => {
+      // The reference uses two short vertical hashmarks above and below each circle.
+      context.lineWidth = 1.5;
+      [[cx - 12, cy - 48, cx - 12, cy - 37],
+        [cx + 12, cy - 48, cx + 12, cy - 37],
+        [cx - 12, cy + 37, cx - 12, cy + 48],
+        [cx + 12, cy + 37, cx + 12, cy + 48]].forEach(([x1, y1, x2, y2]) => {
         context.beginPath();
         context.moveTo(x1, y1);
         context.lineTo(x2, y2);
