@@ -764,22 +764,6 @@ function setupHeroRink(canvas) {
   const artWidth = 240;
   const artHeight = 268;
 
-  function roundedRectPath(target, left, top, width, height, radius) {
-    const right = left + width;
-    const bottom = top + height;
-    target.beginPath();
-    target.moveTo(left + radius, top);
-    target.lineTo(right - radius, top);
-    target.quadraticCurveTo(right, top, right, top + radius);
-    target.lineTo(right, bottom - radius);
-    target.quadraticCurveTo(right, bottom, right - radius, bottom);
-    target.lineTo(left + radius, bottom);
-    target.quadraticCurveTo(left, bottom, left, bottom - radius);
-    target.lineTo(left, top + radius);
-    target.quadraticCurveTo(left, top, left + radius, top);
-    target.closePath();
-  }
-
   function draw() {
     const width = Math.max(wrapper.clientWidth, 250);
     const height = Math.max(wrapper.clientHeight, 150);
@@ -816,6 +800,17 @@ function setupHeroRink(canvas) {
       target.closePath();
     }
 
+    function boardOutlinePath(target) {
+      target.beginPath();
+      target.moveTo(58, rink.top);
+      target.lineTo(240, rink.top);
+      target.moveTo(240, rink.top + rink.height);
+      target.lineTo(58, rink.top + rink.height);
+      target.quadraticCurveTo(rink.left, rink.top + rink.height, rink.left, rink.top + rink.height - rink.radius);
+      target.lineTo(rink.left, rink.top + rink.radius);
+      target.quadraticCurveTo(rink.left, rink.top, 58, rink.top);
+    }
+
     leftHalfPath(context);
     context.save();
     context.clip();
@@ -829,7 +824,13 @@ function setupHeroRink(canvas) {
 
     verticalLine(171, colors.blue, 3);
     verticalLine(240, colors.redLine, 3);
-    verticalLine(313, colors.blue, 3);
+
+    function faceoffDot(cx, cy, radius = 2) {
+      context.fillStyle = colors.redLine;
+      context.beginPath();
+      context.arc(cx, cy, radius, 0, Math.PI * 2);
+      context.fill();
+    }
 
     function faceoffCircle(cx, cy) {
       context.strokeStyle = colors.redLine;
@@ -837,10 +838,7 @@ function setupHeroRink(canvas) {
       context.beginPath();
       context.arc(cx, cy, 38, 0, Math.PI * 2);
       context.stroke();
-      context.fillStyle = colors.redLine;
-      context.beginPath();
-      context.arc(cx, cy, 2, 0, Math.PI * 2);
-      context.fill();
+      faceoffDot(cx, cy);
       context.lineWidth = 1;
       context.beginPath();
       context.moveTo(cx - 12, cy);
@@ -848,13 +846,41 @@ function setupHeroRink(canvas) {
       context.moveTo(cx, cy - 12);
       context.lineTo(cx, cy + 12);
       context.stroke();
-      context.beginPath();
-      context.arc(cx - 14, cy, 6, -Math.PI / 2, Math.PI / 2);
-      context.arc(cx + 14, cy, 6, Math.PI / 2, -Math.PI / 2);
-      context.stroke();
+
+      // Four pairs of short hashmarks sit just outside the faceoff circle.
+      context.lineWidth = 1.2;
+      [[cx - 12, cy - 45, cx - 12, cy - 32],
+        [cx + 12, cy - 45, cx + 12, cy - 32],
+        [cx - 12, cy + 32, cx - 12, cy + 45],
+        [cx + 12, cy + 32, cx + 12, cy + 45],
+        [cx - 45, cy - 12, cx - 32, cy - 12],
+        [cx - 45, cy + 12, cx - 32, cy + 12],
+        [cx + 32, cy - 12, cx + 45, cy - 12],
+        [cx + 32, cy + 12, cx + 45, cy + 12]].forEach(([x1, y1, x2, y2]) => {
+        context.beginPath();
+        context.moveTo(x1, y1);
+        context.lineTo(x2, y2);
+        context.stroke();
+      });
     }
 
     [76, 193].forEach((cy) => faceoffCircle(84, cy));
+    [76, 193].forEach((cy) => faceoffDot(185, cy, 2.2));
+
+    // The center circle is centered on the red line, so only its left half is visible.
+    context.strokeStyle = colors.redLine;
+    context.lineWidth = 1.7;
+    context.beginPath();
+    context.arc(240, 134, 38, 0, Math.PI * 2);
+    context.stroke();
+    faceoffDot(240, 134, 2);
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(228, 134);
+    context.lineTo(252, 134);
+    context.moveTo(240, 122);
+    context.lineTo(240, 146);
+    context.stroke();
 
     function drawNet(xPosition) {
       context.strokeStyle = colors.red;
@@ -955,9 +981,15 @@ function setupHeroRink(canvas) {
     marker("D1", 164, 244, colors.red);
 
     context.restore();
-    leftHalfPath(context);
+    boardOutlinePath(context);
     context.strokeStyle = colors.board;
     context.lineWidth = 2.4;
+    context.stroke();
+    context.strokeStyle = colors.redLine;
+    context.lineWidth = 2.2;
+    context.beginPath();
+    context.moveTo(240, rink.top);
+    context.lineTo(240, rink.top + rink.height);
     context.stroke();
   }
 
