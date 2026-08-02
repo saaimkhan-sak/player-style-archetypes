@@ -749,24 +749,40 @@ function setupLineChart(canvas, series, options = {}) {
 
 function setupHeroRink(canvas) {
   if (!canvas) return;
-  // NHL 2025-26 Official Rules, Section 1: 200' x 85' rink, 28' corners,
-  // goal/blue-line locations, faceoff geometry, crease, and restricted area.
   const context = canvas.getContext("2d");
   const wrapper = canvas.parentElement;
   const styles = getComputedStyle(document.documentElement);
   const colors = {
-    board: styles.getPropertyValue("--navy-900").trim(),
-    ice: styles.getPropertyValue("--paper-strong").trim(),
-    red: styles.getPropertyValue("--coral").trim(),
-    aqua: styles.getPropertyValue("--aqua").trim(),
-    gold: styles.getPropertyValue("--gold").trim(),
-    blue: "#3974bb",
-    crease: "rgba(33, 182, 168, 0.22)",
+    board: "#2c3b53",
+    ice: "#fffefa",
+    red: "#c92525",
+    redLine: "#bc8d9a",
+    blue: "#9caab4",
+    ink: "#111820",
+    logo: "#8997a0",
   };
+  const artWidth = 240;
+  const artHeight = 268;
+
+  function roundedRectPath(target, left, top, width, height, radius) {
+    const right = left + width;
+    const bottom = top + height;
+    target.beginPath();
+    target.moveTo(left + radius, top);
+    target.lineTo(right - radius, top);
+    target.quadraticCurveTo(right, top, right, top + radius);
+    target.lineTo(right, bottom - radius);
+    target.quadraticCurveTo(right, bottom, right - radius, bottom);
+    target.lineTo(left + radius, bottom);
+    target.quadraticCurveTo(left, bottom, left, bottom - radius);
+    target.lineTo(left, top + radius);
+    target.quadraticCurveTo(left, top, left + radius, top);
+    target.closePath();
+  }
 
   function draw() {
     const width = Math.max(wrapper.clientWidth, 250);
-    const height = Math.max(wrapper.clientHeight, 250);
+    const height = Math.max(wrapper.clientHeight, 150);
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = width * ratio;
     canvas.height = height * ratio;
@@ -775,228 +791,174 @@ function setupHeroRink(canvas) {
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, width, height);
 
-    const padding = width < 320 ? 14 : 20;
-    const scale = Math.min(
-      (width - padding * 2) / 100,
-      (height - padding * 2) / 85,
+    const scale = Math.min((width - 14) / artWidth, (height - 14) / artHeight);
+    const offsetX = (width - artWidth * scale) / 2;
+    const offsetY = (height - artHeight * scale) / 2;
+    context.setTransform(
+      ratio * scale,
+      0,
+      0,
+      ratio * scale,
+      ratio * offsetX,
+      ratio * offsetY,
     );
-    const rinkWidth = 100 * scale;
-    const rinkHeight = 85 * scale;
-    const left = (width - rinkWidth) / 2;
-    const top = (height - rinkHeight) / 2;
-    const x = (feet) => left + feet * scale;
-    const y = (feet) => top + (42.5 + feet) * scale;
-    const lineWidth = (feet, minimum = 1) =>
-      Math.max(minimum, feet * scale);
 
-    const rink = new Path2D();
-    rink.moveTo(x(0), y(-42.5));
-    rink.lineTo(x(72), y(-42.5));
-    rink.arc(x(72), y(-14.5), 28 * scale, -Math.PI / 2, 0);
-    rink.lineTo(x(100), y(14.5));
-    rink.arc(x(72), y(14.5), 28 * scale, 0, Math.PI / 2);
-    rink.lineTo(x(0), y(42.5));
-    rink.closePath();
+    const rink = { left: 2, top: 16, width: 238, height: 236, radius: 58 };
+    function leftHalfPath(target) {
+      target.beginPath();
+      target.moveTo(58, rink.top);
+      target.lineTo(240, rink.top);
+      target.lineTo(240, rink.top + rink.height);
+      target.lineTo(58, rink.top + rink.height);
+      target.quadraticCurveTo(rink.left, rink.top + rink.height, rink.left, rink.top + rink.height - rink.radius);
+      target.lineTo(rink.left, rink.top + rink.radius);
+      target.quadraticCurveTo(rink.left, rink.top, 58, rink.top);
+      target.closePath();
+    }
 
+    leftHalfPath(context);
     context.save();
-    context.clip(rink);
+    context.clip();
     context.fillStyle = colors.ice;
-    context.fillRect(left, top, rinkWidth, rinkHeight);
+    context.fillRect(0, 0, artWidth, artHeight);
 
-    function drawVerticalLine(feet, color, thicknessFeet) {
+    function verticalLine(position, color, thickness = 2) {
       context.fillStyle = color;
-      context.fillRect(
-        x(feet - thicknessFeet / 2),
-        y(-42.5),
-        lineWidth(thicknessFeet),
-        rinkHeight,
-      );
+      context.fillRect(position - thickness / 2, rink.top, thickness, rink.height);
     }
 
-    drawVerticalLine(0, colors.red, 1);
-    drawVerticalLine(25, colors.blue, 1);
-    drawVerticalLine(89, colors.red, 2 / 12);
+    verticalLine(171, colors.blue, 3);
+    verticalLine(240, colors.redLine, 3);
+    verticalLine(313, colors.blue, 3);
 
-    function strokeCircle(cx, cy, radius, color, thicknessFeet = 2 / 12) {
+    function faceoffCircle(cx, cy) {
+      context.strokeStyle = colors.redLine;
+      context.lineWidth = 1.7;
       context.beginPath();
-      context.arc(x(cx), y(cy), radius * scale, 0, Math.PI * 2);
-      context.strokeStyle = color;
-      context.lineWidth = lineWidth(thicknessFeet);
+      context.arc(cx, cy, 38, 0, Math.PI * 2);
       context.stroke();
-    }
-
-    function drawSpot(cx, cy, radius, color) {
+      context.fillStyle = colors.redLine;
       context.beginPath();
-      context.arc(x(cx), y(cy), radius * scale, 0, Math.PI * 2);
-      context.fillStyle = color;
+      context.arc(cx, cy, 2, 0, Math.PI * 2);
       context.fill();
+      context.lineWidth = 1;
+      context.beginPath();
+      context.moveTo(cx - 12, cy);
+      context.lineTo(cx + 12, cy);
+      context.moveTo(cx, cy - 12);
+      context.lineTo(cx, cy + 12);
+      context.stroke();
+      context.beginPath();
+      context.arc(cx - 14, cy, 6, -Math.PI / 2, Math.PI / 2);
+      context.arc(cx + 14, cy, 6, Math.PI / 2, -Math.PI / 2);
+      context.stroke();
     }
 
-    strokeCircle(0, 0, 15, colors.blue);
-    drawSpot(0, 0, 0.5, colors.blue);
+    [76, 193].forEach((cy) => faceoffCircle(84, cy));
 
-    for (const spotY of [-22, 22]) {
-      drawSpot(20, spotY, 1, colors.red);
-      strokeCircle(69, spotY, 15, colors.red);
-      drawSpot(69, spotY, 1, colors.red);
-
+    function drawNet(xPosition) {
       context.strokeStyle = colors.red;
-      context.lineWidth = lineWidth(2 / 12);
-      for (const circleSide of [-1, 1]) {
-        for (const offsetY of [-3.79, 3.79]) {
-          context.beginPath();
-          context.moveTo(x(69 + circleSide * 15), y(spotY + offsetY));
-          context.lineTo(
-            x(69 + circleSide * 17.25),
-            y(spotY + offsetY),
-          );
-          context.stroke();
-        }
-      }
-
-      for (const sideX of [-1, 1]) {
-        for (const sideY of [-1, 1]) {
-          const innerX = 69 + sideX * 2;
-          const outerX = 69 + sideX * 6;
-          const innerY = spotY + sideY * 2;
-          const outerY = spotY + sideY * 5;
-          context.beginPath();
-          context.moveTo(x(innerX), y(innerY));
-          context.lineTo(x(outerX), y(innerY));
-          context.lineTo(x(outerX), y(outerY));
-          context.stroke();
-        }
-      }
-    }
-
-    context.strokeStyle = colors.red;
-    context.lineWidth = lineWidth(2 / 12);
-    context.beginPath();
-    context.moveTo(x(89), y(-11));
-    context.lineTo(x(100), y(-14));
-    context.moveTo(x(89), y(11));
-    context.lineTo(x(100), y(14));
-    context.stroke();
-
-    const creaseRadius = 6 * scale;
-    const creaseAngle = Math.atan2(4, Math.sqrt(20));
-    context.beginPath();
-    context.moveTo(x(89), y(-4));
-    context.lineTo(x(89 - Math.sqrt(20)), y(-4));
-    context.arc(
-      x(89),
-      y(0),
-      creaseRadius,
-      -Math.PI + creaseAngle,
-      Math.PI - creaseAngle,
-      true,
-    );
-    context.lineTo(x(89), y(4));
-    context.closePath();
-    context.fillStyle = colors.crease;
-    context.fill();
-    context.strokeStyle = colors.red;
-    context.lineWidth = lineWidth(2 / 12);
-    context.stroke();
-
-    for (const creaseY of [-4, 4]) {
+      context.lineWidth = 1.5;
+      context.strokeRect(xPosition, 123, 12, 23);
       context.beginPath();
-      context.moveTo(x(85), y(creaseY));
-      context.lineTo(x(85 + 5 / 12), y(creaseY));
+      context.moveTo(xPosition + 4, 123);
+      context.lineTo(xPosition + 4, 146);
+      context.moveTo(xPosition + 8, 123);
+      context.lineTo(xPosition + 8, 146);
       context.stroke();
     }
 
-    context.strokeStyle = colors.red;
-    context.lineWidth = Math.max(1.5, lineWidth(2 / 12));
-    context.lineJoin = "round";
-    context.beginPath();
-    context.moveTo(x(89), y(-3));
-    context.lineTo(x(92.68), y(-2.4));
-    context.lineTo(x(92.68), y(2.4));
-    context.lineTo(x(89), y(3));
-    context.moveTo(x(89), y(-3));
-    context.lineTo(x(89), y(3));
-    context.stroke();
+    drawNet(25);
 
-    function drawPlayArrow(start, controlOne, controlTwo, end, color) {
+    function arrowHead(xPosition, yPosition, angle, color, size = 8) {
       context.save();
+      context.fillStyle = color;
       context.beginPath();
-      context.moveTo(x(start[0]), y(start[1]));
-      context.bezierCurveTo(
-        x(controlOne[0]),
-        y(controlOne[1]),
-        x(controlTwo[0]),
-        y(controlTwo[1]),
-        x(end[0]),
-        y(end[1]),
-      );
-      context.strokeStyle = color;
-      context.globalAlpha = 0.78;
-      context.lineWidth = Math.max(1.5, lineWidth(7 / 12));
-      context.lineCap = "round";
-      context.stroke();
-
-      const angle = Math.atan2(
-        y(end[1]) - y(controlTwo[1]),
-        x(end[0]) - x(controlTwo[0]),
-      );
-      const arrowSize = Math.max(5, 2.5 * scale);
-      context.beginPath();
-      context.moveTo(x(end[0]), y(end[1]));
+      context.moveTo(xPosition, yPosition);
       context.lineTo(
-        x(end[0]) - Math.cos(angle - Math.PI / 6) * arrowSize,
-        y(end[1]) - Math.sin(angle - Math.PI / 6) * arrowSize,
+        xPosition - Math.cos(angle - Math.PI / 6) * size,
+        yPosition - Math.sin(angle - Math.PI / 6) * size,
       );
       context.lineTo(
-        x(end[0]) - Math.cos(angle + Math.PI / 6) * arrowSize,
-        y(end[1]) - Math.sin(angle + Math.PI / 6) * arrowSize,
+        xPosition - Math.cos(angle + Math.PI / 6) * size,
+        yPosition - Math.sin(angle + Math.PI / 6) * size,
       );
       context.closePath();
-      context.fillStyle = color;
       context.fill();
       context.restore();
     }
 
-    function drawPlayMarker(type, markerX, markerY, color) {
-      const markerSize = 2.35 * scale;
+    function curveArrow(start, controlOne, controlTwo, end, color, dashed = false) {
       context.save();
       context.strokeStyle = color;
-      context.lineWidth = Math.max(1.8, lineWidth(3 / 4));
+      context.lineWidth = 1.6;
       context.lineCap = "round";
-      if (type === "o") {
-        context.beginPath();
-        context.arc(x(markerX), y(markerY), markerSize, 0, Math.PI * 2);
-        context.stroke();
-      } else {
-        context.beginPath();
-        context.moveTo(x(markerX) - markerSize, y(markerY) - markerSize);
-        context.lineTo(x(markerX) + markerSize, y(markerY) + markerSize);
-        context.moveTo(x(markerX) + markerSize, y(markerY) - markerSize);
-        context.lineTo(x(markerX) - markerSize, y(markerY) + markerSize);
-        context.stroke();
-      }
+      context.setLineDash(dashed ? [4, 4] : []);
+      context.beginPath();
+      context.moveTo(start[0], start[1]);
+      context.bezierCurveTo(
+        controlOne[0], controlOne[1], controlTwo[0], controlTwo[1], end[0], end[1],
+      );
+      context.stroke();
+      context.setLineDash([]);
+      const angle = Math.atan2(end[1] - controlTwo[1], end[0] - controlTwo[0]);
+      arrowHead(end[0], end[1], angle, color, 7);
       context.restore();
     }
 
-    drawPlayArrow([44, -21], [50, -31], [59, -29], [63, -17], colors.aqua);
-    drawPlayArrow([56, 7], [64, -1], [72, -3], [78, 0], colors.gold);
-    drawPlayArrow([51, 21], [59, 13], [68, 17], [74, 23], colors.aqua);
+    function straightArrow(start, end, color, dashed = false) {
+      context.save();
+      context.strokeStyle = color;
+      context.lineWidth = 1.5;
+      context.setLineDash(dashed ? [4, 4] : []);
+      context.beginPath();
+      context.moveTo(start[0], start[1]);
+      context.lineTo(end[0], end[1]);
+      context.stroke();
+      context.setLineDash([]);
+      arrowHead(end[0], end[1], Math.atan2(end[1] - start[1], end[0] - start[0]), color, 7);
+      context.restore();
+    }
 
-    [
-      ["o", 42, -22, colors.board],
-      ["o", 55, 8, colors.board],
-      ["o", 77, 25, colors.board],
-      ["x", 49, 23, colors.red],
-      ["x", 65, -15, colors.red],
-      ["x", 81, 2, colors.red],
-    ].forEach(([type, markerX, markerY, color]) => {
-      drawPlayMarker(type, markerX, markerY, color);
-    });
+    function marker(label, cx, cy, fill, textColor = "#fff", radius = 8) {
+      context.fillStyle = fill;
+      context.beginPath();
+      context.arc(cx, cy, radius, 0, Math.PI * 2);
+      context.fill();
+      context.fillStyle = textColor;
+      context.font = `700 ${label.length > 1 ? 8 : 9}px Arial, sans-serif`;
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillText(label, cx, cy + 0.5);
+    }
+
+    // The reference play: black X/O markers, red forwards/defenders, and their routes.
+    straightArrow([111, 31], [161, 69], colors.red, true);
+    straightArrow([168, 78], [168, 128], colors.red);
+    straightArrow([165, 239], [111, 244], colors.red);
+    straightArrow([64, 219], [88, 243], colors.ink, true);
+    curveArrow([49, 91], [31, 86], [35, 102], [77, 126], colors.red);
+    curveArrow([103, 99], [120, 110], [103, 112], [112, 128], colors.red);
+    curveArrow([126, 177], [107, 179], [113, 151], [118, 144], colors.red);
+    curveArrow([119, 186], [119, 216], [146, 235], [163, 242], colors.red);
+
+    marker("X", 90, 32, colors.ink);
+    marker("X", 22, 93, colors.ink);
+    marker("G", 43, 134, colors.ink);
+    marker("X", 94, 140, colors.ink);
+    marker("X", 20, 209, colors.ink);
+    marker("X", 88, 246, colors.ink);
+    marker("F2", 92, 93, colors.red);
+    marker("F3", 146, 134, colors.red);
+    marker("F1", 91, 174, colors.red);
+    marker("D2", 167, 73, colors.red);
+    marker("D1", 164, 244, colors.red);
 
     context.restore();
+    leftHalfPath(context);
     context.strokeStyle = colors.board;
-    context.lineWidth = Math.max(2, lineWidth(8 / 12));
-    context.stroke(rink);
+    context.lineWidth = 2.4;
+    context.stroke();
   }
 
   draw();
