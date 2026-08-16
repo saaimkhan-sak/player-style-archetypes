@@ -1,5 +1,14 @@
 # Data Refresh Log
 
+## 2026-08-16 10:03:17 EDT
+
+- Season refreshed: `20252026`
+- Completed games included: `1,498`
+- Forward rows: `489`
+- Defense rows: `252`
+- Artifact changes before logging: `0`
+- Changed artifacts: `none`
+
 ## 2026-08-15 10:02:02 EDT
 
 - Season refreshed: `20252026`
