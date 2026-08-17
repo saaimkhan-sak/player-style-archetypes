@@ -8,3 +8,4 @@ data/processed/
 data/features/
 dir-structure.txt
 .streamlit/secrets.toml
+node_modules/
