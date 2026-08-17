@@ -4,5 +4,8 @@
   "private": true,
   "scripts": {
     "build": "node scripts/verify-build.mjs"
+  },
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1"
   }
 }
