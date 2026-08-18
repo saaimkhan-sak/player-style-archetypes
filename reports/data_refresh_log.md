@@ -1,5 +1,20 @@
 # Data Refresh Log
 
+## 2026-08-18 10:04:27 EDT
+
+- Season refreshed: `20252026`
+- Completed games included: `1,498`
+- Forward rows: `489`
+- Defense rows: `252`
+- Artifact changes before logging: `6`
+- Changed artifacts:
+  - `M data/app/players_defense_20252026.parquet`
+  - `M data/app/players_forwards_20252026.parquet`
+  - `M reports/archetype_cards_defense_20252026.csv`
+  - `M reports/archetype_cards_forwards_20252026.csv`
+  - `M reports/archetype_traits_defense_20252026.csv`
+  - `M reports/archetype_traits_forwards_20252026.csv`
+
 ## 2026-08-17 10:09:09 EDT
 
 - Season refreshed: `20252026`
